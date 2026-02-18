@@ -96,7 +96,7 @@ function getDaysAgo(dateString: string | null): string {
     return months === 1 ? '1 month ago' : `${months} months ago`;
 }
 
-function getDaysSince(dateString: string | null): number {
+function getDaysSince(dateString: string | null | undefined): number {
     if (!dateString) return -1;
     const now = new Date();
     const date = new Date(dateString);
