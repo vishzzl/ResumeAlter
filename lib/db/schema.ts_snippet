@@ -1,0 +1,17 @@
+export const profiles = sqliteTable('profiles', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name'),
+    email: text('email'),
+    phone: text('phone'),
+    linkedin: text('linkedin'),
+    website: text('website'),
+    summary: text('summary'),
+    experience: text('experience'), // JSON Array
+    education: text('education'), // JSON Array
+    skills: text('skills'), // JSON Array or Object
+    projects: text('projects'), // JSON Array
+    updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
+});
+
+export type Profile = typeof profiles.$inferSelect;
+export type NewProfile = typeof profiles.$inferInsert;
