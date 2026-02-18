@@ -109,6 +109,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const [atsScore, setAtsScore] = useState<{ before: number, after: number, analysis: string } | null>(initialAnalysis.atsScore || null);
     const [executionTime, setExecutionTime] = useState<number | null>(initialAnalysis.executionTime || null);
     const [resultViewMode, setResultViewMode] = useState<'preview' | 'diff'>('preview');
+    const [tailorPhase, setTailorPhase] = useState<'tailoring' | 'analyzing' | 'complete' | null>(null);
 
     // Cover Letter State
     const [coverLetter, setCoverLetter] = useState(app.coverLetter || '');
@@ -127,6 +128,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'classic' | 'minimal'>('modern');
     const [showChanges, setShowChanges] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [pdfGenerating, setPdfGenerating] = useState(false);
 
     // Workflow step status
     const hasJobData = !!(jobDescription || jobDetails);
@@ -378,6 +380,8 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const handleTailor = async () => {
         setLoading(true);
         setError(null);
+        setTailorPhase('tailoring');
+
         try {
             const apiKey = localStorage.getItem('gemini_api_key');
             let finalJobDescription = jobDescription;
@@ -397,7 +401,9 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                 parts.push(`\nAdditional Context (Cleaned Description):\n${jobDetails.description || jobDescription}`);
                 finalJobDescription = parts.join('\n');
             }
+
             const startTime = performance.now();
+
             const res = await fetch('/api/tailor', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -410,43 +416,108 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     customConfig: customModelConfig
                 }),
             });
-            const endTime = performance.now();
-            const duration = Math.round(endTime - startTime);
-            setExecutionTime(duration);
-            const data = await res.json();
+
             if (!res.ok) {
+                const data = await res.json();
                 throw new Error(data.error || `Server Error: ${res.status}`);
             }
-            if (data.tailoredResume) {
-                setTailoredResume(data.tailoredResume);
-                setChanges(data.changes || []);
-                if (data.atsScore) {
-                    setAtsScore(data.atsScore);
+
+            if (!res.body) throw new Error('No response body');
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let accumulatedData = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                accumulatedData += chunk;
+
+                // Process complete SSE messages
+                const lines = accumulatedData.split('\n\n');
+                accumulatedData = lines.pop() || ''; // Keep incomplete part
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const event = JSON.parse(line.slice(6));
+
+                            if (event.phase === 'tailoring') {
+                                setTailorPhase('tailoring');
+                            } else if (event.phase === 'tailored') {
+                                setTailoredResume(event.data.tailoredResume);
+                            } else if (event.phase === 'analyzing') {
+                                setTailorPhase('analyzing');
+                            } else if (event.phase === 'complete') {
+                                setTailorPhase('complete');
+                                if (event.data.atsScore) setAtsScore(event.data.atsScore);
+                                if (event.data.changes) setChanges(event.data.changes);
+
+                                const endTime = performance.now();
+                                const duration = Math.round(endTime - startTime);
+                                setExecutionTime(duration);
+
+                                await updateApplication(app.id, {
+                                    tailoredResume: tailoredResume, // Might need to use ref or callback if state isn't updated nicely in loop
+                                    // Use event data directly to be safe
+                                    analysis: JSON.stringify({
+                                        changes: event.data.changes || [],
+                                        atsScore: event.data.atsScore || null,
+                                        executionTime: duration
+                                    })
+                                });
+                                // Also update tailored resume in DB
+                                await updateApplication(app.id, { tailoredResume: event.data.tailoredResume || tailoredResume });
+                            } else if (event.phase === 'error') {
+                                throw new Error(event.error);
+                            }
+                        } catch (e) {
+                            console.error('Error parsing SSE event:', e);
+                        }
+                    }
                 }
-                await updateApplication(app.id, {
-                    tailoredResume: data.tailoredResume,
-                    analysis: JSON.stringify({
-                        changes: data.changes || [],
-                        atsScore: data.atsScore || null,
-                        executionTime: duration
-                    })
-                });
             }
+
         } catch (err) {
             console.error('Tailoring failed', err);
-            setError(err instanceof Error ? err.message : 'Failed to tailor resume. Please check your settings.');
+            setError(err instanceof Error ? err.message : 'Failed to tailor resume.');
         } finally {
             setLoading(false);
+            setTailorPhase(null);
         }
     };
 
-    const handleDownloadPDF = () => {
-        // Force preview mode for printing (diff view doesn't make sense in PDF)
+    const handleDownloadPDF = async () => {
+        // Force preview mode (diff view doesn't make sense in PDF)
         if (resultViewMode !== 'preview') {
             setResultViewMode('preview');
         }
-        // Small delay to let React re-render to preview mode before printing
-        setTimeout(() => window.print(), 100);
+
+        setPdfGenerating(true);
+        try {
+            // Small delay to let React re-render to preview mode
+            await new Promise(r => setTimeout(r, 300));
+
+            const { exportResumePDF } = await import('@/lib/pdf-export');
+            const container = document.getElementById('print-container');
+            const resumeEl = container?.querySelector('.resume-content') as HTMLElement | null;
+
+            if (!resumeEl) {
+                setError('Could not find resume content to export.');
+                return;
+            }
+
+            await exportResumePDF(resumeEl, {
+                fileName: `Resume-${app.companyName || 'Untitled'}-${app.jobTitle || 'Resume'}`,
+            });
+        } catch (err) {
+            console.error('PDF export failed:', err);
+            setError('PDF export failed. Please try again.');
+        } finally {
+            setPdfGenerating(false);
+        }
     };
 
     // ─── RENDER ───
@@ -497,11 +568,19 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     <button
                         onClick={handleTailor}
                         disabled={loading || !resumeText || !jobDescription}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-md hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-md hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all min-w-[120px] justify-center"
                     >
                         {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 text-indigo-300" />}
-                        <span className="hidden sm:inline">Tailor Resume</span>
-                        <span className="sm:hidden">Tailor</span>
+                        <span className="hidden sm:inline">
+                            {loading && tailorPhase === 'tailoring' ? 'Tailoring...' :
+                                loading && tailorPhase === 'analyzing' ? 'Analyzing...' :
+                                    'Tailor Resume'}
+                        </span>
+                        <span className="sm:hidden">
+                            {loading && tailorPhase === 'tailoring' ? 'Tailoring...' :
+                                loading && tailorPhase === 'analyzing' ? 'Analyzing...' :
+                                    'Tailor'}
+                        </span>
                     </button>
                 </div>
             </div>
@@ -934,9 +1013,11 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                     <div className="ml-auto shrink-0">
                                         <button
                                             onClick={handleDownloadPDF}
-                                            className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-indigo-600 px-2 py-1 rounded-md hover:bg-indigo-50 transition-colors"
+                                            disabled={pdfGenerating}
+                                            className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-indigo-600 px-2 py-1 rounded-md hover:bg-indigo-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
-                                            <Download className="h-3 w-3" /><span className="hidden sm:inline">PDF</span>
+                                            {pdfGenerating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                                            <span className="hidden sm:inline">{pdfGenerating ? 'Generating...' : 'PDF'}</span>
                                         </button>
                                     </div>
                                 </div>
@@ -1182,12 +1263,12 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                                         <p className="font-semibold text-slate-800 leading-snug">{change.reason}</p>
                                                         {change.original && (
                                                             <div className="text-slate-400 line-through bg-red-50/60 p-2 rounded-lg text-[10px] leading-relaxed">
-                                                                {change.original.substring(0, 80)}...
+                                                                {String(change.original || '').substring(0, 80)}...
                                                             </div>
                                                         )}
                                                         <div className="text-slate-700 pl-2.5 border-l-2 border-emerald-400 bg-emerald-50/50 p-2 rounded-r-lg">
                                                             <span className="font-semibold text-emerald-600 text-[10px]">Updated:</span>
-                                                            <span className="text-[10px] ml-1">{change.new.substring(0, 80)}...</span>
+                                                            <span className="text-[10px] ml-1">{String(change.new || '').substring(0, 80)}...</span>
                                                         </div>
                                                     </div>
                                                 ))}

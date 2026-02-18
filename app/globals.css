@@ -382,7 +382,16 @@ body {
 @media print {
   @page {
     size: A4;
-    margin: 14mm 16mm;
+    margin: 10mm 12mm;
+  }
+
+  /* ── 0. Universal Reset — Kill ALL dark backgrounds ── */
+  * {
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 
   /* ── 1. Global Reset ── */
@@ -392,8 +401,6 @@ body {
     padding: 0 !important;
     background: white !important;
     color: black !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
     width: 100% !important;
     height: auto !important;
     min-height: 0 !important;
@@ -418,7 +425,8 @@ body {
   body>div>div,
   body>div>div>main,
   body>div>div>main>div,
-  body>div>div>main>div>div {
+  body>div>div>main>div>div,
+  body>div>div>main>div>div>div {
     display: block !important;
     position: static !important;
     width: 100% !important;
@@ -432,6 +440,8 @@ body {
     box-shadow: none !important;
     border-radius: 0 !important;
     background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     flex: none !important;
   }
 
@@ -441,12 +451,7 @@ body {
     padding: 0 !important;
   }
 
-  /* ── 4. Hide the left input panel ── */
-  .shrink-0 {
-    display: none !important;
-  }
-
-  /* ── 5. Reset right panel wrappers ── */
+  /* ── 4. Reset output panel wrappers ── */
   .glass-card-solid {
     display: block !important;
     overflow: visible !important;
@@ -457,17 +462,6 @@ body {
     border-radius: 0 !important;
     padding: 0 !important;
     background: white !important;
-  }
-
-  .flex-1 {
-    display: block !important;
-    overflow: visible !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    flex: none !important;
-    padding: 0 !important;
-    border: none !important;
   }
 
   /* ── 6. Print Container ── */
@@ -487,9 +481,10 @@ body {
 
   /* ── 7. Resume Content — A4 Typography ── */
   .resume-content {
-    font-size: 9.5pt !important;
+    font-size: 11pt !important;
     line-height: 1.4 !important;
     color: #1a1a1a !important;
+    background: white !important;
     max-width: none !important;
     padding: 0 !important;
     margin: 0 !important;
@@ -497,7 +492,7 @@ body {
   }
 
   .resume-content h1 {
-    font-size: 18pt !important;
+    font-size: 20pt !important;
     font-weight: 800 !important;
     margin: 0 0 3pt 0 !important;
     padding: 0 0 4pt 0 !important;
@@ -507,13 +502,12 @@ body {
   }
 
   .resume-content h2 {
-    font-size: 11pt !important;
+    font-size: 13pt !important;
     font-weight: 700 !important;
-    margin: 10pt 0 3pt 0 !important;
+    margin: 8pt 0 3pt 0 !important;
     padding: 0 !important;
     color: #222 !important;
     line-height: 1.2 !important;
-    page-break-after: avoid !important;
     letter-spacing: 0.5pt !important;
   }
 
@@ -522,26 +516,25 @@ body {
   }
 
   .resume-content h3 {
-    font-size: 10pt !important;
+    font-size: 12pt !important;
     font-weight: 700 !important;
-    margin: 6pt 0 1pt 0 !important;
+    margin: 5pt 0 1pt 0 !important;
     padding: 0 !important;
     color: #222 !important;
     line-height: 1.2 !important;
-    page-break-after: avoid !important;
   }
 
   .resume-content h4 {
-    font-size: 10pt !important;
+    font-size: 11pt !important;
     font-weight: 600 !important;
-    margin: 5pt 0 1pt 0 !important;
+    margin: 4pt 0 1pt 0 !important;
     padding: 0 !important;
     color: #333 !important;
     line-height: 1.2 !important;
   }
 
   .resume-content p {
-    font-size: 9.5pt !important;
+    font-size: 11pt !important;
     margin: 0 0 2pt 0 !important;
     padding: 0 !important;
     line-height: 1.4 !important;
@@ -555,12 +548,11 @@ body {
   }
 
   .resume-content ul li {
-    font-size: 9pt !important;
+    font-size: 11pt !important;
     line-height: 1.35 !important;
     margin-bottom: 1pt !important;
     padding: 0 !important;
     color: #333 !important;
-    page-break-inside: avoid !important;
   }
 
   .resume-content ol {
@@ -569,7 +561,7 @@ body {
   }
 
   .resume-content ol li {
-    font-size: 9pt !important;
+    font-size: 11pt !important;
     line-height: 1.35 !important;
     margin-bottom: 1pt !important;
   }
@@ -587,26 +579,16 @@ body {
   }
 
   .resume-content hr {
-    margin: 5pt 0 !important;
+    margin: 4pt 0 !important;
     border: none !important;
     border-top: 0.5pt solid #ccc !important;
   }
 
-  /* ── 8. Page Break Control ── */
-  .resume-content h2,
-  .resume-content h3 {
-    page-break-after: avoid !important;
-  }
-
-  .resume-content ul,
-  .resume-content ol,
-  .resume-content p {
-    page-break-inside: avoid !important;
-  }
-
-  /* ── 9. Global cleanup ── */
+  /* ── 8. Force single page — no breaks ── */
   * {
-    box-shadow: none !important;
+    page-break-before: auto !important;
+    page-break-after: auto !important;
+    page-break-inside: auto !important;
   }
 }
 

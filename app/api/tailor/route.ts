@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getGeminiModel } from '@/lib/gemini';
 import { generateWithLocal } from '@/lib/ollama';
 import { generateWithCustom } from '@/lib/custom_llm';
@@ -63,48 +63,49 @@ function cleanJson(text: string) {
         jsonString = jsonString.substring(firstBrace, lastBrace + 1);
     }
 
-    // 3. Dangerous: Attempt to fix unescaped newlines in JSON values
-    // This regex looks for newlines that are NOT followed by a quote or } or , or ]
-    // It's a heuristic and might break valid JSON but helps with "bad" LLM output
-    // jsonString = jsonString.replace(/(?<!\\)\n/g, '\\n'); 
-
     return jsonString;
 }
 
+// Helper to send an SSE event through the stream
+function sendSSE(controller: ReadableStreamDefaultController, encoder: TextEncoder, event: Record<string, unknown>) {
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+}
+
 export async function POST(req: NextRequest) {
-    try {
-        const { resume, jobDescription, apiKey, modelProvider, modelName, customConfig } = await req.json();
+    const body = await req.json();
+    const { resume, jobDescription, apiKey, modelProvider, modelName, customConfig } = body;
 
-        if (!resume || !jobDescription) {
-            return NextResponse.json(
-                { error: 'Resume and Job Description are required' },
-                { status: 400 }
-            );
-        }
+    if (!resume || !jobDescription) {
+        return new Response(
+            JSON.stringify({ error: 'Resume and Job Description are required' }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+    }
 
-        // Determine model source
-        const customUrl = process.env.CUSTOM_LLM_URL;
-        const forceLocal = process.env.USE_LOCAL_MODEL === 'true';
-        const hasGeminiKey = !!apiKey || !!process.env.GEMINI_API_KEY;
+    // Determine model source
+    const customUrl = process.env.CUSTOM_LLM_URL;
+    const hasGeminiKey = !!apiKey || !!process.env.GEMINI_API_KEY;
 
-        let provider = modelProvider;
-        if (!provider) {
-            // Priority: Gemini (Fastest) > Custom > Local
-            if (hasGeminiKey) provider = 'gemini';
-            else if (customUrl) provider = 'custom';
-            else provider = 'local';
-        }
+    let provider = modelProvider;
+    if (!provider) {
+        if (hasGeminiKey) provider = 'gemini';
+        else if (customUrl) provider = 'custom';
+        else provider = 'local';
+    }
 
-        console.log(`Using Model Provider for Tailoring: ${provider}, Model: ${modelName || 'default'}`);
+    console.log(`Using Model Provider for Tailoring: ${provider}, Model: ${modelName || 'default'}`);
 
-        // Parsing Resume Sections
-        const sections = parseResumeSections(resume);
+    const encoder = new TextEncoder();
 
-        // ---------------------------------------------------------
-        // STEP 1: TAILOR (Rewrite Summary, Experience, Skills in ONE go)
-        // ---------------------------------------------------------
+    const stream = new ReadableStream({
+        async start(controller) {
+            try {
+                // ─── PHASE 1: TAILORING ───
+                sendSSE(controller, encoder, { phase: 'tailoring' });
 
-        const tailoringPrompt = `
+                const sections = parseResumeSections(resume);
+
+                const tailoringPrompt = `
         You are an expert Resume Writer and Career Coach, specialized in ATS optimization.
         Your goal is to rewrite the resume to match the Job Description (JD) perfectly while maintaining the candidate's authentic experience.
 
@@ -128,7 +129,7 @@ export async function POST(req: NextRequest) {
         INSTRUCTIONS:
         1. **Format for Machines & Humans**:
            - **IMPORTANT**: Return valid JSON.
-           - **Escape all newlines** within the JSON string values (use \\n). 
+           - **Escape all newlines** within the JSON string values (use \\\\n). 
            - **Do NOT** output literal newlines inside the JSON strings, as this breaks parsing.
         
         2. **Header**: 
@@ -154,7 +155,7 @@ export async function POST(req: NextRequest) {
            - **Formatting**:
              - **MUST** use a star \`*\` for bullet points.
              - **MUST** place every bullet point on a **NEW LINE**.
-             - **Example**: "Matched keywords...\\n* Increased sales by 20%...\\n* Led team of 5..."
+             - **Example**: "Matched keywords...\\\\n* Increased sales by 20%...\\\\n* Led team of 5..."
            - **Content**:
              - Use the **STAR Method** (Situation, Task, Action, Result).
              - Quantify results (e.g., "reduced latency by 50%", "managed $1M budget").
@@ -162,40 +163,37 @@ export async function POST(req: NextRequest) {
 
         OUTPUT FORMAT (JSON ONLY):
         {
-            "header": "# Name\\nEmail • Phone • Location",
+            "header": "# Name\\\\nEmail • Phone • Location",
             "summary": "Professional summary...",
-            "skills": "**Tech**: A, B, C\\n**Soft Skills**: X, Y, Z",
-            "experience": "**Company** | **Role** | **Date**\\n* Achievement 1\\n* Achievement 2..."
+            "skills": "**Tech**: A, B, C\\\\n**Soft Skills**: X, Y, Z",
+            "experience": "**Company** | **Role** | **Date**\\\\n* Achievement 1\\\\n* Achievement 2..."
         }
         `;
 
-        let tailoredSections = { ...sections };
+                let tailoredSections = { ...sections };
 
-        try {
-            console.log("Step 1: Tailoring Content...");
-            const tailoredText = await generateText(tailoringPrompt, provider, apiKey, modelName, customConfig);
-            // console.log("Raw Tailored Text:", tailoredText); // Debugging
+                try {
+                    console.log("Step 1: Tailoring Content...");
+                    const tailoredText = await generateText(tailoringPrompt, provider, apiKey, modelName, customConfig);
 
-            const cleanText = cleanJson(tailoredText);
-            const data = JSON.parse(cleanText);
+                    const cleanText = cleanJson(tailoredText);
+                    const data = JSON.parse(cleanText);
 
-            // Normalize: Convert any remaining literal \n (backslash+n as text) into real newlines
-            // The AI sometimes double-escapes newlines in JSON, leaving them as literal text after parse
-            const normalizeNewlines = (s: string) => s.replace(/\\n/g, '\n');
+                    // Normalize: Convert any remaining literal \n (backslash+n as text) into real newlines
+                    const normalizeNewlines = (s: string) => s.replace(/\\n/g, '\n');
 
-            if (data.header) tailoredSections.header = normalizeNewlines(data.header);
-            if (data.summary) tailoredSections.summary = normalizeNewlines(data.summary);
-            if (data.skills) tailoredSections.skills = normalizeNewlines(data.skills);
-            if (data.experience) tailoredSections.experience = normalizeNewlines(data.experience);
+                    if (data.header) tailoredSections.header = normalizeNewlines(data.header);
+                    if (data.summary) tailoredSections.summary = normalizeNewlines(data.summary);
+                    if (data.skills) tailoredSections.skills = normalizeNewlines(data.skills);
+                    if (data.experience) tailoredSections.experience = normalizeNewlines(data.experience);
 
-        } catch (e) {
-            console.error("Failed to tailor content", e);
-            // Fallback: keep original logic if parsing fails, but we already have originals in tailoredSections
-        }
+                } catch (e) {
+                    console.error("Failed to tailor content", e);
+                    // Fallback: keep original sections
+                }
 
-        // Reconstruct Full Resume with Conditional Headers
-        // Ensure double newlines between sections for clean Markdown rendering
-        let tailoredResume = `
+                // Reconstruct Full Resume
+                let tailoredResume = `
 ${tailoredSections.header}
 
 ### Summary
@@ -208,24 +206,28 @@ ${tailoredSections.experience}
 ${tailoredSections.skills}
 `.trim();
 
-        if (tailoredSections.education && tailoredSections.education.trim()) {
-            tailoredResume += `\n\n### Education\n${tailoredSections.education}`;
-        }
+                if (tailoredSections.education && tailoredSections.education.trim()) {
+                    tailoredResume += `\n\n### Education\n${tailoredSections.education}`;
+                }
 
-        if (tailoredSections.projects && tailoredSections.projects.trim()) {
-            tailoredResume += `\n\n### Projects\n${tailoredSections.projects}`;
-        }
+                if (tailoredSections.projects && tailoredSections.projects.trim()) {
+                    tailoredResume += `\n\n### Projects\n${tailoredSections.projects}`;
+                }
 
-        if (tailoredSections.other && tailoredSections.other.trim()) {
-            tailoredResume += `\n\n${tailoredSections.other}`;
-        }
+                if (tailoredSections.other && tailoredSections.other.trim()) {
+                    tailoredResume += `\n\n${tailoredSections.other}`;
+                }
 
+                // Send the tailored resume immediately — user sees the result before analysis finishes
+                sendSSE(controller, encoder, {
+                    phase: 'tailored',
+                    data: { tailoredResume }
+                });
 
-        // ---------------------------------------------------------
-        // STEP 2: ANALYZE (ATS Score & Changes)
-        // ---------------------------------------------------------
+                // ─── PHASE 2: ATS ANALYSIS ───
+                sendSSE(controller, encoder, { phase: 'analyzing' });
 
-        const analysisPrompt = `
+                const analysisPrompt = `
         You are an ATS (Applicant Tracking System) Algorithm. 
         Analyze the resume below against the Job Description.
 
@@ -253,26 +255,42 @@ ${tailoredSections.skills}
         }
         `;
 
-        let analysisData = { atsScore: null, changes: [] };
-        try {
-            console.log("Step 2: Analyzing...");
-            const analysisText = await generateText(analysisPrompt, provider, apiKey, modelName, customConfig);
-            const cleanAnalysis = cleanJson(analysisText);
-            analysisData = JSON.parse(cleanAnalysis);
-        } catch (e) {
-            console.error("Failed to generate analysis", e);
+                let analysisData = { atsScore: null as any, changes: [] as any[] };
+                try {
+                    console.log("Step 2: Analyzing...");
+                    const analysisText = await generateText(analysisPrompt, provider, apiKey, modelName, customConfig);
+                    const cleanAnalysis = cleanJson(analysisText);
+                    analysisData = JSON.parse(cleanAnalysis);
+                } catch (e) {
+                    console.error("Failed to generate analysis", e);
+                }
+
+                // Send final result
+                sendSSE(controller, encoder, {
+                    phase: 'complete',
+                    data: {
+                        atsScore: analysisData.atsScore,
+                        changes: analysisData.changes
+                    }
+                });
+
+            } catch (error) {
+                console.error('Streaming API Error:', error);
+                sendSSE(controller, encoder, {
+                    phase: 'error',
+                    error: error instanceof Error ? error.message : 'Internal Server Error'
+                });
+            } finally {
+                controller.close();
+            }
         }
+    });
 
-        return NextResponse.json({
-            tailoredResume,
-            atsScore: analysisData.atsScore,
-            changes: analysisData.changes
-        });
-
-    } catch (error) {
-        console.error('API Error:', error);
-        return NextResponse.json({
-            error: error instanceof Error ? error.message : 'Internal Server Error'
-        }, { status: 500 });
-    }
+    return new Response(stream, {
+        headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache, no-transform',
+            'Connection': 'keep-alive',
+        },
+    });
 }
