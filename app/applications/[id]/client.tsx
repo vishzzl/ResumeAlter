@@ -6,7 +6,8 @@ import { updateApplication, getProfile } from '@/lib/actions';
 import {
     Loader2, Save, Wand2, Upload, FileText, ChevronLeft, ChevronRight,
     RefreshCw, Download, CheckSquare, Square, UserCheck, Briefcase,
-    Sparkles, X, Eye, GitCompare, LayoutGrid
+    Sparkles, X, Eye, GitCompare, LayoutGrid, Mail, Copy, Check,
+    PenLine, BookOpen, Zap, Crown
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -107,6 +108,15 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const [executionTime, setExecutionTime] = useState<number | null>(initialAnalysis.executionTime || null);
     const [resultViewMode, setResultViewMode] = useState<'preview' | 'diff'>('preview');
 
+    // Cover Letter State
+    const [coverLetter, setCoverLetter] = useState(app.coverLetter || '');
+    const [coverLetterLoading, setCoverLetterLoading] = useState(false);
+    const [coverLetterStyle, setCoverLetterStyle] = useState<'professional' | 'concise' | 'storytelling' | 'executive'>('professional');
+    const [coverLetterInstructions, setCoverLetterInstructions] = useState('');
+    const [outputTab, setOutputTab] = useState<'resume' | 'coverLetter'>('resume');
+    const [copied, setCopied] = useState(false);
+    const [isEditingCoverLetter, setIsEditingCoverLetter] = useState(false);
+
     // Global AI Config
     const { selectedModel, selectedProvider, customModelConfig } = useAIConfig();
 
@@ -186,8 +196,81 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             jobDetails: jobDetails ? JSON.stringify(jobDetails) : undefined,
             baseResume: resumeText,
             tailoredResume,
+            coverLetter: coverLetter || undefined,
         });
         setLoading(false);
+    };
+
+    const handleGenerateCoverLetter = async () => {
+        setCoverLetterLoading(true);
+        setError(null);
+        setOutputTab('coverLetter');
+        try {
+            const apiKey = localStorage.getItem('gemini_api_key');
+            let finalJobDescription = jobDescription;
+            if (jobDetails && !selectedJobDetails.useFullDescription) {
+                const parts = [];
+                parts.push(`Job Title: ${jobDetails.title || app.jobTitle}`);
+                parts.push(`Company: ${jobDetails.company || app.companyName}`);
+                if (selectedJobDetails.requirements.length > 0) {
+                    parts.push(`\nRequirements:\n${selectedJobDetails.requirements.map(r => `- ${r}`).join('\n')}`);
+                }
+                if (selectedJobDetails.skills.length > 0) {
+                    parts.push(`\nSkills:\n${selectedJobDetails.skills.map(s => `- ${s}`).join('\n')}`);
+                }
+                parts.push(`\nDescription:\n${jobDetails.description || jobDescription}`);
+                finalJobDescription = parts.join('\n');
+            }
+
+            const res = await fetch('/api/cover-letter', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    resume: resumeText,
+                    jobDescription: finalJobDescription,
+                    companyName: app.companyName || jobDetails?.company,
+                    jobTitle: app.jobTitle || jobDetails?.title,
+                    apiKey,
+                    modelProvider: selectedProvider,
+                    modelName: selectedModel,
+                    customConfig: customModelConfig,
+                    style: coverLetterStyle,
+                    customInstructions: coverLetterInstructions || undefined,
+                }),
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || `Server Error: ${res.status}`);
+            }
+
+            if (data.coverLetter) {
+                setCoverLetter(data.coverLetter);
+                setIsEditingCoverLetter(false);
+                await updateApplication(app.id, { coverLetter: data.coverLetter });
+            }
+        } catch (err) {
+            console.error('Cover letter generation failed', err);
+            setError(err instanceof Error ? err.message : 'Failed to generate cover letter.');
+        } finally {
+            setCoverLetterLoading(false);
+        }
+    };
+
+    const handleCopyCoverLetter = () => {
+        navigator.clipboard.writeText(coverLetter);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    const handleDownloadCoverLetterTxt = () => {
+        const blob = new Blob([coverLetter], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `cover-letter-${app.companyName || 'application'}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
     };
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -760,64 +843,119 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     <div className="flex-1 glass-card-solid overflow-hidden flex flex-col relative">
                         {/* ─ Unified Compact Toolbar ─ */}
                         <div className="bg-white border-b border-slate-100 px-3 py-1.5 flex items-center gap-2 shrink-0 print:hidden flex-wrap">
-                            {/* Left: ATS Score inline badge */}
-                            {atsScore ? (
-                                <div className="flex items-center gap-2 mr-auto">
-                                    <ScoreRing score={atsScore.after} size={28} strokeWidth={3} />
-                                    <span className="text-xs font-bold text-slate-700">ATS {atsScore.after}</span>
-                                    <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">+{atsScore.after - atsScore.before}</span>
-                                    {executionTime && <span className="text-[9px] text-slate-400 font-mono">{(executionTime / 1000).toFixed(1)}s</span>}
-                                </div>
-                            ) : (
-                                <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5 mr-auto">
-                                    <Sparkles className="h-3.5 w-3.5 text-indigo-400" /> Result
-                                </span>
-                            )}
+                            {/* Output Tab Toggle */}
+                            <div className="segmented-control text-[11px] mr-2">
+                                <button onClick={() => setOutputTab('resume')} className={outputTab === 'resume' ? 'active' : ''}>
+                                    <span className="flex items-center gap-1"><FileText className="h-3 w-3" /> Resume</span>
+                                </button>
+                                <button onClick={() => setOutputTab('coverLetter')} className={outputTab === 'coverLetter' ? 'active' : ''}>
+                                    <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> Cover Letter</span>
+                                </button>
+                            </div>
 
-                            {/* Center/Right: Controls */}
-                            {tailoredResume && (
+                            {/* Resume-specific controls */}
+                            {outputTab === 'resume' && (
                                 <>
-                                    {/* View toggle */}
-                                    <div className="segmented-control text-[11px]">
-                                        <button onClick={() => setResultViewMode('preview')} className={resultViewMode === 'preview' ? 'active' : ''}>
-                                            <span className="flex items-center gap-1"><Eye className="h-3 w-3" /> Preview</span>
-                                        </button>
-                                        <button onClick={() => setResultViewMode('diff')} className={resultViewMode === 'diff' ? 'active' : ''}>
-                                            <span className="flex items-center gap-1"><GitCompare className="h-3 w-3" /> Diff</span>
-                                        </button>
-                                    </div>
-
-                                    {/* Template (only in preview mode) */}
-                                    {resultViewMode === 'preview' && (
-                                        <div className="segmented-control text-[11px]">
-                                            {(['modern', 'classic', 'minimal'] as const).map((t) => (
-                                                <button key={t} onClick={() => setSelectedTemplate(t)} className={selectedTemplate === t ? 'active' : ''}>
-                                                    {t.charAt(0).toUpperCase() + t.slice(1)}
-                                                </button>
-                                            ))}
+                                    {/* Left: ATS Score inline badge */}
+                                    {atsScore ? (
+                                        <div className="flex items-center gap-2 mr-auto">
+                                            <ScoreRing score={atsScore.after} size={28} strokeWidth={3} />
+                                            <span className="text-xs font-bold text-slate-700">ATS {atsScore.after}</span>
+                                            <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">+{atsScore.after - atsScore.before}</span>
+                                            {executionTime && <span className="text-[9px] text-slate-400 font-mono">{(executionTime / 1000).toFixed(1)}s</span>}
                                         </div>
+                                    ) : (
+                                        <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5 mr-auto">
+                                            <Sparkles className="h-3.5 w-3.5 text-indigo-400" /> Result
+                                        </span>
                                     )}
 
-                                    <button
-                                        onClick={handleDownloadPDF}
-                                        className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-indigo-600 px-2 py-1 rounded-md hover:bg-indigo-50 transition-colors"
-                                    >
-                                        <Download className="h-3 w-3" /> PDF
-                                    </button>
+                                    {/* Center/Right: Controls */}
+                                    {tailoredResume && (
+                                        <>
+                                            {/* View toggle */}
+                                            <div className="segmented-control text-[11px]">
+                                                <button onClick={() => setResultViewMode('preview')} className={resultViewMode === 'preview' ? 'active' : ''}>
+                                                    <span className="flex items-center gap-1"><Eye className="h-3 w-3" /> Preview</span>
+                                                </button>
+                                                <button onClick={() => setResultViewMode('diff')} className={resultViewMode === 'diff' ? 'active' : ''}>
+                                                    <span className="flex items-center gap-1"><GitCompare className="h-3 w-3" /> Diff</span>
+                                                </button>
+                                            </div>
+
+                                            {/* Template (only in preview mode) */}
+                                            {resultViewMode === 'preview' && (
+                                                <div className="segmented-control text-[11px]">
+                                                    {(['modern', 'classic', 'minimal'] as const).map((t) => (
+                                                        <button key={t} onClick={() => setSelectedTemplate(t)} className={selectedTemplate === t ? 'active' : ''}>
+                                                            {t.charAt(0).toUpperCase() + t.slice(1)}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            <button
+                                                onClick={handleDownloadPDF}
+                                                className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-indigo-600 px-2 py-1 rounded-md hover:bg-indigo-50 transition-colors"
+                                            >
+                                                <Download className="h-3 w-3" /> PDF
+                                            </button>
+                                        </>
+                                    )}
+                                </>
+                            )}
+
+                            {/* Cover Letter controls */}
+                            {outputTab === 'coverLetter' && (
+                                <>
+                                    <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5 mr-auto">
+                                        <Mail className="h-3.5 w-3.5 text-violet-400" /> Cover Letter
+                                    </span>
+                                    {coverLetter && (
+                                        <>
+                                            <button
+                                                onClick={() => setIsEditingCoverLetter(!isEditingCoverLetter)}
+                                                className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md transition-colors ${isEditingCoverLetter ? 'text-indigo-600 bg-indigo-50' : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'
+                                                    }`}
+                                            >
+                                                <PenLine className="h-3 w-3" /> Edit
+                                            </button>
+                                            <button
+                                                onClick={handleCopyCoverLetter}
+                                                className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-indigo-600 px-2 py-1 rounded-md hover:bg-indigo-50 transition-colors"
+                                            >
+                                                {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                                                {copied ? 'Copied!' : 'Copy'}
+                                            </button>
+                                            <button
+                                                onClick={handleDownloadCoverLetterTxt}
+                                                className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-indigo-600 px-2 py-1 rounded-md hover:bg-indigo-50 transition-colors"
+                                            >
+                                                <Download className="h-3 w-3" /> TXT
+                                            </button>
+                                        </>
+                                    )}
                                 </>
                             )}
                         </div>
 
                         {/* Loading Overlay */}
-                        {loading && (
+                        {(loading || coverLetterLoading) && (
                             <div className="loading-overlay">
                                 <div className="flex flex-col items-center gap-4 animate-fade-in-up">
-                                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center shadow-lg">
-                                        <Sparkles className="h-7 w-7 text-white animate-spin" style={{ animationDuration: '3s' }} />
+                                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${coverLetterLoading ? 'from-violet-500 to-purple-600' : 'from-indigo-500 to-violet-500'} flex items-center justify-center shadow-lg`}>
+                                        {coverLetterLoading
+                                            ? <Mail className="h-7 w-7 text-white animate-spin" style={{ animationDuration: '3s' }} />
+                                            : <Sparkles className="h-7 w-7 text-white animate-spin" style={{ animationDuration: '3s' }} />
+                                        }
                                     </div>
                                     <div className="text-center">
-                                        <p className="text-sm font-bold text-slate-800">Tailoring your resume</p>
-                                        <p className="text-xs text-slate-500 mt-1">AI is optimizing for this role...</p>
+                                        <p className="text-sm font-bold text-slate-800">
+                                            {coverLetterLoading ? 'Writing your cover letter' : 'Tailoring your resume'}
+                                        </p>
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            {coverLetterLoading ? 'Crafting a personalized letter...' : 'AI is optimizing for this role...'}
+                                        </p>
                                     </div>
                                     <div className="w-48 h-1.5 rounded-full overflow-hidden bg-slate-100">
                                         <div className="h-full animate-shimmer rounded-full" />
@@ -829,30 +967,115 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                         {/* Content & Sidebar Wrapper */}
                         <div className="flex-1 flex min-h-0 overflow-hidden relative">
                             <div id="print-container" className="flex-1 overflow-auto p-4 md:p-8 bg-white custom-scrollbar print:p-0 print:overflow-visible">
-                                {tailoredResume ? (
-                                    resultViewMode === 'diff' ? (
-                                        <div className="h-full overflow-y-auto">
-                                            <DiffViewer oldText={resumeText} newText={tailoredResume} />
-                                        </div>
+                                {outputTab === 'resume' ? (
+                                    // Resume output
+                                    tailoredResume ? (
+                                        resultViewMode === 'diff' ? (
+                                            <div className="h-full overflow-y-auto">
+                                                <DiffViewer oldText={resumeText} newText={tailoredResume} />
+                                            </div>
+                                        ) : (
+                                            <ResumePreview
+                                                content={tailoredResume}
+                                                title={null}
+                                                company={null}
+                                                template={selectedTemplate}
+                                            />
+                                        )
                                     ) : (
-                                        <ResumePreview
-                                            content={tailoredResume}
-                                            title={null}
-                                            company={null}
-                                            template={selectedTemplate}
-                                        />
+                                        <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                                            <div className="w-20 h-20 rounded-3xl bg-slate-50 flex items-center justify-center mb-5 animate-float">
+                                                <Sparkles className="h-9 w-9 text-slate-300" />
+                                            </div>
+                                            <p className="text-base font-semibold text-slate-500 mb-1">No tailored result yet</p>
+                                            <p className="text-sm text-slate-400 max-w-xs text-center">
+                                                Fill in the job description and your resume, then click
+                                                <span className="text-indigo-500 font-semibold"> Tailor Resume</span>
+                                            </p>
+                                        </div>
                                     )
                                 ) : (
-                                    <div className="h-full flex flex-col items-center justify-center text-slate-400">
-                                        <div className="w-20 h-20 rounded-3xl bg-slate-50 flex items-center justify-center mb-5 animate-float">
-                                            <Sparkles className="h-9 w-9 text-slate-300" />
+                                    // Cover Letter output
+                                    coverLetter && !coverLetterLoading ? (
+                                        isEditingCoverLetter ? (
+                                            <textarea
+                                                className="w-full h-full resize-none outline-none font-serif text-[15px] text-slate-800 leading-relaxed p-2"
+                                                value={coverLetter}
+                                                onChange={(e) => setCoverLetter(e.target.value)}
+                                                onBlur={async () => {
+                                                    await updateApplication(app.id, { coverLetter });
+                                                }}
+                                            />
+                                        ) : (
+                                            <div className="max-w-2xl mx-auto">
+                                                <div className="font-serif text-[15px] text-slate-800 leading-relaxed whitespace-pre-wrap">
+                                                    {coverLetter}
+                                                </div>
+                                            </div>
+                                        )
+                                    ) : !coverLetterLoading ? (
+                                        <div className="h-full flex flex-col items-center justify-center">
+                                            {/* Style Picker */}
+                                            <div className="w-full max-w-lg mb-8">
+                                                <h3 className="text-sm font-bold text-slate-700 mb-3 text-center">Choose a Style</h3>
+                                                <div className="grid grid-cols-2 gap-2.5">
+                                                    {([
+                                                        { id: 'professional' as const, label: 'Professional', desc: '3-4 paragraphs, balanced tone', icon: BookOpen, color: 'indigo' },
+                                                        { id: 'concise' as const, label: 'Concise', desc: '2-3 short paragraphs, direct', icon: Zap, color: 'amber' },
+                                                        { id: 'storytelling' as const, label: 'Storytelling', desc: 'Narrative-driven, engaging', icon: PenLine, color: 'violet' },
+                                                        { id: 'executive' as const, label: 'Executive', desc: 'Strategic, leadership focus', icon: Crown, color: 'emerald' },
+                                                    ]).map(s => {
+                                                        const Icon = s.icon;
+                                                        const isActive = coverLetterStyle === s.id;
+                                                        return (
+                                                            <button
+                                                                key={s.id}
+                                                                onClick={() => setCoverLetterStyle(s.id)}
+                                                                className={`flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-all duration-200 ${isActive
+                                                                    ? `border-${s.color}-400 bg-${s.color}-50/50 shadow-sm`
+                                                                    : 'border-slate-200 hover:border-slate-300 bg-white'
+                                                                    }`}
+                                                            >
+                                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isActive ? `bg-${s.color}-100 text-${s.color}-600` : 'bg-slate-100 text-slate-400'
+                                                                    }`}>
+                                                                    <Icon className="h-4 w-4" />
+                                                                </div>
+                                                                <div>
+                                                                    <p className={`text-sm font-semibold ${isActive ? 'text-slate-800' : 'text-slate-600'}`}>{s.label}</p>
+                                                                    <p className="text-[11px] text-slate-400 mt-0.5">{s.desc}</p>
+                                                                </div>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                            {/* Custom Instructions */}
+                                            <div className="w-full max-w-lg mb-6">
+                                                <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Custom Instructions (optional)</label>
+                                                <textarea
+                                                    className="w-full h-20 p-3 resize-none rounded-xl border border-slate-200 text-sm text-slate-700 placeholder:text-slate-300 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all"
+                                                    placeholder='e.g., "Emphasize my leadership experience" or "Keep it under 200 words"'
+                                                    value={coverLetterInstructions}
+                                                    onChange={(e) => setCoverLetterInstructions(e.target.value)}
+                                                />
+                                            </div>
+
+                                            {/* Generate Button */}
+                                            <button
+                                                onClick={handleGenerateCoverLetter}
+                                                disabled={coverLetterLoading || !resumeText || !jobDescription}
+                                                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 px-6 py-3 text-sm font-semibold text-white shadow-lg hover:shadow-xl hover:from-violet-600 hover:to-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                                            >
+                                                <Mail className="h-4 w-4" />
+                                                Generate Cover Letter
+                                            </button>
+
+                                            {(!resumeText || !jobDescription) && (
+                                                <p className="text-xs text-slate-400 mt-3">Add a resume and job description first</p>
+                                            )}
                                         </div>
-                                        <p className="text-base font-semibold text-slate-500 mb-1">No tailored result yet</p>
-                                        <p className="text-sm text-slate-400 max-w-xs text-center">
-                                            Fill in the job description and your resume, then click
-                                            <span className="text-indigo-500 font-semibold"> Tailor Resume</span>
-                                        </p>
-                                    </div>
+                                    ) : null
                                 )}
                             </div>
 

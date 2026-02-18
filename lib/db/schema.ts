@@ -10,6 +10,7 @@ export const applications = sqliteTable('applications', {
     jobDetails: text('job_details'), // JSON string of structured data
     baseResume: text('base_resume'),
     tailoredResume: text('tailored_resume'),
+    coverLetter: text('cover_letter'), // Generated cover letter text
     status: text('status').default('draft'), // draft, applied, interview, rejected, offer
     analysis: text('analysis'), // JSON string of ATS score and changes
     createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
