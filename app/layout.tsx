@@ -52,9 +52,9 @@ export default function RootLayout({
       <body className={inter.className}>
         <ErrorBoundary>
           <AIConfigProvider>
-            <div className="min-h-screen pb-8">
+            <div className="min-h-screen pb-4 md:pb-8">
               <MainNav />
-              <main className="container mx-auto mt-6 px-4 md:px-6">
+              <main className="container mx-auto mt-3 md:mt-6 px-3 md:px-6">
                 {children}
               </main>
             </div>

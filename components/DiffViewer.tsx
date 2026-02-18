@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import * as diff from 'diff';
 import { ChevronDown } from 'lucide-react';
 
@@ -13,8 +13,20 @@ type DiffRow = {
     isCollapsed?: boolean;
 };
 
+function useIsMobile(breakpoint = 1024) {
+    const [isMobile, setIsMobile] = useState(false);
+    useEffect(() => {
+        const check = () => setIsMobile(window.innerWidth < breakpoint);
+        check();
+        window.addEventListener('resize', check);
+        return () => window.removeEventListener('resize', check);
+    }, [breakpoint]);
+    return isMobile;
+}
+
 export const DiffViewer: React.FC<DiffViewerProps> = ({ oldText, newText }) => {
     const [expandedBlocks, setExpandedBlocks] = useState<Record<number, boolean>>({});
+    const isMobile = useIsMobile();
 
     const rows = useMemo(() => {
         const lineDiffs = diff.diffLines(oldText || '', newText || '');
@@ -28,44 +40,27 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ oldText, newText }) => {
             if (lines[lines.length - 1] === '') lines.pop();
 
             if (part.added) {
-                // Check if previous was removed to group into 'modified'
-                // This logic needs to look back at the *result* array to find the 'removed' rows
-                // OR we can peek ahead/behind in the loop.
-                // Simpler: Just render added. If we want alignment, we need to handle it when processing 'removed'.
-                // Let's change strategy: Look ahead.
-
-                // Since we are iterating, 'added' comes after 'removed' usually.
-                // But let's handle it simply:
-                // If we are at an 'added' block, we just adding rows with Right content.
-                // Unless we want to try to "backfill" into empty Right slots of previous 'Removed' rows?
-                // That's the "Modified" alignment visual.
-
-                // Let's try to align if the previous rows were 'removed' and have empty 'right'.
                 let startBackfill = result.length - 1;
                 while (startBackfill >= 0 && result[startBackfill].left?.type === 'removed' && !result[startBackfill].right) {
                     startBackfill--;
                 }
-                startBackfill++; // The first index that is pure 'removed'
+                startBackfill++;
 
                 const removedCount = result.length - startBackfill;
 
-                // If we have a block of removed rows at the end, we can align this added block with them.
                 if (removedCount > 0 && result[result.length - 1].left?.type === 'removed') {
                     lines.forEach((line, idx) => {
                         if (idx < removedCount) {
-                            // Match with existing removed row
                             const row = result[startBackfill + idx];
                             row.right = { line, lineNumber: rightLineNum++, type: 'modified_new' };
-                            if (row.left) row.left.type = 'modified_old'; // Upgrade type
+                            if (row.left) row.left.type = 'modified_old';
                         } else {
-                            // New row needed (added is longer than removed)
                             result.push({
                                 right: { line, lineNumber: rightLineNum++, type: 'added' }
                             });
                         }
                     });
                 } else {
-                    // Just standard added rows
                     lines.forEach(line => {
                         result.push({
                             right: { line, lineNumber: rightLineNum++, type: 'added' }
@@ -91,19 +86,111 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ oldText, newText }) => {
         return result;
     }, [oldText, newText]);
 
-
-    // Identify collapsible blocks
-    // A block is collapsible if it has > 4 unchanged rows
-    const renderRows = () => {
+    // ─── MOBILE: Unified Diff ───
+    const renderMobileRows = () => {
         const rendered: React.ReactNode[] = [];
         let collapseBuffer: DiffRow[] = [];
         let bufferStartIndex = -1;
 
-        const flushBuffer = (idx: number) => {
+        const flushBuffer = () => {
+            if (collapseBuffer.length === 0) return;
+            if (collapseBuffer.length > 4 && !expandedBlocks[bufferStartIndex]) {
+                rendered.push(
+                    <div
+                        key={`collapse-m-${bufferStartIndex}`}
+                        className="py-2 px-3 text-center text-gray-400 text-[11px] bg-gray-50 border-y border-gray-100 cursor-pointer active:bg-gray-100"
+                        onClick={() => setExpandedBlocks(p => ({ ...p, [bufferStartIndex]: true }))}
+                    >
+                        <div className="flex items-center justify-center gap-1.5">
+                            <ChevronDown className="h-3 w-3" />
+                            <span>{collapseBuffer.length} unchanged lines</span>
+                        </div>
+                    </div>
+                );
+            } else {
+                collapseBuffer.forEach((row, i) => {
+                    const line = row.right?.line ?? row.left?.line ?? '';
+                    const num = row.right?.lineNumber ?? row.left?.lineNumber ?? 0;
+                    rendered.push(
+                        <div key={`m-${bufferStartIndex + i}`} className="flex text-gray-500 leading-6">
+                            <span className="w-8 shrink-0 text-right pr-2 text-[10px] text-gray-300 select-none">{num}</span>
+                            <span className="flex-1 whitespace-pre-wrap break-words text-[13px] px-2">{line}</span>
+                        </div>
+                    );
+                });
+            }
+            collapseBuffer = [];
+            bufferStartIndex = -1;
+        };
+
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const isUnchanged = row.left?.type === 'unchanged' && row.right?.type === 'unchanged';
+
+            if (isUnchanged) {
+                if (bufferStartIndex === -1) bufferStartIndex = i;
+                collapseBuffer.push(row);
+                continue;
+            }
+
+            flushBuffer();
+
+            // Modified pair: show old then new stacked
+            if (row.left?.type === 'modified_old' && row.right?.type === 'modified_new') {
+                const wordDiffs = diff.diffWordsWithSpace(row.left.line, row.right.line);
+
+                const oldContent = wordDiffs.map((part, j) => {
+                    if (part.added) return null;
+                    return <span key={j} className={part.removed ? 'bg-red-200 text-red-900 rounded-sm' : ''}>{part.value}</span>;
+                });
+
+                const newContent = wordDiffs.map((part, j) => {
+                    if (part.removed) return null;
+                    return <span key={j} className={part.added ? 'bg-green-200 text-green-900 rounded-sm' : ''}>{part.value}</span>;
+                });
+
+                rendered.push(
+                    <div key={`m-old-${i}`} className="flex bg-red-50 border-l-3 border-red-400 leading-6">
+                        <span className="w-8 shrink-0 text-right pr-2 text-[10px] text-red-300 select-none">−</span>
+                        <span className="flex-1 whitespace-pre-wrap break-words text-[13px] text-red-800 px-2 line-through decoration-red-300">{oldContent}</span>
+                    </div>
+                );
+                rendered.push(
+                    <div key={`m-new-${i}`} className="flex bg-green-50 border-l-3 border-green-400 leading-6">
+                        <span className="w-8 shrink-0 text-right pr-2 text-[10px] text-green-400 select-none">+</span>
+                        <span className="flex-1 whitespace-pre-wrap break-words text-[13px] text-green-900 px-2">{newContent}</span>
+                    </div>
+                );
+            } else if (row.left?.type === 'removed') {
+                rendered.push(
+                    <div key={`m-rm-${i}`} className="flex bg-red-50 border-l-3 border-red-400 leading-6">
+                        <span className="w-8 shrink-0 text-right pr-2 text-[10px] text-red-300 select-none">−</span>
+                        <span className="flex-1 whitespace-pre-wrap break-words text-[13px] text-red-800 px-2">{row.left.line}</span>
+                    </div>
+                );
+            } else if (row.right?.type === 'added') {
+                rendered.push(
+                    <div key={`m-add-${i}`} className="flex bg-green-50 border-l-3 border-green-400 leading-6">
+                        <span className="w-8 shrink-0 text-right pr-2 text-[10px] text-green-400 select-none">+</span>
+                        <span className="flex-1 whitespace-pre-wrap break-words text-[13px] text-green-900 px-2">{row.right.line}</span>
+                    </div>
+                );
+            }
+        }
+        flushBuffer();
+        return rendered;
+    };
+
+    // ─── DESKTOP: Side-by-Side Diff (Original) ───
+    const renderDesktopRows = () => {
+        const rendered: React.ReactNode[] = [];
+        let collapseBuffer: DiffRow[] = [];
+        let bufferStartIndex = -1;
+
+        const flushBuffer = () => {
             if (collapseBuffer.length === 0) return;
 
             if (collapseBuffer.length > 4 && !expandedBlocks[bufferStartIndex]) {
-                // Render collapsed placeholder
                 rendered.push(
                     <tr key={`collapse-${bufferStartIndex}`} className="bg-gray-50 border-y border-gray-100 group cursor-pointer hover:bg-gray-100" onClick={() => setExpandedBlocks(p => ({ ...p, [bufferStartIndex]: true }))}>
                         <td colSpan={4} className="py-2 px-4 text-center text-gray-400 select-none text-[10px]">
@@ -115,7 +202,6 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ oldText, newText }) => {
                     </tr>
                 );
             } else {
-                // Render all normally
                 collapseBuffer.forEach((row, i) => {
                     rendered.push(renderSingleRow(row, bufferStartIndex + i));
                 });
@@ -125,7 +211,6 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ oldText, newText }) => {
         };
 
         const renderSingleRow = (row: DiffRow, idx: number) => {
-            // Word diff highlighting for modified rows
             let leftContent: React.ReactNode = row.left?.line;
             let rightContent: React.ReactNode = row.right?.line;
 
@@ -145,22 +230,19 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ oldText, newText }) => {
 
             return (
                 <tr key={idx} className="hover:bg-gray-50/50">
-                    {/* LEFT SIDE */}
                     <td className={`w-8 select-none text-right pr-2 text-[10px] leading-5 py-0.5 border-r border-gray-100 ${row.left ? 'text-gray-400' : 'text-transparent'}`}>
                         {row.left?.lineNumber}
                     </td>
                     <td className={`w-1/2 pl-2 py-0.5 whitespace-pre-wrap break-all border-r border-gray-100 ${row.left?.type === 'removed' ? 'bg-red-50 text-red-900' :
-                            row.left?.type === 'modified_old' ? 'bg-red-50 text-gray-600' : 'text-gray-500'
+                        row.left?.type === 'modified_old' ? 'bg-red-50 text-gray-600' : 'text-gray-500'
                         }`}>
                         {leftContent || (row.left?.type ? '' : '')}
                     </td>
-
-                    {/* RIGHT SIDE */}
                     <td className={`w-8 select-none text-right pr-2 text-[10px] leading-5 py-0.5 border-r border-gray-100 ${row.right ? 'text-gray-400' : 'text-transparent'}`}>
                         {row.right?.lineNumber}
                     </td>
                     <td className={`w-1/2 pl-2 py-0.5 whitespace-pre-wrap break-all ${row.right?.type === 'added' ? 'bg-green-50 text-green-900' :
-                            row.right?.type === 'modified_new' ? 'bg-green-50 text-gray-900' : 'text-gray-500'
+                        row.right?.type === 'modified_new' ? 'bg-green-50 text-gray-900' : 'text-gray-500'
                         }`}>
                         {rightContent}
                     </td>
@@ -177,15 +259,30 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ oldText, newText }) => {
                 if (bufferStartIndex === -1) bufferStartIndex = i;
                 collapseBuffer.push(row);
             } else {
-                flushBuffer(i);
+                flushBuffer();
                 rendered.push(renderSingleRow(row, i));
             }
         }
-        flushBuffer(rows.length);
+        flushBuffer();
 
         return rendered;
     };
 
+    // ─── RENDER ───
+    if (isMobile) {
+        return (
+            <div className="font-mono text-xs bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                {/* Mobile Header */}
+                <div className="flex border-b border-gray-200 bg-gray-50 text-[10px] uppercase font-medium text-gray-500">
+                    <div className="flex-1 py-1.5 px-3 text-center">Unified Diff</div>
+                </div>
+                {/* Mobile Content */}
+                <div className="divide-y divide-gray-50">
+                    {renderMobileRows()}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="font-mono text-xs overflow-x-auto bg-white rounded-lg border shadow-sm">
@@ -203,7 +300,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ oldText, newText }) => {
                     </tr>
                 </thead>
                 <tbody>
-                    {renderRows()}
+                    {renderDesktopRows()}
                 </tbody>
             </table>
         </div>

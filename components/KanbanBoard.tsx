@@ -132,6 +132,7 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
     const [dragOverCol, setDragOverCol] = useState<string | null>(null);
     const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set());
     const [mobileTab, setMobileTab] = useState('draft');
+    const [movingAppId, setMovingAppId] = useState<number | null>(null);
 
     // Auto-update mobile tab if last active application was in a different column? 
     // For now, keep it simple.
@@ -234,21 +235,21 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
     return (
         <div className="flex flex-col h-full overflow-hidden animate-fade-in-up">
             {/* ━━━ Dashboard Header ━━━ */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 shrink-0 px-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-3 sm:mb-5 shrink-0 px-1">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                    <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                         Dashboard
                     </h1>
-                    <p className="text-sm text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-slate-700">{totalApps} Applications</span>
-                        {appliedCount > 0 && <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide">Applied {appliedCount}</span>}
-                        {interviewCount > 0 && <span className="inline-flex items-center gap-1 bg-violet-50 text-violet-700 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide">Interview {interviewCount}</span>}
-                        {offerCount > 0 && <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide">Offers {offerCount}</span>}
+                    <p className="text-xs sm:text-sm text-slate-500 mt-0.5 sm:mt-1 flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                        <span className="font-medium text-slate-700">{totalApps} Apps</span>
+                        {appliedCount > 0 && <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide">Applied {appliedCount}</span>}
+                        {interviewCount > 0 && <span className="inline-flex items-center gap-1 bg-violet-50 text-violet-700 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide">Interview {interviewCount}</span>}
+                        {offerCount > 0 && <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide">Offers {offerCount}</span>}
                     </p>
                 </div>
                 <Link
                     href="/new"
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:from-indigo-600 hover:to-violet-600 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 px-4 sm:px-5 py-2 sm:py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:from-indigo-600 hover:to-violet-600 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 >
                     <Plus className="h-4 w-4" />
                     New Application
@@ -256,8 +257,8 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
             </div>
 
             {/* ━━━ Mobile Tabs (Visible only on small screens) ━━━ */}
-            <div className="lg:hidden mb-4 shrink-0 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
-                <div className="flex gap-2">
+            <div className="lg:hidden mb-3 shrink-0 px-1">
+                <div className="grid grid-cols-5 gap-1 bg-slate-100/80 rounded-xl p-1">
                     {STATUS_COLUMNS.map(col => {
                         const isActive = mobileTab === col.id;
                         const count = getColumnApps(col.id).length;
@@ -268,17 +269,17 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
                                 key={col.id}
                                 onClick={() => setMobileTab(col.id)}
                                 className={cn(
-                                    "flex items-center gap-2 px-3.5 py-2 rounded-full whitespace-nowrap transition-all duration-200 border",
+                                    "flex flex-col items-center gap-0.5 py-1.5 px-1 rounded-lg transition-all duration-200 min-w-0",
                                     isActive
-                                        ? "bg-slate-900 text-white border-slate-900 shadow-md transform scale-[1.02]"
-                                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                                        ? "bg-white text-slate-900 shadow-sm"
+                                        : "text-slate-500 hover:text-slate-700"
                                 )}
                             >
-                                <Icon className={cn("h-3.5 w-3.5", isActive ? "text-white" : "text-slate-400")} />
-                                <span className="text-xs font-semibold">{col.label}</span>
+                                <Icon className={cn("h-3.5 w-3.5 shrink-0", isActive ? "text-indigo-600" : "text-slate-400")} />
+                                <span className="text-[10px] font-semibold truncate w-full text-center leading-tight">{col.label}</span>
                                 <span className={cn(
-                                    "ml-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full",
-                                    isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+                                    "text-[9px] font-bold min-w-[16px] text-center rounded-full px-1",
+                                    isActive ? "bg-indigo-100 text-indigo-700" : "text-slate-400"
                                 )}>
                                     {count}
                                 </span>
@@ -357,7 +358,7 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
                                                     draggedAppId === app.id && "opacity-50 scale-95 rotate-1"
                                                 )}
                                             >
-                                                {/* Drag Handle + Delete */}
+                                                {/* Drag Handle + Delete (Desktop) */}
                                                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 lg:flex hidden">
                                                     <button
                                                         onClick={(e) => handleDelete(app.id, e)}
@@ -375,8 +376,6 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
                                                         <h4 className="font-bold text-sm text-slate-800 truncate leading-snug group-hover:text-indigo-600 transition-colors">
                                                             {app.jobTitle || 'Untitled Position'}
                                                         </h4>
-                                                        {/* Mobile Delete Button (always visible if needed, or swipe? sticking to simple button for now) */}
-                                                        {/* Actually, let's keep clean for now */}
                                                     </div>
 
                                                     {/* Company */}
@@ -430,6 +429,73 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
                                                         <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all" />
                                                     </div>
                                                 </Link>
+
+                                                {/* Mobile Actions: Move + Delete */}
+                                                <div className="lg:hidden flex items-center justify-between px-3 py-2 border-t border-slate-100 bg-slate-50/50 rounded-b-xl">
+                                                    <div className="relative">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                setMovingAppId(movingAppId === app.id ? null : app.id);
+                                                            }}
+                                                            className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 hover:text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+                                                        >
+                                                            <ArrowRight className="h-3 w-3" />
+                                                            Move to
+                                                        </button>
+                                                        {movingAppId === app.id && (
+                                                            <div className="absolute bottom-full left-0 mb-1 bg-white rounded-xl shadow-xl border border-slate-200 z-20 py-1 min-w-[140px] animate-in fade-in slide-in-from-bottom-2 duration-150">
+                                                                {STATUS_COLUMNS.filter(c => c.id !== col.id).map(targetCol => {
+                                                                    const TargetIcon = targetCol.icon;
+                                                                    return (
+                                                                        <button
+                                                                            key={targetCol.id}
+                                                                            onClick={async (e) => {
+                                                                                e.preventDefault();
+                                                                                e.stopPropagation();
+                                                                                setMovingAppId(null);
+
+                                                                                if (targetCol.id === 'applied' && !app.tailoredResume) {
+                                                                                    alert('Cannot move to Applied: Generate a Tailored Resume first!');
+                                                                                    return;
+                                                                                }
+
+                                                                                const updates: any = { status: targetCol.id };
+                                                                                if (targetCol.id === 'applied' && !app.dateApplied) {
+                                                                                    updates.dateApplied = new Date().toISOString();
+                                                                                }
+
+                                                                                setApplications(prev => prev.map(a =>
+                                                                                    a.id === app.id ? { ...a, ...updates } : a
+                                                                                ));
+
+                                                                                try {
+                                                                                    await updateApplication(app.id, updates);
+                                                                                } catch (error) {
+                                                                                    console.error('Failed to move', error);
+                                                                                    setApplications(applications);
+                                                                                }
+                                                                            }}
+                                                                            className="flex items-center gap-2 w-full px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                                                                        >
+                                                                            <TargetIcon className="h-3.5 w-3.5" />
+                                                                            {targetCol.label}
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <button
+                                                        onClick={(e) => handleDelete(app.id, e)}
+                                                        disabled={isDeleting}
+                                                        className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                                        title="Delete"
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
                                             </div>
                                         );
                                     })}

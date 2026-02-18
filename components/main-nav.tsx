@@ -15,11 +15,11 @@ export function MainNav() {
 
     return (
         <nav className="sticky top-0 z-50 w-full border-b border-indigo-100/50 bg-white/70 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60">
-            <div className="container mx-auto flex h-16 items-center px-4 justify-between">
+            <div className="container mx-auto flex h-12 md:h-16 items-center px-3 md:px-4 justify-between">
                 {/* Logo */}
-                <Link href="/" className="flex items-center gap-2.5 font-bold text-xl text-slate-900 data-[hover]:text-indigo-600 transition-colors shrink-0 group">
-                    <div className="p-2 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-transform duration-200">
-                        <FileText className="h-5 w-5" />
+                <Link href="/" className="flex items-center gap-2 font-bold text-lg md:text-xl text-slate-900 data-[hover]:text-indigo-600 transition-colors shrink-0 group">
+                    <div className="p-1.5 md:p-2 rounded-lg md:rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-transform duration-200">
+                        <FileText className="h-4 w-4 md:h-5 md:w-5" />
                     </div>
                     <span className="hidden sm:inline bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-700">ResumeAlter</span>
                 </Link>
@@ -87,7 +87,7 @@ export function MainNav() {
                     className="md:hidden p-2 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
                     aria-label="Toggle menu"
                 >
-                    {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                    {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
                 </button>
             </div>
 

@@ -164,15 +164,15 @@ export default function ProfilePage() {
 
     return (
         <div className="min-h-screen bg-slate-50/50 pb-20 md:pb-12 font-sans text-slate-900 animate-in fade-in duration-500">
-            {/* Header */}
-            <header className="bg-white/80 border-b border-indigo-100/50 sticky top-14 md:top-16 z-30 px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 transition-all">
+            {/* Header — Desktop Only (sticky sub-header) */}
+            <header className="hidden lg:flex bg-white/80 border-b border-indigo-100/50 sticky top-14 z-30 px-6 lg:px-8 h-14 items-center justify-between backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 transition-all">
                 <div className="flex items-center gap-3 min-w-0">
                     <Link href="/" className="group flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-indigo-600 transition-colors shrink-0">
                         <ChevronRight className="h-4 w-4 rotate-180 text-slate-400 group-hover:text-indigo-600 transition-colors" />
-                        <span className="hidden sm:inline">Dashboard</span>
+                        <span>Dashboard</span>
                     </Link>
                     <div className="h-4 w-px bg-slate-200" />
-                    <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight truncate flex items-center gap-2">
+                    <h1 className="text-lg font-bold text-slate-900 tracking-tight truncate flex items-center gap-2">
                         <User className="h-4 w-4 text-indigo-500" />
                         Master Profile
                     </h1>
@@ -182,31 +182,57 @@ export default function ProfilePage() {
                     onClick={handleSave}
                     disabled={saveStatus === 'saving'}
                     className={cn(
-                        "inline-flex items-center gap-1.5 sm:gap-2 rounded-xl px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-md shadow-blue-500/20 transition-all focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shrink-0 transform active:scale-95",
+                        "inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-md shadow-blue-500/20 transition-all focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shrink-0 transform active:scale-95",
                         saveStatus === 'saved' ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20" :
                             saveStatus === 'error' ? "bg-red-500 hover:bg-red-600 shadow-red-500/20" :
                                 "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
                     )}
                 >
-                    {saveStatus === 'saving' ? <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" /> :
-                        saveStatus === 'saved' ? <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> :
-                            saveStatus === 'error' ? <AlertCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> :
-                                <Save className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
-                    <span className="hidden sm:inline">
+                    {saveStatus === 'saving' ? <Loader2 className="h-4 w-4 animate-spin" /> :
+                        saveStatus === 'saved' ? <CheckCircle2 className="h-4 w-4" /> :
+                            saveStatus === 'error' ? <AlertCircle className="h-4 w-4" /> :
+                                <Save className="h-4 w-4" />}
+                    <span>
                         {saveStatus === 'saving' ? 'Saving...' :
                             saveStatus === 'saved' ? 'Saved' :
                                 saveStatus === 'error' ? 'Error' : 'Save Changes'}
                     </span>
-                    <span className="sm:hidden">
-                        {saveStatus === 'saving' ? 'Saving' :
-                            saveStatus === 'saved' ? 'Saved' :
-                                saveStatus === 'error' ? 'Error' : 'Save'}
-                    </span>
                 </button>
             </header>
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-                <div className="flex flex-col-reverse lg:grid lg:grid-cols-12 gap-8 items-start">
+            <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-8">
+                {/* Mobile Inline Header — replaces the sticky sub-header */}
+                <div className="lg:hidden flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <Link href="/" className="p-1.5 -ml-1.5 text-slate-400 hover:text-indigo-600 transition-colors">
+                            <ChevronRight className="h-4 w-4 rotate-180" />
+                        </Link>
+                        <h1 className="text-sm font-bold text-slate-900 truncate flex items-center gap-1.5">
+                            <User className="h-3.5 w-3.5 text-indigo-500" />
+                            Master Profile
+                        </h1>
+                    </div>
+                    <button
+                        onClick={handleSave}
+                        disabled={saveStatus === 'saving'}
+                        className={cn(
+                            "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all active:scale-95",
+                            saveStatus === 'saved' ? "bg-emerald-500" :
+                                saveStatus === 'error' ? "bg-red-500" :
+                                    "bg-slate-900"
+                        )}
+                    >
+                        {saveStatus === 'saving' ? <Loader2 className="h-3 w-3 animate-spin" /> :
+                            saveStatus === 'saved' ? <CheckCircle2 className="h-3 w-3" /> :
+                                saveStatus === 'error' ? <AlertCircle className="h-3 w-3" /> :
+                                    <Save className="h-3 w-3" />}
+                        {saveStatus === 'saving' ? 'Saving' :
+                            saveStatus === 'saved' ? 'Saved' :
+                                saveStatus === 'error' ? 'Error' : 'Save'}
+                    </button>
+                </div>
+
+                <div className="flex flex-col lg:grid lg:grid-cols-12 gap-5 sm:gap-8 items-start">
 
                     {/* Left Column (Bottom on Mobile): Import & Settings */}
                     <div className="lg:col-span-4 space-y-6 w-full">
@@ -216,9 +242,9 @@ export default function ProfilePage() {
                                 <FileText className="h-4 w-4 text-indigo-500" />
                                 <h2 className="font-semibold text-slate-900 text-sm">Resume Source</h2>
                             </div>
-                            <div className="p-5 space-y-6">
+                            <div className="p-4 sm:p-5 space-y-4 sm:space-y-6">
                                 <div>
-                                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 sm:mb-3">
                                         Import from File
                                     </label>
                                     <div className="relative group">
@@ -230,21 +256,21 @@ export default function ProfilePage() {
                                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                                         />
                                         <div className={cn(
-                                            "border-2 border-dashed rounded-xl p-6 text-center transition-all duration-300",
+                                            "border-2 border-dashed rounded-xl p-4 sm:p-6 text-center transition-all duration-300",
                                             isUploading
                                                 ? "border-indigo-400 bg-indigo-50/50"
                                                 : "border-slate-200 group-hover:border-indigo-400 group-hover:bg-indigo-50/10"
                                         )}>
                                             <div className={cn(
-                                                "mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-colors",
+                                                "mx-auto w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center mb-2 sm:mb-3 transition-colors",
                                                 isUploading ? "bg-white text-indigo-600" : "bg-indigo-50 text-indigo-500 group-hover:scale-110"
                                             )}>
-                                                <Upload className="h-5 w-5" />
+                                                <Upload className="h-4 w-4 sm:h-5 sm:w-5" />
                                             </div>
-                                            <p className="text-sm font-medium text-slate-700">
-                                                {isUploading ? 'Extracting text...' : 'Click to upload PDF or TXT'}
+                                            <p className="text-xs sm:text-sm font-medium text-slate-700">
+                                                {isUploading ? 'Extracting text...' : 'Upload PDF or TXT'}
                                             </p>
-                                            <p className="text-xs text-slate-400 mt-1">Max 5MB</p>
+                                            <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1">Max 5MB</p>
                                         </div>
                                     </div>
                                 </div>
@@ -258,7 +284,7 @@ export default function ProfilePage() {
 
                                 <div>
                                     <textarea
-                                        className="w-full h-48 p-3 bg-slate-50/50 border border-slate-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none transition-all placeholder:text-slate-400 custom-scrollbar"
+                                        className="w-full h-32 sm:h-48 p-3 bg-slate-50/50 border border-slate-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none transition-all placeholder:text-slate-400 custom-scrollbar"
                                         placeholder="Paste your full resume text here..."
                                         value={resumeText}
                                         onChange={e => setResumeText(e.target.value)}
@@ -284,20 +310,38 @@ export default function ProfilePage() {
                     {/* Right Column (Top on Mobile): Editor */}
                     <div className="lg:col-span-8 flex flex-col gap-6 w-full">
                         {/* Sticky Tabs Navigation */}
-                        <div className="sticky top-[7rem] md:top-[8.5rem] z-20 -mx-4 px-4 sm:mx-0 sm:px-0 bg-gradient-to-b from-slate-50/90 via-slate-50/90 to-transparent pb-4 pt-2 supports-[backdrop-filter]:from-slate-50/60 supports-[backdrop-filter]:via-slate-50/60 backdrop-blur-sm">
-                            <div className="bg-white/80 backdrop-blur-md rounded-2xl border border-indigo-100/50 p-1.5 shadow-sm inline-flex w-full overflow-x-auto sm:overflow-visible scrollbar-hide snap-x">
+                        <div className="sticky top-12 lg:top-[7.5rem] z-20 -mx-3 px-3 sm:mx-0 sm:px-0 bg-gradient-to-b from-slate-50/90 via-slate-50/90 to-transparent pb-3 sm:pb-4 pt-1 sm:pt-2 supports-[backdrop-filter]:from-slate-50/60 supports-[backdrop-filter]:via-slate-50/60 backdrop-blur-sm">
+                            {/* Mobile: Compact Grid Tabs */}
+                            <div className="sm:hidden bg-slate-100/80 rounded-xl p-1">
+                                <div className="grid grid-cols-4 gap-1">
+                                    {tabs.map(tab => (
+                                        <button
+                                            key={tab.id}
+                                            onClick={() => {
+                                                setActiveTab(tab.id);
+                                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                            }}
+                                            className={cn(
+                                                "flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg transition-all duration-200 min-w-0",
+                                                activeTab === tab.id
+                                                    ? "bg-white text-indigo-700 shadow-sm"
+                                                    : "text-slate-500 hover:text-slate-700"
+                                            )}
+                                        >
+                                            <tab.icon className={cn("h-4 w-4 shrink-0", activeTab === tab.id ? "text-indigo-600" : "text-slate-400")} />
+                                            <span className="text-[10px] font-semibold truncate w-full text-center leading-tight">{tab.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            {/* Desktop: Pill Tabs */}
+                            <div className="hidden sm:inline-flex bg-white/80 backdrop-blur-md rounded-2xl border border-indigo-100/50 p-1.5 shadow-sm w-full">
                                 {tabs.map(tab => (
                                     <button
                                         key={tab.id}
-                                        onClick={() => {
-                                            setActiveTab(tab.id);
-                                            // Scroll to top of editor gently
-                                            if (window.innerWidth < 1024) {
-                                                window.scrollTo({ top: 0, behavior: 'smooth' });
-                                            }
-                                        }}
+                                        onClick={() => setActiveTab(tab.id)}
                                         className={cn(
-                                            "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl transition-all whitespace-nowrap snap-center focus:outline-none focus:ring-2 focus:ring-indigo-500/20",
+                                            "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl transition-all whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/20",
                                             activeTab === tab.id
                                                 ? "bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-indigo-200"
                                                 : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
@@ -311,13 +355,13 @@ export default function ProfilePage() {
                         </div>
 
                         {/* Editor Content */}
-                        <div className="glass-card-solid bg-white rounded-2xl border border-slate-200/60 shadow-sm min-h-[600px] flex flex-col overflow-hidden">
+                        <div className="glass-card-solid bg-white rounded-xl sm:rounded-2xl border border-slate-200/60 shadow-sm min-h-[400px] sm:min-h-[600px] flex flex-col overflow-hidden">
                             {/* Tab Header */}
-                            <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/30">
-                                <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+                            <div className="px-4 py-3 sm:px-6 sm:py-5 border-b border-slate-100 bg-slate-50/30">
+                                <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
                                     {tabs.find(t => t.id === activeTab)?.label}
                                 </h2>
-                                <p className="text-sm text-slate-500 mt-0.5">
+                                <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
                                     {activeTab === 'basics' && "Personal information and contact details."}
                                     {activeTab === 'experience' && "Your professional work history."}
                                     {activeTab === 'education' && "Academic background and qualifications."}
@@ -325,7 +369,7 @@ export default function ProfilePage() {
                                 </p>
                             </div>
 
-                            <div className="p-5 sm:p-7 flex-1">
+                            <div className="p-3 sm:p-7 flex-1">
                                 {activeTab === 'basics' && (
                                     <div className="space-y-6 max-w-3xl animate-in fade-in slide-in-from-bottom-2 duration-500">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -399,12 +443,12 @@ export default function ProfilePage() {
                                             <div key={i} className="group relative bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all overflow-hidden hover:border-indigo-200">
 
                                                 {/* Card Header */}
-                                                <div className="p-5 border-b border-slate-100 bg-white relative">
+                                                <div className="p-3 sm:p-5 border-b border-slate-100 bg-white relative">
                                                     <div className="flex flex-col gap-3">
                                                         <div className="flex items-start justify-between pr-8">
                                                             <div className="flex-1 space-y-1">
                                                                 <input
-                                                                    className="w-full text-lg font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-indigo-300 focus:border-indigo-500 focus:ring-0 outline-none placeholder:text-slate-300 transition-all px-0 py-0.5"
+                                                                    className="w-full text-base sm:text-lg font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-indigo-300 focus:border-indigo-500 focus:ring-0 outline-none placeholder:text-slate-300 transition-all px-0 py-0.5"
                                                                     value={exp.role}
                                                                     placeholder="Job Title"
                                                                     onChange={e => {
@@ -460,7 +504,7 @@ export default function ProfilePage() {
                                                 {/* Card Body */}
                                                 <div className="p-0 bg-slate-50/30">
                                                     <textarea
-                                                        className="w-full text-base md:text-sm leading-relaxed text-slate-700 bg-transparent p-5 border-none focus:ring-2 focus:ring-inset focus:ring-indigo-500/10 outline-none resize-y transition-all placeholder:text-slate-400 min-h-[160px]"
+                                                        className="w-full text-base md:text-sm leading-relaxed text-slate-700 bg-transparent p-3 sm:p-5 border-none focus:ring-2 focus:ring-inset focus:ring-indigo-500/10 outline-none resize-y transition-all placeholder:text-slate-400 min-h-[120px] sm:min-h-[160px]"
                                                         value={exp.description}
                                                         placeholder="• Describe your key responsibilities and achievements..."
                                                         onChange={e => {
@@ -475,7 +519,7 @@ export default function ProfilePage() {
 
                                         <button
                                             onClick={() => setProfile({ ...profile, experience: [...profile.experience, { role: '', company: '', dates: '', description: '', highlights: [] }] })}
-                                            className="w-full py-6 border-2 border-dashed border-slate-200 rounded-2xl text-slate-500 font-medium hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all flex flex-col items-center justify-center gap-2 group"
+                                            className="w-full py-4 sm:py-6 border-2 border-dashed border-slate-200 rounded-xl sm:rounded-2xl text-slate-500 font-medium hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all flex flex-col items-center justify-center gap-2 group"
                                         >
                                             <div className="p-2.5 rounded-full bg-slate-100 group-hover:bg-indigo-100 transition-colors">
                                                 <Plus className="h-5 w-5" />
@@ -492,7 +536,7 @@ export default function ProfilePage() {
                                             <p>Enter your skills one per line. The AI uses these to match keywords in job descriptions.</p>
                                         </div>
                                         <textarea
-                                            className="w-full flex-1 min-h-[400px] p-5 border border-slate-200 rounded-xl font-mono text-base md:text-sm leading-relaxed focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none transition-all placeholder:text-slate-400 bg-slate-50/30 focus:bg-white"
+                                            className="w-full flex-1 min-h-[250px] sm:min-h-[400px] p-3 sm:p-5 border border-slate-200 rounded-xl font-mono text-base md:text-sm leading-relaxed focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none transition-all placeholder:text-slate-400 bg-slate-50/30 focus:bg-white"
                                             value={Array.isArray(profile.skills) ? profile.skills.join('\n') : profile.skills}
                                             onChange={e => setProfile({ ...profile, skills: e.target.value.split('\n') })}
                                             placeholder="Java&#10;Python&#10;React&#10;Project Management&#10;..."
@@ -503,7 +547,7 @@ export default function ProfilePage() {
                                 {activeTab === 'education' && (
                                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
                                         {profile.education.map((edu: any, i: number) => (
-                                            <div key={i} className="group relative p-6 border border-slate-200 rounded-xl bg-slate-50/30 hover:bg-white hover:border-indigo-200 hover:shadow-md transition-all">
+                                            <div key={i} className="group relative p-4 sm:p-6 border border-slate-200 rounded-xl bg-slate-50/30 hover:bg-white hover:border-indigo-200 hover:shadow-md transition-all">
                                                 <button
                                                     onClick={() => {
                                                         const newEdu = [...profile.education];
@@ -516,7 +560,7 @@ export default function ProfilePage() {
                                                     <Trash2 className="h-4 w-4" />
                                                 </button>
 
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5 mb-3 sm:mb-5">
                                                     <div className="space-y-1.5">
                                                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Institution</label>
                                                         <input

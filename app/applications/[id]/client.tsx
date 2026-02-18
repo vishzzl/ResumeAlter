@@ -452,10 +452,10 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     // ─── RENDER ───
 
     return (
-        <div className="h-[calc(100vh-6rem)] flex flex-col gap-0">
+        <div className="min-h-[calc(100vh-6rem)] lg:h-[calc(100vh-6rem)] flex flex-col gap-0">
 
             {/* ━━━ Header (Sticky on Mobile) ━━━ */}
-            <div className="sticky top-14 z-30 bg-white/80 backdrop-blur-xl border-b border-slate-200/50 px-3 sm:px-5 py-2 flex items-center justify-between print:hidden flex-wrap gap-2 transition-all">
+            <div className="sticky top-12 md:top-14 z-30 bg-white/80 backdrop-blur-xl border-b border-slate-200/50 px-3 sm:px-5 py-1.5 sm:py-2 flex items-center justify-between print:hidden flex-wrap gap-2 transition-all">
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                     <Link
                         href="/"
@@ -507,7 +507,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             </div>
 
             {/* ━━━ Mobile Bottom Tab Bar ━━━ */}
-            <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-lg border-t border-slate-200 px-6 py-2 flex items-center justify-between shadow-lg ring-1 ring-slate-900/5 pb-safe">
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-lg border-t border-slate-200 px-6 py-2 flex items-center justify-between shadow-lg ring-1 ring-slate-900/5 pb-safe print:hidden">
                 {([
                     { id: 'job', label: 'Job', icon: Briefcase },
                     { id: 'resume', label: 'Resume', icon: FileText },
@@ -551,14 +551,14 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             )}
 
             {/* ━━━ Main Workspace ━━━ */}
-            <div className="flex-1 flex flex-col lg:flex-row gap-3 min-h-0 overflow-hidden relative transition-all duration-300 ease-in-out">
+            <div className="flex-1 flex flex-col lg:flex-row gap-3 min-h-0 overflow-auto lg:overflow-hidden relative transition-all duration-300 ease-in-out">
 
                 {/* ── Left Panel: Input (JD & Resume) ── */}
                 <div
                     className={cn(
-                        "transition-all duration-300 ease-in-out shrink-0 flex flex-col gap-3 min-h-0",
-                        // Mobile: Full width, visible only if tab is job or resume
-                        mobileTab === 'result' ? "hidden lg:flex" : "w-full",
+                        "transition-all duration-300 ease-in-out shrink-0 flex flex-col gap-3",
+                        // Mobile: Full width with explicit height, visible only if tab is job or resume
+                        mobileTab === 'result' ? "hidden lg:flex" : "w-full min-h-[calc(100vh-11rem)] lg:min-h-0",
                         // Desktop: Controlled by isLeftPanelOpen
                         isLeftPanelOpen ? "lg:w-[420px] opacity-100" : "lg:w-0 lg:opacity-0 lg:p-0 lg:overflow-hidden"
                     )}
@@ -595,7 +595,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     </div>
 
                     {/* Panel Content */}
-                    <div className="flex-1 glass-card-solid overflow-hidden flex flex-col">
+                    <div className="flex-1 glass-card-solid overflow-visible lg:overflow-hidden flex flex-col">
 
                         {/* ─ Job Description Tab ─ */}
                         {activeTab === 'job' && (
@@ -802,7 +802,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                         </div>
                                     ) : (
                                         <textarea
-                                            className="w-full h-full p-4 resize-none outline-none font-mono text-[13px] text-slate-800 bg-white placeholder:text-slate-300"
+                                            className="w-full flex-1 min-h-[60vh] lg:min-h-0 p-4 resize-none outline-none font-mono text-[13px] sm:text-[13px] text-slate-800 bg-white placeholder:text-slate-300 overflow-y-auto"
                                             placeholder="Paste the job description here, or click Analyze to extract key details..."
                                             value={jobDescription}
                                             onChange={(e) => setJobDescription(e.target.value)}
@@ -852,7 +852,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                     </div>
                                 ) : (
                                     <textarea
-                                        className="flex-1 w-full p-4 resize-none outline-none font-mono text-[13px] text-slate-800 bg-white placeholder:text-slate-300 custom-scrollbar"
+                                        className="flex-1 w-full min-h-[60vh] lg:min-h-0 p-4 resize-none outline-none font-mono text-[13px] sm:text-[13px] text-slate-800 bg-white placeholder:text-slate-300 custom-scrollbar overflow-y-auto"
                                         placeholder="Paste your resume content here..."
                                         value={resumeText}
                                         onChange={(e) => setResumeText(e.target.value)}
@@ -866,106 +866,105 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                 {/* ── Right Panel: Output ── */}
                 <div className={cn(
                     "flex-1 flex flex-col min-h-0 overflow-hidden transition-all duration-300 ease-in-out",
-                    // Mobile: Visible only if tab is result
-                    mobileTab !== 'result' ? "hidden lg:flex" : "flex"
+                    // Mobile: Visible only if tab is result — with minimum height
+                    mobileTab !== 'result' ? "hidden lg:flex" : "flex min-h-[60vh] lg:min-h-0"
                 )}>
                     {/* ─ Main Result Area (single card, no gaps above) ─ */}
                     <div className="flex-1 glass-card-solid overflow-hidden flex flex-col relative">
                         {/* ─ Unified Compact Toolbar ─ */}
-                        <div className="bg-white border-b border-slate-100 px-3 py-1.5 flex items-center gap-2 shrink-0 print:hidden flex-wrap">
-                            {/* Output Tab Toggle */}
-                            <div className="segmented-control text-[11px] mr-2">
-                                <button onClick={() => setOutputTab('resume')} className={outputTab === 'resume' ? 'active' : ''}>
-                                    <span className="flex items-center gap-1"><FileText className="h-3 w-3" /> Resume</span>
-                                </button>
-                                <button onClick={() => setOutputTab('coverLetter')} className={outputTab === 'coverLetter' ? 'active' : ''}>
-                                    <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> Cover Letter</span>
-                                </button>
+                        <div className="bg-white border-b border-slate-100 px-2 sm:px-3 py-1.5 shrink-0 print:hidden">
+                            {/* Row 1: Output Tab Toggle */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <div className="segmented-control text-[11px] mr-auto">
+                                    <button onClick={() => setOutputTab('resume')} className={outputTab === 'resume' ? 'active' : ''}>
+                                        <span className="flex items-center gap-1"><FileText className="h-3 w-3" /><span className="hidden sm:inline">Resume</span><span className="sm:hidden">Resume</span></span>
+                                    </button>
+                                    <button onClick={() => setOutputTab('coverLetter')} className={outputTab === 'coverLetter' ? 'active' : ''}>
+                                        <span className="flex items-center gap-1"><Mail className="h-3 w-3" /><span className="hidden sm:inline">Cover Letter</span><span className="sm:hidden">Letter</span></span>
+                                    </button>
+                                </div>
+
+                                {/* ATS Score (compact on mobile) */}
+                                {outputTab === 'resume' && atsScore && (
+                                    <div className="flex items-center gap-1.5 sm:gap-2">
+                                        <ScoreRing score={atsScore.after} size={24} strokeWidth={3} />
+                                        <span className="text-[11px] sm:text-xs font-bold text-slate-700">{atsScore.after}</span>
+                                        <span className="text-[9px] sm:text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1 sm:px-1.5 py-0.5 rounded-full">+{atsScore.after - atsScore.before}</span>
+                                        {executionTime && <span className="text-[9px] text-slate-400 font-mono hidden sm:inline">{(executionTime / 1000).toFixed(1)}s</span>}
+                                    </div>
+                                )}
+                                {outputTab === 'resume' && !atsScore && (
+                                    <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1">
+                                        <Sparkles className="h-3 w-3 text-indigo-400" /> Result
+                                    </span>
+                                )}
+
+                                {/* Cover Letter label */}
+                                {outputTab === 'coverLetter' && (
+                                    <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1">
+                                        <Mail className="h-3 w-3 text-violet-400" /> Cover Letter
+                                    </span>
+                                )}
                             </div>
 
-                            {/* Resume-specific controls */}
-                            {outputTab === 'resume' && (
-                                <>
-                                    {/* Left: ATS Score inline badge */}
-                                    {atsScore ? (
-                                        <div className="flex items-center gap-2 mr-auto">
-                                            <ScoreRing score={atsScore.after} size={28} strokeWidth={3} />
-                                            <span className="text-xs font-bold text-slate-700">ATS {atsScore.after}</span>
-                                            <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">+{atsScore.after - atsScore.before}</span>
-                                            {executionTime && <span className="text-[9px] text-slate-400 font-mono">{(executionTime / 1000).toFixed(1)}s</span>}
+                            {/* Row 2: View Controls (only when there's content) */}
+                            {outputTab === 'resume' && tailoredResume && (
+                                <div className="flex items-center gap-1.5 sm:gap-2 mt-1.5 overflow-x-auto scrollbar-hide">
+                                    {/* View toggle */}
+                                    <div className="segmented-control text-[11px] shrink-0">
+                                        <button onClick={() => setResultViewMode('preview')} className={resultViewMode === 'preview' ? 'active' : ''}>
+                                            <span className="flex items-center gap-1"><Eye className="h-3 w-3" /><span className="hidden sm:inline">Preview</span></span>
+                                        </button>
+                                        <button onClick={() => setResultViewMode('diff')} className={resultViewMode === 'diff' ? 'active' : ''}>
+                                            <span className="flex items-center gap-1"><GitCompare className="h-3 w-3" /><span className="hidden sm:inline">Diff</span></span>
+                                        </button>
+                                    </div>
+
+                                    {/* Template selector */}
+                                    {resultViewMode === 'preview' && (
+                                        <div className="segmented-control text-[11px] shrink-0">
+                                            {(['modern', 'classic', 'minimal'] as const).map((t) => (
+                                                <button key={t} onClick={() => setSelectedTemplate(t)} className={selectedTemplate === t ? 'active' : ''}>
+                                                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                                                </button>
+                                            ))}
                                         </div>
-                                    ) : (
-                                        <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5 mr-auto">
-                                            <Sparkles className="h-3.5 w-3.5 text-indigo-400" /> Result
-                                        </span>
                                     )}
 
-                                    {/* Center/Right: Controls */}
-                                    {tailoredResume && (
-                                        <>
-                                            {/* View toggle */}
-                                            <div className="segmented-control text-[11px]">
-                                                <button onClick={() => setResultViewMode('preview')} className={resultViewMode === 'preview' ? 'active' : ''}>
-                                                    <span className="flex items-center gap-1"><Eye className="h-3 w-3" /> Preview</span>
-                                                </button>
-                                                <button onClick={() => setResultViewMode('diff')} className={resultViewMode === 'diff' ? 'active' : ''}>
-                                                    <span className="flex items-center gap-1"><GitCompare className="h-3 w-3" /> Diff</span>
-                                                </button>
-                                            </div>
-
-                                            {/* Template (only in preview mode) */}
-                                            {resultViewMode === 'preview' && (
-                                                <div className="segmented-control text-[11px]">
-                                                    {(['modern', 'classic', 'minimal'] as const).map((t) => (
-                                                        <button key={t} onClick={() => setSelectedTemplate(t)} className={selectedTemplate === t ? 'active' : ''}>
-                                                            {t.charAt(0).toUpperCase() + t.slice(1)}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            <button
-                                                onClick={handleDownloadPDF}
-                                                className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-indigo-600 px-2 py-1 rounded-md hover:bg-indigo-50 transition-colors"
-                                            >
-                                                <Download className="h-3 w-3" /> PDF
-                                            </button>
-                                        </>
-                                    )}
-                                </>
+                                    <div className="ml-auto shrink-0">
+                                        <button
+                                            onClick={handleDownloadPDF}
+                                            className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-indigo-600 px-2 py-1 rounded-md hover:bg-indigo-50 transition-colors"
+                                        >
+                                            <Download className="h-3 w-3" /><span className="hidden sm:inline">PDF</span>
+                                        </button>
+                                    </div>
+                                </div>
                             )}
 
-                            {/* Cover Letter controls */}
-                            {outputTab === 'coverLetter' && (
-                                <>
-                                    <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5 mr-auto">
-                                        <Mail className="h-3.5 w-3.5 text-violet-400" /> Cover Letter
-                                    </span>
-                                    {coverLetter && (
-                                        <>
-                                            <button
-                                                onClick={() => setIsEditingCoverLetter(!isEditingCoverLetter)}
-                                                className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md transition-colors ${isEditingCoverLetter ? 'text-indigo-600 bg-indigo-50' : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'
-                                                    }`}
-                                            >
-                                                <PenLine className="h-3 w-3" /> Edit
-                                            </button>
-                                            <button
-                                                onClick={handleCopyCoverLetter}
-                                                className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-indigo-600 px-2 py-1 rounded-md hover:bg-indigo-50 transition-colors"
-                                            >
-                                                {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-                                                {copied ? 'Copied!' : 'Copy'}
-                                            </button>
-                                            <button
-                                                onClick={handleDownloadCoverLetterTxt}
-                                                className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-indigo-600 px-2 py-1 rounded-md hover:bg-indigo-50 transition-colors"
-                                            >
-                                                <Download className="h-3 w-3" /> TXT
-                                            </button>
-                                        </>
-                                    )}
-                                </>
+                            {/* Cover Letter action buttons */}
+                            {outputTab === 'coverLetter' && coverLetter && (
+                                <div className="flex items-center gap-1 mt-1.5">
+                                    <button
+                                        onClick={() => setIsEditingCoverLetter(!isEditingCoverLetter)}
+                                        className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md transition-colors ${isEditingCoverLetter ? 'text-indigo-600 bg-indigo-50' : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                    >
+                                        <PenLine className="h-3 w-3" /><span className="hidden sm:inline">Edit</span>
+                                    </button>
+                                    <button
+                                        onClick={handleCopyCoverLetter}
+                                        className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-indigo-600 px-2 py-1 rounded-md hover:bg-indigo-50 transition-colors"
+                                    >
+                                        {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                                        <span className="hidden sm:inline">{copied ? 'Copied!' : 'Copy'}</span>
+                                    </button>
+                                    <button
+                                        onClick={handleDownloadCoverLetterTxt}
+                                        className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-indigo-600 px-2 py-1 rounded-md hover:bg-indigo-50 transition-colors"
+                                    >
+                                        <Download className="h-3 w-3" /><span className="hidden sm:inline">TXT</span>
+                                    </button>
+                                </div>
                             )}
                         </div>
 
@@ -996,7 +995,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
 
                         {/* Content & Sidebar Wrapper */}
                         <div className="flex-1 flex min-h-0 overflow-hidden relative">
-                            <div id="print-container" className="flex-1 overflow-auto p-4 md:p-8 bg-white custom-scrollbar print:p-0 print:overflow-visible pb-20 lg:pb-8">
+                            <div id="print-container" className="flex-1 overflow-auto p-3 sm:p-4 md:p-8 bg-white custom-scrollbar print:p-0 print:overflow-visible pb-20 lg:pb-8">
                                 {outputTab === 'resume' ? (
                                     // Resume output
                                     tailoredResume ? (
@@ -1044,11 +1043,11 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                             </div>
                                         )
                                     ) : !coverLetterLoading ? (
-                                        <div className="h-full flex flex-col items-center justify-center">
+                                        <div className="h-full flex flex-col items-center justify-center px-4 sm:px-0">
                                             {/* Style Picker */}
-                                            <div className="w-full max-w-lg mb-8">
+                                            <div className="w-full max-w-lg mb-6 sm:mb-8">
                                                 <h3 className="text-sm font-bold text-slate-700 mb-3 text-center">Choose a Style</h3>
-                                                <div className="grid grid-cols-2 gap-2.5">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
                                                     {([
                                                         { id: 'professional' as const, label: 'Professional', desc: '3-4 paragraphs, balanced tone', icon: BookOpen, color: 'indigo' },
                                                         { id: 'concise' as const, label: 'Concise', desc: '2-3 short paragraphs, direct', icon: Zap, color: 'amber' },
@@ -1061,7 +1060,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                                             <button
                                                                 key={s.id}
                                                                 onClick={() => setCoverLetterStyle(s.id)}
-                                                                className={`flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-all duration-200 ${isActive
+                                                                className={`flex items-start gap-3 p-3 sm:p-3.5 rounded-xl border-2 text-left transition-all duration-200 ${isActive
                                                                     ? `border-${s.color}-400 bg-${s.color}-50/50 shadow-sm`
                                                                     : 'border-slate-200 hover:border-slate-300 bg-white'
                                                                     }`}
@@ -1071,7 +1070,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                                                     <Icon className="h-4 w-4" />
                                                                 </div>
                                                                 <div>
-                                                                    <p className={`text-sm font-semibold ${isActive ? 'text-slate-800' : 'text-slate-600'}`}>{s.label}</p>
+                                                                    <p className={`text-[13px] sm:text-sm font-semibold ${isActive ? 'text-slate-800' : 'text-slate-600'}`}>{s.label}</p>
                                                                     <p className="text-[11px] text-slate-400 mt-0.5">{s.desc}</p>
                                                                 </div>
                                                             </button>
@@ -1081,11 +1080,11 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                             </div>
 
                                             {/* Custom Instructions */}
-                                            <div className="w-full max-w-lg mb-6">
+                                            <div className="w-full max-w-lg mb-5 sm:mb-6">
                                                 <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Custom Instructions (optional)</label>
                                                 <textarea
-                                                    className="w-full h-20 p-3 resize-none rounded-xl border border-slate-200 text-sm text-slate-700 placeholder:text-slate-300 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all"
-                                                    placeholder='e.g., "Emphasize my leadership experience" or "Keep it under 200 words"'
+                                                    className="w-full h-20 p-3 resize-none rounded-xl border border-slate-200 text-[16px] sm:text-sm text-slate-700 placeholder:text-slate-300 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all"
+                                                    placeholder='e.g., "Emphasize my leadership experience"'
                                                     value={coverLetterInstructions}
                                                     onChange={(e) => setCoverLetterInstructions(e.target.value)}
                                                 />
@@ -1095,56 +1094,107 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                             <button
                                                 onClick={handleGenerateCoverLetter}
                                                 disabled={coverLetterLoading || !resumeText || !jobDescription}
-                                                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 px-6 py-3 text-sm font-semibold text-white shadow-lg hover:shadow-xl hover:from-violet-600 hover:to-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                                                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 px-6 py-3 text-sm font-semibold text-white shadow-lg hover:shadow-xl hover:from-violet-600 hover:to-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                                             >
                                                 <Mail className="h-4 w-4" />
                                                 Generate Cover Letter
                                             </button>
 
                                             {(!resumeText || !jobDescription) && (
-                                                <p className="text-xs text-slate-400 mt-3">Add a resume and job description first</p>
+                                                <p className="text-xs text-slate-400 mt-3 text-center">Add a resume and job description first</p>
                                             )}
                                         </div>
                                     ) : null
                                 )}
                             </div>
 
-                            {/* Change Analysis Sidebar */}
+                            {/* Change Analysis — Desktop: Sidebar, Mobile: Bottom Sheet */}
                             {changes.length > 0 && showChanges && resultViewMode === 'preview' && (
-                                <div className="w-72 border-l border-slate-100 bg-slate-50/70 overflow-auto custom-scrollbar p-4 shrink-0 print:hidden transition-all duration-300 animate-slide-in-right">
-                                    <div className="flex items-center justify-between mb-4 sticky top-0 bg-slate-50/90 backdrop-blur-sm py-2 -mt-2 z-10">
-                                        <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                                            Changes ({changes.length})
-                                        </h3>
-                                        <button
-                                            onClick={() => setShowChanges(false)}
-                                            className="p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
+                                <>
+                                    {/* Mobile: Bottom Sheet Overlay */}
+                                    <div className="lg:hidden fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" onClick={() => setShowChanges(false)} />
+                                    <div className={cn(
+                                        "print:hidden transition-all duration-300 animate-slide-in-right",
+                                        // Mobile: Fixed bottom sheet with flex layout
+                                        "fixed bottom-0 left-0 right-0 z-50 max-h-[70vh] rounded-t-2xl shadow-2xl flex flex-col",
+                                        // Desktop: Side panel
+                                        "lg:static lg:w-72 lg:max-h-none lg:rounded-none lg:shadow-none lg:z-auto",
+                                        "border-l-0 lg:border-l border-slate-100 bg-white lg:bg-slate-50/70 shrink-0"
+                                    )}>
+                                        {/* Fixed Header — drag handle + title + close */}
+                                        <div
+                                            className="shrink-0 select-none touch-none"
+                                            onTouchStart={(e) => {
+                                                const startY = e.touches[0].clientY;
+                                                const el = e.currentTarget.parentElement;
+                                                if (!el) return;
+
+                                                const handleMove = (ev: TouchEvent) => {
+                                                    const deltaY = ev.touches[0].clientY - startY;
+                                                    if (deltaY > 0) {
+                                                        el.style.transform = `translateY(${deltaY}px)`;
+                                                        el.style.transition = 'none';
+                                                    }
+                                                };
+
+                                                const handleEnd = (ev: TouchEvent) => {
+                                                    const deltaY = ev.changedTouches[0].clientY - startY;
+                                                    el.style.transform = '';
+                                                    el.style.transition = '';
+                                                    if (deltaY > 80) {
+                                                        setShowChanges(false);
+                                                    }
+                                                    document.removeEventListener('touchmove', handleMove);
+                                                    document.removeEventListener('touchend', handleEnd);
+                                                };
+
+                                                document.addEventListener('touchmove', handleMove, { passive: true });
+                                                document.addEventListener('touchend', handleEnd, { passive: true });
+                                            }}
                                         >
-                                            <X className="h-3.5 w-3.5" />
-                                        </button>
-                                    </div>
-                                    <div className="space-y-3 stagger-children">
-                                        {changes.map((change, i) => (
-                                            <div key={i} className="text-xs space-y-2 bg-white p-3 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-                                                {change.section && (
-                                                    <span className="inline-block px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                                                        {change.section}
-                                                    </span>
-                                                )}
-                                                <p className="font-semibold text-slate-800 leading-snug">{change.reason}</p>
-                                                {change.original && (
-                                                    <div className="text-slate-400 line-through bg-red-50/60 p-2 rounded-lg text-[10px] leading-relaxed">
-                                                        {change.original.substring(0, 80)}...
-                                                    </div>
-                                                )}
-                                                <div className="text-slate-700 pl-2.5 border-l-2 border-emerald-400 bg-emerald-50/50 p-2 rounded-r-lg">
-                                                    <span className="font-semibold text-emerald-600 text-[10px]">Updated:</span>
-                                                    <span className="text-[10px] ml-1">{change.new.substring(0, 80)}...</span>
-                                                </div>
+                                            {/* Drag indicator (mobile only) */}
+                                            <div className="lg:hidden flex justify-center pt-3 pb-1 cursor-grab">
+                                                <div className="w-10 h-1.5 rounded-full bg-slate-300" />
                                             </div>
-                                        ))}
+                                            <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
+                                                <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                                    Changes ({changes.length})
+                                                </h3>
+                                                <button
+                                                    onClick={() => setShowChanges(false)}
+                                                    className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
+                                                >
+                                                    <X className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Scrollable Body */}
+                                        <div className="flex-1 overflow-y-auto custom-scrollbar overscroll-contain p-4">
+                                            <div className="space-y-3 stagger-children pb-6 lg:pb-0">
+                                                {changes.map((change, i) => (
+                                                    <div key={i} className="text-xs space-y-2 bg-white lg:bg-white p-3 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                                                        {change.section && (
+                                                            <span className="inline-block px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                                                                {change.section}
+                                                            </span>
+                                                        )}
+                                                        <p className="font-semibold text-slate-800 leading-snug">{change.reason}</p>
+                                                        {change.original && (
+                                                            <div className="text-slate-400 line-through bg-red-50/60 p-2 rounded-lg text-[10px] leading-relaxed">
+                                                                {change.original.substring(0, 80)}...
+                                                            </div>
+                                                        )}
+                                                        <div className="text-slate-700 pl-2.5 border-l-2 border-emerald-400 bg-emerald-50/50 p-2 rounded-r-lg">
+                                                            <span className="font-semibold text-emerald-600 text-[10px]">Updated:</span>
+                                                            <span className="text-[10px] ml-1">{change.new.substring(0, 80)}...</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
+                                </>
                             )}
                         </div>
                     </div>
@@ -1165,16 +1215,29 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             )}
 
             {/* Show Changes button when sidebar is hidden */}
-            {changes.length > 0 && !showChanges && tailoredResume && resultViewMode === 'preview' && (
-                <div className="absolute right-4 bottom-24 lg:right-6 lg:top-40 z-10 print:hidden">
+            {changes.length > 0 && !showChanges && tailoredResume && resultViewMode === 'preview' && mobileTab === 'result' && (
+                <>
+                    {/* Mobile: Fixed FAB above bottom tab bar */}
                     <button
                         onClick={() => setShowChanges(true)}
-                        className="p-3 bg-white border border-slate-200 shadow-lg rounded-xl text-slate-600 hover:shadow-xl hover:text-indigo-600 hover:border-indigo-200 transition-all hover:scale-105 active:scale-95"
-                        title="Show change analysis"
+                        className="lg:hidden fixed right-4 bottom-20 z-40 flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-indigo-500 to-violet-500 text-white rounded-full shadow-xl shadow-indigo-500/30 hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200 print:hidden animate-in fade-in slide-in-from-bottom-4"
                     >
-                        <LayoutGrid className="h-5 w-5" />
+                        <LayoutGrid className="h-4 w-4" />
+                        <span className="text-xs font-bold">Changes</span>
+                        <span className="bg-white/25 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{changes.length}</span>
                     </button>
-                </div>
+
+                    {/* Desktop: Absolute icon button */}
+                    <div className="hidden lg:block absolute right-6 top-40 z-10 print:hidden">
+                        <button
+                            onClick={() => setShowChanges(true)}
+                            className="p-3 bg-white border border-slate-200 shadow-lg rounded-xl text-slate-600 hover:shadow-xl hover:text-indigo-600 hover:border-indigo-200 transition-all hover:scale-105 active:scale-95"
+                            title="Show change analysis"
+                        >
+                            <LayoutGrid className="h-5 w-5" />
+                        </button>
+                    </div>
+                </>
             )}
         </div>
     );
