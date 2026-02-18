@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { getProfile, createProfile, updateProfile } from '@/lib/actions';
 import { useAIConfig } from '@/app/context/AIConfigContext';
-import { Loader2, Save, Upload, User, Briefcase, GraduationCap, Code, ChevronRight, FileText, Settings, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Loader2, Save, Upload, User, Briefcase, GraduationCap, Code, ChevronRight, FileText, Settings, CheckCircle2, AlertCircle, Sparkles, Trash2, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
@@ -163,26 +163,29 @@ export default function ProfilePage() {
     ];
 
     return (
-        <div className="min-h-screen bg-gray-50/50 pb-12 font-sans text-gray-900">
+        <div className="min-h-screen bg-slate-50/50 pb-20 md:pb-12 font-sans text-slate-900 animate-in fade-in duration-500">
             {/* Header */}
-            <header className="bg-white border-b sticky top-0 z-20 px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between shadow-sm/50 backdrop-blur-md bg-white/90 supports-[backdrop-filter]:bg-white/60">
-                <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-                    <Link href="/" className="group flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors shrink-0">
-                        <ChevronRight className="h-4 w-4 rotate-180 text-gray-400 group-hover:text-gray-900 transition-colors" />
+            <header className="bg-white/80 border-b border-indigo-100/50 sticky top-14 md:top-16 z-30 px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 transition-all">
+                <div className="flex items-center gap-3 min-w-0">
+                    <Link href="/" className="group flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-indigo-600 transition-colors shrink-0">
+                        <ChevronRight className="h-4 w-4 rotate-180 text-slate-400 group-hover:text-indigo-600 transition-colors" />
                         <span className="hidden sm:inline">Dashboard</span>
                     </Link>
-                    <div className="h-4 w-px bg-gray-200" />
-                    <h1 className="text-base sm:text-lg font-semibold text-gray-900 tracking-tight truncate">Master Profile</h1>
+                    <div className="h-4 w-px bg-slate-200" />
+                    <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight truncate flex items-center gap-2">
+                        <User className="h-4 w-4 text-indigo-500" />
+                        Master Profile
+                    </h1>
                 </div>
 
                 <button
                     onClick={handleSave}
                     disabled={saveStatus === 'saving'}
                     className={cn(
-                        "inline-flex items-center gap-1.5 sm:gap-2 rounded-lg px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white shadow-sm transition-all focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shrink-0",
-                        saveStatus === 'saved' ? "bg-green-600 hover:bg-green-700" :
-                            saveStatus === 'error' ? "bg-red-600 hover:bg-red-700" :
-                                "bg-blue-600 hover:bg-blue-700"
+                        "inline-flex items-center gap-1.5 sm:gap-2 rounded-xl px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-md shadow-blue-500/20 transition-all focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shrink-0 transform active:scale-95",
+                        saveStatus === 'saved' ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20" :
+                            saveStatus === 'error' ? "bg-red-500 hover:bg-red-600 shadow-red-500/20" :
+                                "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
                     )}
                 >
                     {saveStatus === 'saving' ? <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" /> :
@@ -202,20 +205,20 @@ export default function ProfilePage() {
                 </button>
             </header>
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+                <div className="flex flex-col-reverse lg:grid lg:grid-cols-12 gap-8 items-start">
 
-                    {/* Left Column: Import & Settings */}
-                    <div className="lg:col-span-4 space-y-6">
+                    {/* Left Column (Bottom on Mobile): Import & Settings */}
+                    <div className="lg:col-span-4 space-y-6 w-full">
                         {/* Import Card */}
-                        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                            <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
-                                <FileText className="h-4 w-4 text-gray-500" />
-                                <h2 className="font-semibold text-gray-900 text-sm">Resume Source</h2>
+                        <div className="glass-card bg-white/60 overflow-hidden">
+                            <div className="p-4 border-b border-indigo-50/50 bg-indigo-50/30 flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-indigo-500" />
+                                <h2 className="font-semibold text-slate-900 text-sm">Resume Source</h2>
                             </div>
                             <div className="p-5 space-y-6">
                                 <div>
-                                    <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
                                         Import from File
                                     </label>
                                     <div className="relative group">
@@ -227,27 +230,35 @@ export default function ProfilePage() {
                                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                                         />
                                         <div className={cn(
-                                            "border-2 border-dashed rounded-lg p-6 text-center transition-all",
-                                            isUploading ? "border-blue-300 bg-blue-50" : "border-gray-300 group-hover:border-blue-400 group-hover:bg-gray-50"
+                                            "border-2 border-dashed rounded-xl p-6 text-center transition-all duration-300",
+                                            isUploading
+                                                ? "border-indigo-400 bg-indigo-50/50"
+                                                : "border-slate-200 group-hover:border-indigo-400 group-hover:bg-indigo-50/10"
                                         )}>
-                                            <Upload className={cn("mx-auto h-8 w-8 mb-2 transition-colors", isUploading ? "text-blue-500" : "text-gray-400 group-hover:text-blue-500")} />
-                                            <p className="text-sm font-medium text-gray-700">
+                                            <div className={cn(
+                                                "mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-colors",
+                                                isUploading ? "bg-white text-indigo-600" : "bg-indigo-50 text-indigo-500 group-hover:scale-110"
+                                            )}>
+                                                <Upload className="h-5 w-5" />
+                                            </div>
+                                            <p className="text-sm font-medium text-slate-700">
                                                 {isUploading ? 'Extracting text...' : 'Click to upload PDF or TXT'}
                                             </p>
+                                            <p className="text-xs text-slate-400 mt-1">Max 5MB</p>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div className="relative">
-                                    <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-gray-100" />
+                                    <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-slate-100" />
                                     <div className="relative flex justify-center">
-                                        <span className="bg-white px-2 text-xs text-gray-400 uppercase">or paste text</span>
+                                        <span className="bg-white/50 backdrop-blur-sm px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">or paste text</span>
                                     </div>
                                 </div>
 
                                 <div>
                                     <textarea
-                                        className="w-full h-48 p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none transition-all placeholder:text-gray-400"
+                                        className="w-full h-48 p-3 bg-slate-50/50 border border-slate-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none transition-all placeholder:text-slate-400 custom-scrollbar"
                                         placeholder="Paste your full resume text here..."
                                         value={resumeText}
                                         onChange={e => setResumeText(e.target.value)}
@@ -257,43 +268,56 @@ export default function ProfilePage() {
                                 <button
                                     onClick={handleParseResume}
                                     disabled={isParsing || !resumeText}
-                                    className="w-full flex justify-center items-center gap-2 bg-gray-900 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                                    className="w-full flex justify-center items-center gap-2 bg-slate-900 text-white py-3 rounded-xl text-sm font-semibold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-slate-900/10 active:scale-[0.98]"
                                 >
-                                    {isParsing ? <Loader2 className="animate-spin h-4 w-4" /> : 'Auto-Parse with AI'}
+                                    {isParsing ? <Loader2 className="animate-spin h-4 w-4" /> :
+                                        <>
+                                            <Sparkles className="h-4 w-4 text-indigo-300" />
+                                            Auto-Parse with AI
+                                        </>
+                                    }
                                 </button>
                             </div>
                         </div>
-
-                        {/* AI Settings Card Removed - Validated Global Config */}
                     </div>
 
-                    {/* Right Column: Editor */}
-                    <div className="lg:col-span-8 flex flex-col gap-6">
-                        {/* Tabs Navigation */}
-                        <div className="bg-white rounded-xl border border-gray-200 p-1.5 shadow-sm inline-flex w-full overflow-x-auto sm:overflow-visible scrollbar-hide">
-                            {tabs.map(tab => (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
-                                    className={cn(
-                                        "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all whitespace-nowrap",
-                                        activeTab === tab.id ? "bg-blue-50 text-blue-700 shadow-sm ring-1 ring-blue-100" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                                    )}
-                                >
-                                    <tab.icon className={cn("h-4 w-4", activeTab === tab.id ? "text-blue-600" : "text-gray-400")} />
-                                    {tab.label}
-                                </button>
-                            ))}
+                    {/* Right Column (Top on Mobile): Editor */}
+                    <div className="lg:col-span-8 flex flex-col gap-6 w-full">
+                        {/* Sticky Tabs Navigation */}
+                        <div className="sticky top-[7rem] md:top-[8.5rem] z-20 -mx-4 px-4 sm:mx-0 sm:px-0 bg-gradient-to-b from-slate-50/90 via-slate-50/90 to-transparent pb-4 pt-2 supports-[backdrop-filter]:from-slate-50/60 supports-[backdrop-filter]:via-slate-50/60 backdrop-blur-sm">
+                            <div className="bg-white/80 backdrop-blur-md rounded-2xl border border-indigo-100/50 p-1.5 shadow-sm inline-flex w-full overflow-x-auto sm:overflow-visible scrollbar-hide snap-x">
+                                {tabs.map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => {
+                                            setActiveTab(tab.id);
+                                            // Scroll to top of editor gently
+                                            if (window.innerWidth < 1024) {
+                                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                            }
+                                        }}
+                                        className={cn(
+                                            "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl transition-all whitespace-nowrap snap-center focus:outline-none focus:ring-2 focus:ring-indigo-500/20",
+                                            activeTab === tab.id
+                                                ? "bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-indigo-200"
+                                                : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                                        )}
+                                    >
+                                        <tab.icon className={cn("h-4 w-4", activeTab === tab.id ? "text-indigo-600" : "text-slate-400")} />
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
 
                         {/* Editor Content */}
-                        <div className="bg-white rounded-xl border border-gray-200 shadow-sm min-h-[600px] flex flex-col">
+                        <div className="glass-card-solid bg-white rounded-2xl border border-slate-200/60 shadow-sm min-h-[600px] flex flex-col overflow-hidden">
                             {/* Tab Header */}
-                            <div className="px-6 py-4 border-b border-gray-100">
-                                <h2 className="text-lg font-semibold text-gray-900">
+                            <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/30">
+                                <h2 className="text-lg font-bold text-slate-900 tracking-tight">
                                     {tabs.find(t => t.id === activeTab)?.label}
                                 </h2>
-                                <p className="text-sm text-gray-500">
+                                <p className="text-sm text-slate-500 mt-0.5">
                                     {activeTab === 'basics' && "Personal information and contact details."}
                                     {activeTab === 'experience' && "Your professional work history."}
                                     {activeTab === 'education' && "Academic background and qualifications."}
@@ -301,55 +325,55 @@ export default function ProfilePage() {
                                 </p>
                             </div>
 
-                            <div className="p-6 flex-1">
+                            <div className="p-5 sm:p-7 flex-1">
                                 {activeTab === 'basics' && (
-                                    <div className="space-y-6 max-w-3xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="space-y-6 max-w-3xl animate-in fade-in slide-in-from-bottom-2 duration-500">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <div className="space-y-1.5">
-                                                <label className="block text-sm font-medium text-gray-700">Full Name</label>
+                                                <label className="block text-sm font-medium text-slate-700">Full Name</label>
                                                 <input
                                                     type="text"
-                                                    className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder:text-gray-400"
+                                                    className="w-full text-base md:text-sm p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 bg-slate-50/50 focus:bg-white"
                                                     value={profile.name || ''}
                                                     onChange={e => setProfile({ ...profile, name: e.target.value })}
                                                     placeholder="e.g. Jane Doe"
                                                 />
                                             </div>
                                             <div className="space-y-1.5">
-                                                <label className="block text-sm font-medium text-gray-700">Email Address</label>
+                                                <label className="block text-sm font-medium text-slate-700">Email Address</label>
                                                 <input
                                                     type="email"
-                                                    className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder:text-gray-400"
+                                                    className="w-full text-base md:text-sm p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 bg-slate-50/50 focus:bg-white"
                                                     value={profile.email || ''}
                                                     onChange={e => setProfile({ ...profile, email: e.target.value })}
                                                     placeholder="e.g. jane@example.com"
                                                 />
                                             </div>
                                             <div className="space-y-1.5">
-                                                <label className="block text-sm font-medium text-gray-700">Phone Number</label>
+                                                <label className="block text-sm font-medium text-slate-700">Phone Number</label>
                                                 <input
                                                     type="tel"
-                                                    className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder:text-gray-400"
+                                                    className="w-full text-base md:text-sm p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 bg-slate-50/50 focus:bg-white"
                                                     value={profile.phone || ''}
                                                     onChange={e => setProfile({ ...profile, phone: e.target.value })}
                                                     placeholder="e.g. +1 (555) 000-0000"
                                                 />
                                             </div>
                                             <div className="space-y-1.5">
-                                                <label className="block text-sm font-medium text-gray-700">LinkedIn URL</label>
+                                                <label className="block text-sm font-medium text-slate-700">LinkedIn URL</label>
                                                 <input
                                                     type="url"
-                                                    className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder:text-gray-400"
+                                                    className="w-full text-base md:text-sm p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 bg-slate-50/50 focus:bg-white"
                                                     value={profile.linkedin || ''}
                                                     onChange={e => setProfile({ ...profile, linkedin: e.target.value })}
                                                     placeholder="https://linkedin.com/in/..."
                                                 />
                                             </div>
                                             <div className="space-y-1.5 md:col-span-2">
-                                                <label className="block text-sm font-medium text-gray-700">Website / Portfolio</label>
+                                                <label className="block text-sm font-medium text-slate-700">Website / Portfolio</label>
                                                 <input
                                                     type="url"
-                                                    className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder:text-gray-400"
+                                                    className="w-full text-base md:text-sm p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 bg-slate-50/50 focus:bg-white"
                                                     value={profile.website || ''}
                                                     onChange={e => setProfile({ ...profile, website: e.target.value })}
                                                     placeholder="https://janedoe.com"
@@ -358,9 +382,9 @@ export default function ProfilePage() {
                                         </div>
 
                                         <div className="space-y-1.5 pt-2">
-                                            <label className="block text-sm font-medium text-gray-700">Professional Summary</label>
+                                            <label className="block text-sm font-medium text-slate-700">Professional Summary</label>
                                             <textarea
-                                                className="w-full h-40 p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-y transition-all placeholder:text-gray-400"
+                                                className="w-full text-base md:text-sm h-40 p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-y transition-all placeholder:text-slate-400 bg-slate-50/50 focus:bg-white leading-relaxed"
                                                 value={profile.summary || ''}
                                                 onChange={e => setProfile({ ...profile, summary: e.target.value })}
                                                 placeholder="Brief overview of your professional background and key achievements..."
@@ -370,18 +394,17 @@ export default function ProfilePage() {
                                 )}
 
                                 {activeTab === 'experience' && (
-                                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
                                         {profile.experience.map((exp: any, i: number) => (
-                                            <div key={i} className="group relative bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all overflow-hidden">
+                                            <div key={i} className="group relative bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all overflow-hidden hover:border-indigo-200">
 
-                                                {/* Card Header: Role & Company & Dates */}
-                                                <div className="p-5 border-b border-gray-100 bg-white relative">
+                                                {/* Card Header */}
+                                                <div className="p-5 border-b border-slate-100 bg-white relative">
                                                     <div className="flex flex-col gap-3">
-
                                                         <div className="flex items-start justify-between pr-8">
                                                             <div className="flex-1 space-y-1">
                                                                 <input
-                                                                    className="w-full text-lg font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-blue-300 focus:border-blue-500 focus:ring-0 outline-none placeholder:text-gray-300 transition-all"
+                                                                    className="w-full text-lg font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-indigo-300 focus:border-indigo-500 focus:ring-0 outline-none placeholder:text-slate-300 transition-all px-0 py-0.5"
                                                                     value={exp.role}
                                                                     placeholder="Job Title"
                                                                     onChange={e => {
@@ -390,10 +413,10 @@ export default function ProfilePage() {
                                                                         setProfile({ ...profile, experience: newExp });
                                                                     }}
                                                                 />
-                                                                <div className="flex items-center gap-2 text-gray-600">
-                                                                    <Briefcase className="h-3.5 w-3.5 text-gray-400" />
+                                                                <div className="flex items-center gap-2 text-slate-600">
+                                                                    <Briefcase className="h-4 w-4 text-indigo-400" />
                                                                     <input
-                                                                        className="text-sm font-medium bg-transparent border-b border-transparent hover:border-blue-300 focus:border-blue-500 focus:ring-0 outline-none placeholder:text-gray-300 transition-all w-full max-w-sm"
+                                                                        className="text-sm font-medium bg-transparent border-b border-transparent hover:border-indigo-300 focus:border-indigo-500 focus:ring-0 outline-none placeholder:text-slate-300 transition-all w-full max-w-sm px-0 py-0.5"
                                                                         value={exp.company}
                                                                         placeholder="Company Name"
                                                                         onChange={e => {
@@ -407,9 +430,9 @@ export default function ProfilePage() {
                                                         </div>
 
                                                         <div className="flex items-center gap-2 pt-1">
-                                                            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Dates</span>
+                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-1.5 py-0.5 rounded">Dates</span>
                                                             <input
-                                                                className="text-xs font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded px-2 py-1 hover:border-blue-300 focus:border-blue-500 focus:ring-0 outline-none placeholder:text-gray-400 w-full max-w-xs transition-all"
+                                                                className="text-xs sm:text-sm font-medium text-slate-600 bg-slate-50/50 border border-slate-200 rounded-lg px-2.5 py-1.5 hover:border-indigo-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none placeholder:text-slate-400 w-full max-w-xs transition-all"
                                                                 value={exp.dates}
                                                                 placeholder="e.g. Jan 2020 - Present"
                                                                 onChange={e => {
@@ -427,17 +450,17 @@ export default function ProfilePage() {
                                                             newExp.splice(i, 1);
                                                             setProfile({ ...profile, experience: newExp });
                                                         }}
-                                                        className="absolute top-4 right-4 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                        className="absolute top-4 right-4 p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all md:opacity-0 md:group-hover:opacity-100 opacity-100"
                                                         title="Remove Position"
                                                     >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>
+                                                        <Trash2 className="h-4 w-4" />
                                                     </button>
                                                 </div>
 
-                                                {/* Card Body: Description */}
-                                                <div className="p-0 bg-gray-50/30">
+                                                {/* Card Body */}
+                                                <div className="p-0 bg-slate-50/30">
                                                     <textarea
-                                                        className="w-full text-sm leading-relaxed text-gray-700 bg-transparent p-5 border-none focus:ring-2 focus:ring-inset focus:ring-blue-500/50 outline-none resize-y transition-all placeholder:text-gray-400 min-h-[160px]"
+                                                        className="w-full text-base md:text-sm leading-relaxed text-slate-700 bg-transparent p-5 border-none focus:ring-2 focus:ring-inset focus:ring-indigo-500/10 outline-none resize-y transition-all placeholder:text-slate-400 min-h-[160px]"
                                                         value={exp.description}
                                                         placeholder="• Describe your key responsibilities and achievements..."
                                                         onChange={e => {
@@ -452,10 +475,10 @@ export default function ProfilePage() {
 
                                         <button
                                             onClick={() => setProfile({ ...profile, experience: [...profile.experience, { role: '', company: '', dates: '', description: '', highlights: [] }] })}
-                                            className="w-full py-6 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 font-medium hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50/50 transition-all flex flex-col items-center justify-center gap-2 group"
+                                            className="w-full py-6 border-2 border-dashed border-slate-200 rounded-2xl text-slate-500 font-medium hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all flex flex-col items-center justify-center gap-2 group"
                                         >
-                                            <div className="p-2 rounded-full bg-gray-100 group-hover:bg-blue-100 transition-colors">
-                                                <Briefcase className="h-5 w-5" />
+                                            <div className="p-2.5 rounded-full bg-slate-100 group-hover:bg-indigo-100 transition-colors">
+                                                <Plus className="h-5 w-5" />
                                             </div>
                                             <span>Add New Position</span>
                                         </button>
@@ -463,13 +486,13 @@ export default function ProfilePage() {
                                 )}
 
                                 {activeTab === 'skills' && (
-                                    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col">
-                                        <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 flex gap-3 text-blue-700 text-sm">
-                                            <div className="mt-0.5"><CheckCircle2 className="h-4 w-4" /></div>
+                                    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500 h-full flex flex-col">
+                                        <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 flex gap-3 text-blue-700 text-sm">
+                                            <div className="mt-0.5"><Sparkles className="h-4 w-4" /></div>
                                             <p>Enter your skills one per line. The AI uses these to match keywords in job descriptions.</p>
                                         </div>
                                         <textarea
-                                            className="w-full flex-1 min-h-[400px] p-4 border border-gray-200 rounded-lg font-mono text-sm leading-relaxed focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none transition-all placeholder:text-gray-400"
+                                            className="w-full flex-1 min-h-[400px] p-5 border border-slate-200 rounded-xl font-mono text-base md:text-sm leading-relaxed focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none resize-none transition-all placeholder:text-slate-400 bg-slate-50/30 focus:bg-white"
                                             value={Array.isArray(profile.skills) ? profile.skills.join('\n') : profile.skills}
                                             onChange={e => setProfile({ ...profile, skills: e.target.value.split('\n') })}
                                             placeholder="Java&#10;Python&#10;React&#10;Project Management&#10;..."
@@ -478,28 +501,28 @@ export default function ProfilePage() {
                                 )}
 
                                 {activeTab === 'education' && (
-                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
                                         {profile.education.map((edu: any, i: number) => (
-                                            <div key={i} className="group relative p-6 border border-gray-200 rounded-xl bg-gray-50/50 hover:bg-white hover:border-blue-200 hover:shadow-md transition-all">
+                                            <div key={i} className="group relative p-6 border border-slate-200 rounded-xl bg-slate-50/30 hover:bg-white hover:border-indigo-200 hover:shadow-md transition-all">
                                                 <button
                                                     onClick={() => {
                                                         const newEdu = [...profile.education];
                                                         newEdu.splice(i, 1);
                                                         setProfile({ ...profile, education: newEdu });
                                                     }}
-                                                    className="absolute top-4 right-4 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                                    className="absolute top-4 right-4 p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg md:opacity-0 md:group-hover:opacity-100 opacity-100 transition-all"
                                                     title="Remove Education"
                                                 >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>
+                                                    <Trash2 className="h-4 w-4" />
                                                 </button>
 
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                                    <div className="space-y-1">
-                                                        <label className="text-xs font-semibold text-gray-500 uppercase">Institution</label>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Institution</label>
                                                         <input
-                                                            className="w-full text-base font-medium bg-transparent border-b border-gray-200 hover:border-blue-300 focus:border-blue-500 outline-none placeholder:text-gray-300 text-gray-900 transition-colors pb-1"
+                                                            className="w-full text-base font-bold bg-transparent border-b border-slate-200 hover:border-indigo-300 focus:border-indigo-500 outline-none placeholder:text-slate-300 text-slate-900 transition-colors pb-1"
                                                             value={edu.institution || ''}
-                                                            placeholder="University or School Name"
+                                                            placeholder="University Name"
                                                             onChange={e => {
                                                                 const newEdu = [...profile.education];
                                                                 newEdu[i].institution = e.target.value;
@@ -507,12 +530,12 @@ export default function ProfilePage() {
                                                             }}
                                                         />
                                                     </div>
-                                                    <div className="space-y-1">
-                                                        <label className="text-xs font-semibold text-gray-500 uppercase">Degree</label>
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Degree</label>
                                                         <input
-                                                            className="w-full text-base font-medium bg-transparent border-b border-gray-200 hover:border-blue-300 focus:border-blue-500 outline-none placeholder:text-gray-300 text-gray-900 transition-colors pb-1"
+                                                            className="w-full text-base font-bold bg-transparent border-b border-slate-200 hover:border-indigo-300 focus:border-indigo-500 outline-none placeholder:text-slate-300 text-slate-900 transition-colors pb-1"
                                                             value={edu.degree || ''}
-                                                            placeholder="Degree (e.g. BS Computer Science)"
+                                                            placeholder="Degree (e.g. BS CS)"
                                                             onChange={e => {
                                                                 const newEdu = [...profile.education];
                                                                 newEdu[i].degree = e.target.value;
@@ -522,10 +545,10 @@ export default function ProfilePage() {
                                                     </div>
                                                 </div>
 
-                                                <div className="space-y-1">
-                                                    <label className="text-xs font-semibold text-gray-500 uppercase">Dates</label>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Dates</label>
                                                     <input
-                                                        className="w-full text-sm text-gray-600 bg-transparent border-b border-gray-200 hover:border-blue-300 focus:border-blue-500 outline-none placeholder:text-gray-300 pb-1"
+                                                        className="w-full text-sm text-slate-600 bg-transparent border-b border-slate-200 hover:border-indigo-300 focus:border-indigo-500 outline-none placeholder:text-slate-300 pb-1"
                                                         value={edu.dates || ''}
                                                         placeholder="Dates Attended (e.g. 2018 - 2022)"
                                                         onChange={e => {
@@ -540,9 +563,9 @@ export default function ProfilePage() {
 
                                         <button
                                             onClick={() => setProfile({ ...profile, education: [...profile.education, { institution: '', degree: '', dates: '' }] })}
-                                            className="w-full py-4 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 font-medium hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 transition-all flex items-center justify-center gap-2"
+                                            className="w-full py-4 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-medium hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all flex items-center justify-center gap-2 group"
                                         >
-                                            <div className="p-1 rounded bg-gray-100 group-hover:bg-blue-100"><GraduationCap className="h-4 w-4" /></div>
+                                            <div className="p-1.5 rounded bg-slate-100 group-hover:bg-indigo-100"><Plus className="h-4 w-4" /></div>
                                             Add New Education
                                         </button>
                                     </div>

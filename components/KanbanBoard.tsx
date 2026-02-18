@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { updateApplication, deleteApplication } from '@/lib/actions';
 import {
     Briefcase, Calendar, Plus, Trash2, GripVertical,
     Sparkles, Clock, FileCheck, FileX, ArrowRight,
-    ChevronRight, Zap, Trophy, XCircle, Send
+    ChevronRight, Zap, Trophy, XCircle, Send, Filter
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type Application = {
     id: number;
@@ -130,7 +131,12 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
     const [draggedAppId, setDraggedAppId] = useState<number | null>(null);
     const [dragOverCol, setDragOverCol] = useState<string | null>(null);
     const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set());
-    const router = useRouter();
+    const [mobileTab, setMobileTab] = useState('draft');
+
+    // Auto-update mobile tab if last active application was in a different column? 
+    // For now, keep it simple.
+
+    const getColumnApps = (colId: string) => applications.filter(a => (a.status || 'draft') === colId);
 
     const handleDragStart = (e: React.DragEvent, id: number) => {
         setDraggedAppId(id);
@@ -228,69 +234,105 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
     return (
         <div className="flex flex-col h-full overflow-hidden animate-fade-in-up">
             {/* ━━━ Dashboard Header ━━━ */}
-            <div className="flex items-center justify-between mb-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 shrink-0 px-1">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-                        Application Tracker
+                        Dashboard
                     </h1>
-                    <p className="text-sm text-slate-500 mt-0.5">
-                        {totalApps} application{totalApps !== 1 ? 's' : ''}
-                        {appliedCount > 0 && <> · <span className="text-blue-600 font-medium">{appliedCount} applied</span></>}
-                        {interviewCount > 0 && <> · <span className="text-violet-600 font-medium">{interviewCount} interviewing</span></>}
-                        {offerCount > 0 && <> · <span className="text-emerald-600 font-medium">{offerCount} offer{offerCount !== 1 ? 's' : ''}</span></>}
+                    <p className="text-sm text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-slate-700">{totalApps} Applications</span>
+                        {appliedCount > 0 && <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide">Applied {appliedCount}</span>}
+                        {interviewCount > 0 && <span className="inline-flex items-center gap-1 bg-violet-50 text-violet-700 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide">Interview {interviewCount}</span>}
+                        {offerCount > 0 && <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide">Offers {offerCount}</span>}
                     </p>
                 </div>
                 <Link
                     href="/new"
-                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:shadow-lg hover:from-indigo-600 hover:to-violet-600 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:from-indigo-600 hover:to-violet-600 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 >
                     <Plus className="h-4 w-4" />
                     New Application
                 </Link>
             </div>
 
-            {/* ━━━ Kanban Columns ━━━ */}
-            <div className="flex-1 overflow-x-auto pb-2 custom-scrollbar">
-                <div className="flex gap-3 min-w-[1100px] h-full">
+            {/* ━━━ Mobile Tabs (Visible only on small screens) ━━━ */}
+            <div className="lg:hidden mb-4 shrink-0 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
+                <div className="flex gap-2">
                     {STATUS_COLUMNS.map(col => {
-                        const colApps = applications.filter(a => (a.status || 'draft') === col.id);
+                        const isActive = mobileTab === col.id;
+                        const count = getColumnApps(col.id).length;
+                        const Icon = col.icon;
+
+                        return (
+                            <button
+                                key={col.id}
+                                onClick={() => setMobileTab(col.id)}
+                                className={cn(
+                                    "flex items-center gap-2 px-3.5 py-2 rounded-full whitespace-nowrap transition-all duration-200 border",
+                                    isActive
+                                        ? "bg-slate-900 text-white border-slate-900 shadow-md transform scale-[1.02]"
+                                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                                )}
+                            >
+                                <Icon className={cn("h-3.5 w-3.5", isActive ? "text-white" : "text-slate-400")} />
+                                <span className="text-xs font-semibold">{col.label}</span>
+                                <span className={cn(
+                                    "ml-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full",
+                                    isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+                                )}>
+                                    {count}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* ━━━ Kanban Columns ━━━ */}
+            <div className="flex-1 overflow-auto custom-scrollbar lg:overflow-x-auto pb-2">
+                <div className="lg:flex lg:gap-4 lg:min-w-[1100px] h-full">
+                    {STATUS_COLUMNS.map(col => {
+                        // On mobile, only show valid column. On Desktop, show all.
+                        const isVisibleMobile = mobileTab === col.id;
+                        const colApps = getColumnApps(col.id);
                         const Icon = col.icon;
                         const isDropTarget = dragOverCol === col.id && draggedAppId !== null;
 
                         return (
                             <div
                                 key={col.id}
-                                className={`flex-1 min-w-[210px] rounded-xl border flex flex-col h-full transition-all duration-200 ${col.bg} ${col.border} ${isDropTarget ? 'ring-2 ring-indigo-400/50 scale-[1.01] shadow-lg' : ''
-                                    }`}
+                                className={cn(
+                                    "flex-1 min-w-[280px] rounded-2xl border flex flex-col h-full transition-all duration-300",
+                                    col.bg, col.border,
+                                    isDropTarget && "ring-2 ring-indigo-400/50 scale-[1.01] shadow-xl",
+                                    !isVisibleMobile && "hidden lg:flex" // Hide on mobile if not active tab
+                                )}
                                 onDragOver={(e) => handleDragOver(e, col.id)}
                                 onDragLeave={handleDragLeave}
                                 onDrop={() => handleDrop(col.id)}
                             >
                                 {/* Column Header */}
-                                <div className={`px-3.5 py-2.5 rounded-t-xl flex items-center justify-between ${col.headerBg} border-b ${col.border}`}>
-                                    <div className="flex items-center gap-2">
-                                        <div className={`w-6 h-6 rounded-lg bg-gradient-to-br ${col.gradient} flex items-center justify-center shadow-sm`}>
-                                            <Icon className="h-3 w-3 text-white" />
+                                <div className={cn("px-4 py-3 rounded-t-2xl flex items-center justify-between border-b backdrop-blur-sm", col.headerBg, col.border)}>
+                                    <div className="flex items-center gap-2.5">
+                                        <div className={cn("w-7 h-7 rounded-lg bg-gradient-to-br flex items-center justify-center shadow-sm", col.gradient)}>
+                                            <Icon className="h-4 w-4 text-white" />
                                         </div>
-                                        <h3 className="font-semibold text-slate-700 text-sm">{col.label}</h3>
+                                        <h3 className="font-bold text-slate-800 text-sm tracking-tight">{col.label}</h3>
                                     </div>
-                                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${col.badge}`}>
+                                    <span className={cn("text-[11px] font-bold px-2.5 py-1 rounded-full shadow-sm/50", col.badge)}>
                                         {colApps.length}
                                     </span>
                                 </div>
 
                                 {/* Cards */}
-                                <div className="p-2.5 flex-1 overflow-y-auto space-y-2.5 custom-scrollbar">
+                                <div className="p-3 flex-1 overflow-y-auto space-y-3 custom-scrollbar">
                                     {colApps.length === 0 && (
-                                        <div className="flex flex-col items-center justify-center py-10 text-center">
-                                            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center mb-3">
-                                                <Icon className="h-5 w-5 text-slate-300" />
+                                        <div className="flex flex-col items-center justify-center py-12 text-center select-none opacity-60">
+                                            <div className="w-12 h-12 rounded-2xl bg-white/50 border border-slate-200/50 flex items-center justify-center mb-3">
+                                                <Icon className="h-6 w-6 text-slate-300" />
                                             </div>
-                                            <p className="text-xs text-slate-400 font-medium">
-                                                No applications
-                                            </p>
-                                            <p className="text-[10px] text-slate-300 mt-0.5">
-                                                Drag cards here
+                                            <p className="text-xs text-slate-500 font-medium">
+                                                Empty
                                             </p>
                                         </div>
                                     )}
@@ -308,44 +350,48 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
                                                 draggable={!isDeleting}
                                                 onDragStart={(e) => handleDragStart(e, app.id)}
                                                 onDragEnd={handleDragEnd}
-                                                className={`
-                                                    group relative bg-white rounded-xl border border-slate-200/80 shadow-sm
-                                                    cursor-grab active:cursor-grabbing
-                                                    hover:shadow-md hover:border-slate-300 hover:-translate-y-0.5
-                                                    transition-all duration-200 ease-out
-                                                    ${isDeleting ? 'opacity-40 scale-95 pointer-events-none' : ''}
-                                                    ${draggedAppId === app.id ? 'opacity-50 scale-95' : ''}
-                                                `}
+                                                className={cn(
+                                                    "group relative bg-white rounded-xl border border-slate-200/60 shadow-sm cursor-grab active:cursor-grabbing transition-all duration-200 ease-out",
+                                                    "hover:shadow-md hover:border-indigo-200/60 hover:-translate-y-0.5",
+                                                    isDeleting && "opacity-40 scale-95 pointer-events-none",
+                                                    draggedAppId === app.id && "opacity-50 scale-95 rotate-1"
+                                                )}
                                             >
                                                 {/* Drag Handle + Delete */}
-                                                <div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 lg:flex hidden">
                                                     <button
                                                         onClick={(e) => handleDelete(app.id, e)}
                                                         disabled={isDeleting}
-                                                        className="p-1 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                                        className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
                                                         title="Delete"
                                                     >
                                                         <Trash2 className="h-3.5 w-3.5" />
                                                     </button>
                                                 </div>
 
-                                                <Link href={`/applications/${app.id}`} className="block p-3">
+                                                <Link href={`/applications/${app.id}`} className="block p-4">
                                                     {/* Title */}
-                                                    <h4 className="font-semibold text-sm text-slate-800 truncate pr-6 group-hover:text-indigo-600 transition-colors leading-snug">
-                                                        {app.jobTitle || 'Untitled Position'}
-                                                    </h4>
+                                                    <div className="flex justify-between items-start gap-3">
+                                                        <h4 className="font-bold text-sm text-slate-800 truncate leading-snug group-hover:text-indigo-600 transition-colors">
+                                                            {app.jobTitle || 'Untitled Position'}
+                                                        </h4>
+                                                        {/* Mobile Delete Button (always visible if needed, or swipe? sticking to simple button for now) */}
+                                                        {/* Actually, let's keep clean for now */}
+                                                    </div>
 
                                                     {/* Company */}
-                                                    <p className="text-xs text-slate-500 truncate mt-0.5 flex items-center gap-1">
+                                                    <div className="flex items-center gap-1.5 mt-1">
                                                         <Briefcase className="h-3 w-3 text-slate-400 shrink-0" />
-                                                        {app.companyName || 'Unknown Company'}
-                                                    </p>
+                                                        <p className="text-xs font-medium text-slate-500 truncate">
+                                                            {app.companyName || 'Unknown Company'}
+                                                        </p>
+                                                    </div>
 
                                                     {/* Metadata Row */}
-                                                    <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+                                                    <div className="flex items-center gap-2 mt-3 flex-wrap">
                                                         {/* Days ago badge */}
                                                         {daysAgo && (
-                                                            <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded-md">
+                                                            <span className="inline-flex items-center gap-1 text-[10px] lowercase text-slate-400 font-medium bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-md">
                                                                 <Clock className="h-2.5 w-2.5" />
                                                                 {daysAgo}
                                                             </span>
@@ -353,12 +399,14 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
 
                                                         {/* Days since applied */}
                                                         {daysSinceApplied >= 0 && col.id !== 'draft' && (
-                                                            <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md ${daysSinceApplied > 14
-                                                                ? 'text-amber-600 bg-amber-50'
-                                                                : 'text-blue-500 bg-blue-50'
-                                                                }`}>
+                                                            <span className={cn(
+                                                                "inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md border",
+                                                                daysSinceApplied > 14
+                                                                    ? "text-amber-600 bg-amber-50 border-amber-100"
+                                                                    : "text-blue-600 bg-blue-50 border-blue-100"
+                                                            )}>
                                                                 <Send className="h-2.5 w-2.5" />
-                                                                {daysSinceApplied === 0 ? 'Applied today' : `${daysSinceApplied}d since applied`}
+                                                                {daysSinceApplied === 0 ? 'Today' : `${daysSinceApplied}d`}
                                                             </span>
                                                         )}
 
@@ -368,16 +416,18 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
                                                         )}
                                                     </div>
 
-                                                    {/* Resume status indicator */}
-                                                    <div className="mt-2 flex items-center justify-between">
-                                                        <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md ${hasResume
-                                                            ? 'text-emerald-600 bg-emerald-50'
-                                                            : 'text-slate-400 bg-slate-50'
-                                                            }`}>
-                                                            {hasResume ? <FileCheck className="h-2.5 w-2.5" /> : <FileX className="h-2.5 w-2.5" />}
-                                                            {hasResume ? 'Resume ready' : 'No resume'}
+                                                    {/* Footer */}
+                                                    <div className="mt-3 pt-3 border-t border-slate-50 flex items-center justify-between">
+                                                        <span className={cn(
+                                                            "inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full",
+                                                            hasResume
+                                                                ? "text-emerald-700 bg-emerald-50/50 ring-1 ring-emerald-100"
+                                                                : "text-slate-400 bg-slate-50 ring-1 ring-slate-100"
+                                                        )}>
+                                                            {hasResume ? <FileCheck className="h-3 w-3" /> : <FileX className="h-3 w-3" />}
+                                                            {hasResume ? 'Ready' : 'No Resume'}
                                                         </span>
-                                                        <ChevronRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-indigo-400 transition-colors" />
+                                                        <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all" />
                                                     </div>
                                                 </Link>
                                             </div>

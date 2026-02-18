@@ -4,9 +4,9 @@
   --background: #f8fafc;
   --foreground: #0f172a;
 
-  /* Primary palette — Indigo / Violet */
-  --primary-50: #eef2ff;
-  --primary-100: #e0e7ff;
+  /* Primary palette — Premium Indigo / Violet */
+  --primary-50: #eff4ff;
+  --primary-100: #e0eaff;
   --primary-200: #c7d2fe;
   --primary-300: #a5b4fc;
   --primary-400: #818cf8;
@@ -15,23 +15,30 @@
   --primary-700: #4338ca;
   --primary-800: #3730a3;
   --primary-900: #312e81;
+  --primary-950: #1e1b4b;
 
-  /* Accent — Violet */
+  /* Accent — Vivid Violet */
+  --accent-50: #f5f3ff;
+  --accent-100: #ede9fe;
+  --accent-200: #ddd6fe;
+  --accent-300: #c4b5fd;
   --accent-400: #a78bfa;
   --accent-500: #8b5cf6;
   --accent-600: #7c3aed;
+  --accent-700: #6d28d9;
 
   /* Semantic */
   --success-50: #f0fdf4;
-  --success-500: #22c55e;
-  --success-600: #16a34a;
+  --success-500: #10b981;
+  --success-600: #059669;
   --danger-50: #fef2f2;
   --danger-500: #ef4444;
   --danger-600: #dc2626;
   --warning-50: #fffbeb;
   --warning-500: #f59e0b;
+  --info-500: #3b82f6;
 
-  /* Neutrals */
+  /* Neutrals — Cool Slate */
   --slate-50: #f8fafc;
   --slate-100: #f1f5f9;
   --slate-200: #e2e8f0;
@@ -43,18 +50,20 @@
   --slate-800: #1e293b;
   --slate-900: #0f172a;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.04);
-  --shadow-glow: 0 0 20px rgb(99 102 241 / 0.15);
+  /* Shadows — Softer & More Ambient */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.25);
+  --shadow-glow-accent: 0 0 20px rgba(139, 92, 246, 0.25);
 
   /* Radius */
   --radius-sm: 6px;
   --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
 }
 
 @theme inline {
@@ -72,14 +81,29 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ─── Glass Card ─── */
-.glass-card {
+/* ─── Glass Conditionals ─── */
+.glass-effect {
   background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+/* ─── Glass Card 2.0 ─── */
+.glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-md), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
   border-radius: var(--radius-lg);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  box-shadow: var(--shadow-lg), inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+  border-color: rgba(255, 255, 255, 0.8);
+  transform: translateY(-1px);
 }
 
 .glass-card-solid {
@@ -100,9 +124,10 @@ body {
 
 .bg-gradient-mesh {
   background:
-    radial-gradient(at 20% 80%, rgba(99, 102, 241, 0.06) 0px, transparent 50%),
-    radial-gradient(at 80% 20%, rgba(139, 92, 246, 0.06) 0px, transparent 50%),
-    radial-gradient(at 50% 50%, rgba(99, 102, 241, 0.03) 0px, transparent 70%),
+    radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(20, 184, 166, 0.05) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(244, 63, 94, 0.05) 0px, transparent 50%),
     var(--slate-50);
 }
 
@@ -115,19 +140,21 @@ body {
   input[type="button"],
   input[type="submit"],
   [role="button"] {
-    min-height: 44px;
-    min-width: 44px;
+    min-height: 48px;
+    /* Improved from 44px for better tapping */
+    min-width: 48px;
   }
 
   /* Improve tap highlight */
   * {
-    -webkit-tap-highlight-color: rgba(99, 102, 241, 0.1);
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
 /* ─── Custom Scrollbar ─── */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -136,11 +163,13 @@ body {
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: var(--slate-300);
-  border-radius: 10px;
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: var(--slate-400);
+  background-color: var(--slate-400);
 }
 
 /* ─── Segmented Control ─── */

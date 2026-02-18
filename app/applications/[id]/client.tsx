@@ -9,6 +9,7 @@ import {
     Sparkles, X, Eye, GitCompare, LayoutGrid, Mail, Copy, Check,
     PenLine, BookOpen, Zap, Crown
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { JobDetails } from '@/lib/parser';
@@ -59,7 +60,8 @@ function ScoreRing({ score, size = 80, strokeWidth = 7 }: { score: number; size?
 export default function ApplicationClient({ initialApplication }: ApplicationClientProps) {
     const [app, setApp] = useState(initialApplication);
     const [loading, setLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState<'job' | 'resume' | 'result'>('job');
+    const [activeTab, setActiveTab] = useState<'job' | 'resume'>('job');
+    const [mobileTab, setMobileTab] = useState<'job' | 'resume' | 'result'>('job');
     const router = useRouter();
 
     // Resume State
@@ -452,15 +454,15 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     return (
         <div className="h-[calc(100vh-6rem)] flex flex-col gap-0">
 
-            {/* ━━━ Header ━━━ */}
-            <div className="glass-card mb-2 px-3 sm:px-5 py-2 flex items-center justify-between print:hidden flex-wrap gap-2">
+            {/* ━━━ Header (Sticky on Mobile) ━━━ */}
+            <div className="sticky top-14 z-30 bg-white/80 backdrop-blur-xl border-b border-slate-200/50 px-3 sm:px-5 py-2 flex items-center justify-between print:hidden flex-wrap gap-2 transition-all">
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                     <Link
                         href="/"
-                        className="flex items-center gap-1.5 text-slate-400 hover:text-indigo-600 transition-colors shrink-0"
+                        className="flex items-center gap-1.5 text-slate-500 hover:text-indigo-600 transition-colors shrink-0"
                     >
                         <ChevronLeft className="h-4 w-4" />
-                        <span className="text-xs font-medium hidden sm:inline">Dashboard</span>
+                        <span className="text-xs font-semibold hidden sm:inline">Dashboard</span>
                     </Link>
 
                     <div className="h-5 w-px bg-slate-200 shrink-0 hidden sm:block" />
@@ -469,22 +471,16 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                         <h1 className="text-sm sm:text-base font-bold text-slate-900 leading-tight truncate">
                             {app.jobTitle || 'New Application'}
                         </h1>
-                        {app.companyName && (
-                            <span className="text-xs sm:text-sm text-slate-400 font-normal whitespace-nowrap hidden sm:inline">at {app.companyName}</span>
-                        )}
                     </div>
 
                     {/* Status Badge */}
-                    <span className={`
-                        shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider
-                        ${hasResult
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : hasResume
-                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                : 'bg-slate-100 text-slate-500 border border-slate-200'
-                        }
-                    `}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${hasResult ? 'bg-emerald-500' : hasResume ? 'bg-amber-500' : 'bg-slate-400'}`} />
+                    <span className={cn(
+                        "shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-bold uppercase tracking-wider",
+                        hasResult ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                            hasResume ? "bg-amber-50 text-amber-700 border border-amber-200" :
+                                "bg-slate-100 text-slate-500 border border-slate-200"
+                    )}>
+                        <span className={cn("w-1.5 h-1.5 rounded-full", hasResult ? "bg-emerald-500" : hasResume ? "bg-amber-500" : "bg-slate-400")} />
                         <span className="hidden sm:inline">{hasResult ? 'Tailored' : hasResume ? 'In Progress' : 'Draft'}</span>
                     </span>
                 </div>
@@ -493,25 +489,52 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     <button
                         onClick={handleSave}
                         disabled={loading}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 shadow-sm"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
                     >
-                        {loading ? <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" /> : <Save className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
+                        {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                         <span className="hidden sm:inline">Save</span>
                     </button>
                     <button
                         onClick={handleTailor}
                         disabled={loading || !resumeText || !jobDescription}
-                        className="inline-flex items-center gap-1.5 sm:gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-500 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white shadow-md hover:shadow-lg hover:from-indigo-600 hover:to-violet-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-md hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                     >
-                        {loading ? (
-                            <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
-                        ) : (
-                            <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                        )}
+                        {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 text-indigo-300" />}
                         <span className="hidden sm:inline">Tailor Resume</span>
                         <span className="sm:hidden">Tailor</span>
                     </button>
                 </div>
+            </div>
+
+            {/* ━━━ Mobile Bottom Tab Bar ━━━ */}
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-lg border-t border-slate-200 px-6 py-2 flex items-center justify-between shadow-lg ring-1 ring-slate-900/5 pb-safe">
+                {([
+                    { id: 'job', label: 'Job', icon: Briefcase },
+                    { id: 'resume', label: 'Resume', icon: FileText },
+                    { id: 'result', label: 'Result', icon: Sparkles },
+                ] as const).map(tab => (
+                    <button
+                        key={tab.id}
+                        onClick={() => {
+                            setMobileTab(tab.id);
+                            if (tab.id !== 'result') setActiveTab(tab.id as 'job' | 'resume');
+                        }}
+                        className={cn(
+                            "flex flex-col items-center gap-1 transition-all",
+                            mobileTab === tab.id
+                                ? "text-indigo-600 scale-105"
+                                : "text-slate-400 hover:text-slate-600"
+                        )}
+                    >
+                        <div className={cn(
+                            "p-1.5 rounded-full transition-colors",
+                            mobileTab === tab.id ? "bg-indigo-50" : "bg-transparent"
+                        )}>
+                            <tab.icon className="h-5 w-5" />
+                        </div>
+                        <span className="text-[10px] font-medium">{tab.label}</span>
+                    </button>
+                ))}
             </div>
 
 
@@ -532,13 +555,16 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
 
                 {/* ── Left Panel: Input (JD & Resume) ── */}
                 <div
-                    className={`${isLeftPanelOpen
-                        ? 'w-full lg:w-[420px] min-w-[340px] opacity-100'
-                        : 'w-0 h-0 lg:h-auto lg:w-0 min-w-0 opacity-0 p-0 overflow-hidden'
-                        } flex flex-col gap-3 min-h-0 transition-all duration-300 ease-in-out shrink-0`}
+                    className={cn(
+                        "transition-all duration-300 ease-in-out shrink-0 flex flex-col gap-3 min-h-0",
+                        // Mobile: Full width, visible only if tab is job or resume
+                        mobileTab === 'result' ? "hidden lg:flex" : "w-full",
+                        // Desktop: Controlled by isLeftPanelOpen
+                        isLeftPanelOpen ? "lg:w-[420px] opacity-100" : "lg:w-0 lg:opacity-0 lg:p-0 lg:overflow-hidden"
+                    )}
                 >
-                    {/* Segmented Control */}
-                    <div className="flex items-center gap-2 print:hidden">
+                    {/* Segmented Control (Desktop Only) */}
+                    <div className="hidden lg:flex items-center gap-2 print:hidden">
                         <div className="segmented-control flex-1">
                             <button
                                 onClick={() => setActiveTab('job')}
@@ -644,7 +670,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                 </div>
 
                                 {/* Content */}
-                                <div className="flex-1 overflow-auto custom-scrollbar">
+                                <div className="flex-1 overflow-auto custom-scrollbar pb-20 lg:pb-0">
                                     {jobDetails && viewMode === 'analysis' ? (
                                         <div className="p-4 space-y-5 stagger-children">
                                             {/* Job Type Badge */}
@@ -838,7 +864,11 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                 </div>
 
                 {/* ── Right Panel: Output ── */}
-                <div className="flex-1 flex flex-col min-h-0 overflow-hidden transition-all duration-300 ease-in-out">
+                <div className={cn(
+                    "flex-1 flex flex-col min-h-0 overflow-hidden transition-all duration-300 ease-in-out",
+                    // Mobile: Visible only if tab is result
+                    mobileTab !== 'result' ? "hidden lg:flex" : "flex"
+                )}>
                     {/* ─ Main Result Area (single card, no gaps above) ─ */}
                     <div className="flex-1 glass-card-solid overflow-hidden flex flex-col relative">
                         {/* ─ Unified Compact Toolbar ─ */}
@@ -966,7 +996,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
 
                         {/* Content & Sidebar Wrapper */}
                         <div className="flex-1 flex min-h-0 overflow-hidden relative">
-                            <div id="print-container" className="flex-1 overflow-auto p-4 md:p-8 bg-white custom-scrollbar print:p-0 print:overflow-visible">
+                            <div id="print-container" className="flex-1 overflow-auto p-4 md:p-8 bg-white custom-scrollbar print:p-0 print:overflow-visible pb-20 lg:pb-8">
                                 {outputTab === 'resume' ? (
                                     // Resume output
                                     tailoredResume ? (
@@ -1121,9 +1151,9 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                 </div>
             </div>
 
-            {/* ━━━ Floating Expand Button ━━━ */}
+            {/* ━━━ Floating Expand Button (Desktop Only) ━━━ */}
             {!isLeftPanelOpen && (
-                <div className="absolute left-4 bottom-24 lg:left-6 lg:top-40 z-10 print:hidden">
+                <div className="hidden lg:block absolute left-6 top-40 z-10 print:hidden">
                     <button
                         onClick={() => setIsLeftPanelOpen(true)}
                         className="p-3 bg-gradient-to-br from-indigo-500 to-violet-500 shadow-lg rounded-xl text-white hover:shadow-xl transition-all hover:scale-105 active:scale-95"
