@@ -7,7 +7,7 @@ import {
     Loader2, Save, Wand2, Upload, FileText, ChevronLeft, ChevronRight,
     RefreshCw, Download, CheckSquare, Square, UserCheck, Briefcase,
     Sparkles, X, Eye, GitCompare, LayoutGrid, Mail, Copy, Check,
-    PenLine, BookOpen, Zap, Crown
+    PenLine, BookOpen, Zap, Crown, Award
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -108,7 +108,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const [changes, setChanges] = useState<any[]>(initialAnalysis.changes || []);
     const [atsScore, setAtsScore] = useState<{ before: number, after: number, analysis: string } | null>(initialAnalysis.atsScore || null);
     const [executionTime, setExecutionTime] = useState<number | null>(initialAnalysis.executionTime || null);
-    const [resultViewMode, setResultViewMode] = useState<'preview' | 'diff'>('preview');
+    const [resultViewMode, setResultViewMode] = useState<'preview' | 'diff' | 'edit'>('preview');
     const [tailorPhase, setTailorPhase] = useState<'tailoring' | 'analyzing' | 'complete' | null>(null);
 
     // Cover Letter State
@@ -134,6 +134,40 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const hasJobData = !!(jobDescription || jobDetails);
     const hasResume = !!resumeText;
     const hasResult = !!tailoredResume;
+
+    // Certifications State
+    const [profileCertifications, setProfileCertifications] = useState<any[]>([]);
+    const [selectedCertifications, setSelectedCertifications] = useState<any[]>(
+        app.selectedCertifications ? JSON.parse(app.selectedCertifications) : []
+    );
+
+    useEffect(() => {
+        // Load master profile certifications
+        getProfile().then(p => {
+            if (p && p.certifications) {
+                try {
+                    const certs = JSON.parse(p.certifications);
+                    setProfileCertifications(certs);
+                } catch (e) {
+                    console.error("Failed to parse certifications:", e);
+                    setProfileCertifications([]);
+                }
+                // If no selection made yet, select all by default? Or leave empty? 
+                // Let's leave empty or respect DB.
+            }
+        });
+    }, []);
+
+    // Save selected certifications when changed
+    useEffect(() => {
+        const saveSelection = async () => {
+            // Debounce or just save?
+            // Since this might trigger on every click, maybe better to save in handleSave?
+            // But for now let's keep it in sync with handleSave or update lazily.
+            // Actually, the main handleSave should include it.
+        };
+    }, [selectedCertifications]);
+
 
     useEffect(() => {
         if (!app.jobDescription && app.jobUrl && !jobDescription) {
@@ -201,6 +235,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             baseResume: resumeText,
             tailoredResume,
             coverLetter: coverLetter || undefined,
+            selectedCertifications: JSON.stringify(selectedCertifications),
         });
         setLoading(false);
     };
@@ -994,6 +1029,9 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                         <button onClick={() => setResultViewMode('preview')} className={resultViewMode === 'preview' ? 'active' : ''}>
                                             <span className="flex items-center gap-1"><Eye className="h-3 w-3" /><span className="hidden sm:inline">Preview</span></span>
                                         </button>
+                                        <button onClick={() => setResultViewMode('edit')} className={resultViewMode === 'edit' ? 'active' : ''}>
+                                            <span className="flex items-center gap-1"><PenLine className="h-3 w-3" /><span className="hidden sm:inline">Edit</span></span>
+                                        </button>
                                         <button onClick={() => setResultViewMode('diff')} className={resultViewMode === 'diff' ? 'active' : ''}>
                                             <span className="flex items-center gap-1"><GitCompare className="h-3 w-3" /><span className="hidden sm:inline">Diff</span></span>
                                         </button>
@@ -1084,13 +1122,39 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                             <div className="h-full overflow-y-auto">
                                                 <DiffViewer oldText={resumeText} newText={tailoredResume} />
                                             </div>
+                                        ) : resultViewMode === 'edit' ? (
+                                            <div className="w-full h-full flex flex-col relative z-20 group/editor">
+                                                <textarea
+                                                    className="flex-1 w-full p-4 resize-none outline-none font-mono text-[13px] sm:text-sm text-slate-800 bg-white placeholder:text-slate-300 overflow-y-auto"
+                                                    placeholder="Edit your tailored resume here..."
+                                                    value={tailoredResume}
+                                                    onChange={(e) => setTailoredResume(e.target.value)}
+                                                    spellCheck={false}
+                                                />
+                                                <button
+                                                    onClick={() => setResultViewMode('preview')}
+                                                    className="absolute top-4 right-6 bg-indigo-600 text-white shadow-md hover:bg-indigo-700 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all opacity-50 hover:opacity-100"
+                                                >
+                                                    <Eye className="h-3.5 w-3.5" />
+                                                    Done
+                                                </button>
+                                            </div>
                                         ) : (
-                                            <ResumePreview
-                                                content={tailoredResume}
-                                                title={null}
-                                                company={null}
-                                                template={selectedTemplate}
-                                            />
+                                            <div className="relative group/preview min-h-full">
+                                                <ResumePreview
+                                                    content={tailoredResume}
+                                                    title={null}
+                                                    company={null}
+                                                    template={selectedTemplate}
+                                                />
+                                                <button
+                                                    onClick={() => setResultViewMode('edit')}
+                                                    className="absolute top-2 right-2 opacity-0 group-hover/preview:opacity-100 transition-opacity bg-white/90 shadow-sm border border-slate-200 text-slate-500 hover:text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5"
+                                                >
+                                                    <PenLine className="h-3.5 w-3.5" />
+                                                    Edit
+                                                </button>
+                                            </div>
                                         )
                                     ) : (
                                         <div className="h-full flex flex-col items-center justify-center text-slate-400">

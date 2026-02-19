@@ -5,6 +5,7 @@ import { useAIConfig, AIProvider } from "@/app/context/AIConfigContext";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
     Command,
     CommandEmpty,
@@ -88,118 +89,85 @@ export function ModelSelector() {
 
                 <div className="p-0">
                     {activeTab === 'gemini' && (
-                        <Command className="bg-transparent">
-                            <CommandInput placeholder="Search Gemini models..." className="border-none focus:ring-0 text-xs py-2" />
-                            <CommandList className="max-h-[300px] custom-scrollbar">
-                                <CommandEmpty className="py-6 text-center text-xs text-slate-400">No model found.</CommandEmpty>
-                                <CommandGroup heading="Available Models" className="text-slate-500">
-                                    {availableModels.map((model) => (
-                                        <CommandItem
-                                            key={model.name}
-                                            value={model.name}
-                                            keywords={[model.displayName, model.name]}
-                                            onSelect={(currentValue) => {
-                                                console.log("Selected raw value:", currentValue);
-                                                // Find model case-insensitively
-                                                const targetModel = availableModels.find(
-                                                    m => m.name.toLowerCase() === currentValue.toLowerCase() ||
-                                                        m.displayName.toLowerCase() === currentValue.toLowerCase()
-                                                );
+                        <div className="flex flex-col h-full">
+                            <Command className="bg-transparent flex-1">
+                                <CommandInput placeholder="Search Gemini models..." className="border-none focus:ring-0 text-xs py-2" />
+                                <CommandList className="max-h-[200px] custom-scrollbar">
+                                    <CommandEmpty className="py-6 text-center text-xs text-slate-400">No model found.</CommandEmpty>
+                                    <CommandGroup heading="Available Models" className="text-slate-500">
+                                        {availableModels.map((model) => (
+                                            <CommandItem
+                                                key={model.name}
+                                                value={model.name}
+                                                keywords={[model.displayName, model.name]}
+                                                onSelect={(currentValue) => {
+                                                    // Find model case-insensitively
+                                                    const targetModel = availableModels.find(
+                                                        m => m.name.toLowerCase() === currentValue.toLowerCase() ||
+                                                            m.displayName.toLowerCase() === currentValue.toLowerCase()
+                                                    );
 
-                                                if (targetModel) {
-                                                    console.log("Setting model to:", targetModel.name);
-                                                    setSelectedProvider('gemini');
-                                                    setSelectedModel(targetModel.name);
-                                                    setOpen(false);
-                                                } else {
-                                                    console.warn("Could not find model for value:", currentValue);
-                                                }
-                                            }}
-                                            className="cursor-pointer data-[disabled]:pointer-events-auto data-[disabled]:opacity-100 aria-selected:bg-indigo-50 aria-selected:text-indigo-700 my-1 mx-1 rounded-md transition-colors"
-                                        >
-                                            <Check
-                                                className={cn(
-                                                    "mr-2 h-3.5 w-3.5 text-indigo-500",
-                                                    selectedProvider === 'gemini' && selectedModel === model.name ? "opacity-100" : "opacity-0"
-                                                )}
-                                            />
-                                            <div className="flex flex-col">
-                                                <span className="font-medium text-slate-700">{model.displayName}</span>
-                                                {model.description && (
-                                                    <span className="text-[10px] text-slate-400 line-clamp-1">{model.description}</span>
-                                                )}
-                                            </div>
-                                        </CommandItem>
-                                    ))}
-                                </CommandGroup>
-                            </CommandList>
-                        </Command>
-                    )}
+                                                    if (targetModel) {
+                                                        setSelectedProvider('gemini');
+                                                        setSelectedModel(targetModel.name);
+                                                        setOpen(false);
+                                                    }
+                                                }}
+                                                className="cursor-pointer data-[disabled]:pointer-events-auto data-[disabled]:opacity-100 aria-selected:bg-indigo-50 aria-selected:text-indigo-700 my-1 mx-1 rounded-md transition-colors"
+                                            >
+                                                <Check
+                                                    className={cn(
+                                                        "mr-2 h-3.5 w-3.5 text-indigo-500",
+                                                        selectedProvider === 'gemini' && selectedModel === model.name ? "opacity-100" : "opacity-0"
+                                                    )}
+                                                />
+                                                <div className="flex flex-col">
+                                                    <span className="font-medium text-slate-700">{model.displayName}</span>
+                                                    {model.description && (
+                                                        <span className="text-[10px] text-slate-400 line-clamp-1">{model.description}</span>
+                                                    )}
+                                                </div>
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
 
-                    {activeTab === 'local' && (
-                        <div className="p-4 space-y-4 bg-slate-50/30">
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-600">Ollama URL</label>
-                                <input
-                                    className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300"
-                                    placeholder="http://localhost:11434"
-                                    value={customModelConfig.localUrl}
-                                    onChange={(e) => updateCustomConfig({ localUrl: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-600">Model Name</label>
-                                <input
-                                    className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300"
-                                    placeholder="llama3, mistral, etc."
-                                    value={customModelConfig.localModel}
-                                    onChange={(e) => updateCustomConfig({ localModel: e.target.value })}
-                                />
-                            </div>
-                            <Button
-                                size="sm"
-                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-                                onClick={() => {
-                                    setSelectedProvider('local');
-                                    setOpen(false);
-                                }}
-                            >
-                                Use Local Provider
-                            </Button>
-                        </div>
-                    )}
+                            {/* Status Check Section */}
+                            <div className="p-2 border-t border-slate-100 bg-slate-50/50">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-between text-[10px] h-7 px-2 text-slate-500 hover:text-indigo-600 hover:bg-white border border-transparent hover:border-indigo-100"
+                                    onClick={async () => {
+                                        const toastId = toast.loading("Checking API status...");
+                                        try {
+                                            const res = await fetch(`/api/quota?modelName=${selectedModel}`);
+                                            const data = await res.json();
 
-                    {activeTab === 'custom' && (
-                        <div className="p-4 space-y-4 bg-slate-50/30">
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-600">API Endpoint</label>
-                                <input
-                                    className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-500/10 focus:border-violet-500 outline-none transition-all placeholder:text-slate-300"
-                                    placeholder="https://api.openai.com/v1..."
-                                    value={customModelConfig.customUrl}
-                                    onChange={(e) => updateCustomConfig({ customUrl: e.target.value })}
-                                />
+                                            if (data.status === 'ok') {
+                                                toast.success(`Service Operational`, {
+                                                    id: toastId,
+                                                    description: `Model: ${data.model}`
+                                                });
+                                            } else {
+                                                toast.error(`Issue Detected`, {
+                                                    id: toastId,
+                                                    description: data.message
+                                                });
+                                            }
+                                        } catch (e) {
+                                            toast.error("Failed to check status", {
+                                                id: toastId,
+                                                description: "Network or server error"
+                                            });
+                                        }
+                                    }}
+                                >
+                                    <span>Check API Status</span>
+                                    <div className="h-1.5 w-1.5 rounded-full bg-slate-300 group-hover:bg-indigo-400" />
+                                </Button>
                             </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-600">API Key</label>
-                                <input
-                                    type="password"
-                                    className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-500/10 focus:border-violet-500 outline-none transition-all placeholder:text-slate-300"
-                                    placeholder="sk-..."
-                                    value={customModelConfig.customKey}
-                                    onChange={(e) => updateCustomConfig({ customKey: e.target.value })}
-                                />
-                            </div>
-                            <Button
-                                size="sm"
-                                className="w-full bg-violet-600 hover:bg-violet-700 text-white shadow-sm"
-                                onClick={() => {
-                                    setSelectedProvider('custom');
-                                    setOpen(false);
-                                }}
-                            >
-                                Use Custom Provider
-                            </Button>
                         </div>
                     )}
                 </div>

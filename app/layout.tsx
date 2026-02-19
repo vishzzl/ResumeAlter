@@ -4,6 +4,8 @@ import "./globals.css";
 import { MainNav } from "@/components/main-nav";
 import { AIConfigProvider } from "@/app/context/AIConfigContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { auth } from "@/auth";
+import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -42,22 +44,25 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth();
+
   return (
     <html lang="en">
       <body className={inter.className}>
         <ErrorBoundary>
           <AIConfigProvider>
             <div className="min-h-screen pb-4 md:pb-8">
-              <MainNav />
+              <MainNav user={session?.user} />
               <main className="container mx-auto mt-3 md:mt-6 px-3 md:px-6">
                 {children}
               </main>
             </div>
+            <Toaster richColors position="top-right" />
           </AIConfigProvider>
         </ErrorBoundary>
       </body>

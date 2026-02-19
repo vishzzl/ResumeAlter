@@ -29,7 +29,7 @@ export function ResumePreview({ content, title, company, template = 'modern' }: 
         },
         // CLASSIC (PROFESSIONAL ATS) - Traditional, serif headings, very safe parsing
         classic: {
-            container: "font-serif text-gray-900 leading-normal",
+            container: "font-serif text-gray-900 leading-normal [&>h1+p]:text-center [&>h1+p]:mb-6",
             h1: "text-2xl sm:text-3xl font-bold text-center text-gray-900 mb-4 sm:mb-6 uppercase tracking-wide border-b border-gray-900 pb-2",
             h2: "text-[14px] sm:text-base font-bold text-gray-900 uppercase border-b border-gray-400 pb-1 mb-2 sm:mb-3 mt-5 sm:mt-6 tracking-widest",
             h3: "text-[14px] sm:text-base font-bold text-gray-900 mt-3 sm:mt-4 mb-1",

@@ -140,6 +140,7 @@ export async function POST(req: NextRequest) {
         3. **Summary**: 
            - Write a 3-4 sentence professional summary.
            - **ATS Hack**: Include the exact job title from the JD in the first sentence.
+           - **CRITICAL**: Do NOT mention the company name from the JD. You are writing the candidate's history, not a cover letter.
            - Focus on *achievements* relevant to the JD.
 
         4. **Skills**:
@@ -159,6 +160,7 @@ export async function POST(req: NextRequest) {
            - **Content**:
              - Use the **STAR Method** (Situation, Task, Action, Result).
              - Quantify results (e.g., "reduced latency by 50%", "managed $1M budget").
+             - **CRITICAL**: Do NOT mention the company name from the JD in any bullet points. modifying the past history to include the target company is strictly forbidden.
              - **Remove** irrelevant duties that don't match the JD.
 
         OUTPUT FORMAT (JSON ONLY):

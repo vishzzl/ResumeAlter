@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { getProfile, createProfile, updateProfile } from '@/lib/actions';
 import { useAIConfig } from '@/app/context/AIConfigContext';
-import { Loader2, Save, Upload, User, Briefcase, GraduationCap, Code, ChevronRight, FileText, Settings, CheckCircle2, AlertCircle, Sparkles, Trash2, Plus } from 'lucide-react';
+import { Loader2, Save, Upload, User, Briefcase, GraduationCap, Code, ChevronRight, FileText, Settings, CheckCircle2, AlertCircle, Sparkles, Trash2, Plus, Award } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
@@ -36,11 +36,12 @@ export default function ProfilePage() {
                     education: data.education ? JSON.parse(data.education) : [],
                     skills: data.skills ? JSON.parse(data.skills) : [],
                     projects: data.projects ? JSON.parse(data.projects) : [],
+                    certifications: data.certifications ? JSON.parse(data.certifications) : [],
                 });
             } else {
                 setProfile({
                     name: '', email: '', phone: '', linkedin: '', website: '', summary: '',
-                    experience: [], education: [], skills: [], projects: []
+                    experience: [], education: [], skills: [], projects: [], certifications: []
                 });
             }
         } catch (err) {
@@ -101,6 +102,7 @@ export default function ProfilePage() {
                     education: data.education || [],
                     skills: data.skills || [],
                     projects: data.projects || [],
+                    certifications: data.certifications || [],
                 });
             } else {
                 throw new Error(data.error || 'Unknown error');
@@ -127,6 +129,7 @@ export default function ProfilePage() {
                 education: JSON.stringify(profile.education),
                 skills: JSON.stringify(profile.skills),
                 projects: JSON.stringify(profile.projects),
+                certifications: JSON.stringify(profile.certifications),
             };
 
             if (profile.id) {
@@ -160,6 +163,7 @@ export default function ProfilePage() {
         { id: 'experience', label: 'Experience', icon: Briefcase },
         { id: 'education', label: 'Education', icon: GraduationCap },
         { id: 'skills', label: 'Skills', icon: Code },
+        { id: 'certifications', label: 'Certifications', icon: Award },
     ];
 
     return (
@@ -366,6 +370,7 @@ export default function ProfilePage() {
                                     {activeTab === 'experience' && "Your professional work history."}
                                     {activeTab === 'education' && "Academic background and qualifications."}
                                     {activeTab === 'skills' && "Technical and soft skills."}
+                                    {activeTab === 'certifications' && "Professional certifications and licenses."}
                                 </p>
                             </div>
 
@@ -611,6 +616,93 @@ export default function ProfilePage() {
                                         >
                                             <div className="p-1.5 rounded bg-slate-100 group-hover:bg-indigo-100"><Plus className="h-4 w-4" /></div>
                                             Add New Education
+                                        </button>
+                                    </div>
+                                )}
+
+                                {activeTab === 'certifications' && (
+                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                        {profile.certifications.map((cert: any, i: number) => (
+                                            <div key={i} className="group relative p-4 sm:p-6 border border-slate-200 rounded-xl bg-slate-50/30 hover:bg-white hover:border-indigo-200 hover:shadow-md transition-all">
+                                                <button
+                                                    onClick={() => {
+                                                        const newCerts = [...profile.certifications];
+                                                        newCerts.splice(i, 1);
+                                                        setProfile({ ...profile, certifications: newCerts });
+                                                    }}
+                                                    className="absolute top-4 right-4 p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg md:opacity-0 md:group-hover:opacity-100 opacity-100 transition-all"
+                                                    title="Remove Certification"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+
+                                                <div className="space-y-4">
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Certification Name</label>
+                                                        <input
+                                                            className="w-full text-base font-bold bg-transparent border-b border-slate-200 hover:border-indigo-300 focus:border-indigo-500 outline-none placeholder:text-slate-300 text-slate-900 transition-colors pb-1"
+                                                            value={cert.name || ''}
+                                                            placeholder="e.g. AWS Certified Solutions Architect"
+                                                            onChange={e => {
+                                                                const newCerts = [...profile.certifications];
+                                                                newCerts[i].name = e.target.value;
+                                                                setProfile({ ...profile, certifications: newCerts });
+                                                            }}
+                                                        />
+                                                    </div>
+
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Issuer</label>
+                                                            <input
+                                                                className="w-full text-sm text-slate-600 bg-transparent border-b border-slate-200 hover:border-indigo-300 focus:border-indigo-500 outline-none placeholder:text-slate-300 pb-1"
+                                                                value={cert.issuer || ''}
+                                                                placeholder="e.g. Amazon Web Services"
+                                                                onChange={e => {
+                                                                    const newCerts = [...profile.certifications];
+                                                                    newCerts[i].issuer = e.target.value;
+                                                                    setProfile({ ...profile, certifications: newCerts });
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date</label>
+                                                            <input
+                                                                className="w-full text-sm text-slate-600 bg-transparent border-b border-slate-200 hover:border-indigo-300 focus:border-indigo-500 outline-none placeholder:text-slate-300 pb-1"
+                                                                value={cert.date || ''}
+                                                                placeholder="e.g. 2023"
+                                                                onChange={e => {
+                                                                    const newCerts = [...profile.certifications];
+                                                                    newCerts[i].date = e.target.value;
+                                                                    setProfile({ ...profile, certifications: newCerts });
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">URL (Optional)</label>
+                                                        <input
+                                                            className="w-full text-sm text-slate-600 bg-transparent border-b border-slate-200 hover:border-indigo-300 focus:border-indigo-500 outline-none placeholder:text-slate-300 pb-1"
+                                                            value={cert.url || ''}
+                                                            placeholder="https://..."
+                                                            onChange={e => {
+                                                                const newCerts = [...profile.certifications];
+                                                                newCerts[i].url = e.target.value;
+                                                                setProfile({ ...profile, certifications: newCerts });
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        <button
+                                            onClick={() => setProfile({ ...profile, certifications: [...profile.certifications, { name: '', issuer: '', date: '', url: '' }] })}
+                                            className="w-full py-4 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-medium hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all flex items-center justify-center gap-2 group"
+                                        >
+                                            <div className="p-1.5 rounded bg-slate-100 group-hover:bg-indigo-100"><Plus className="h-4 w-4" /></div>
+                                            Add New Certification
                                         </button>
                                     </div>
                                 )}
