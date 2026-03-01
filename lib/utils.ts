@@ -53,12 +53,36 @@ export function formatProfileToText(profile: any): string {
       const experience = typeof profile.experience === 'string' ? JSON.parse(profile.experience) : profile.experience;
       if (Array.isArray(experience)) {
         experience.forEach((exp: any) => {
-          text += `${exp.role} at ${exp.company}\n`;
-          text += `${exp.dates || ''}\n`;
-          if (exp.description) text += `${exp.description}\n`;
-          if (exp.highlights && Array.isArray(exp.highlights)) {
-            exp.highlights.forEach((h: string) => text += `- ${h}\n`);
+          // Company | Role | Dates header (matches tailor prompt format)
+          text += `**${exp.company || 'Company'}** | **${exp.role || 'Role'}** | **${exp.dates || ''}**\n\n`;
+
+          // General description (not client-specific)
+          if (exp.description) {
+            exp.description.split('\n').filter((l: string) => l.trim()).forEach((line: string) => {
+              const clean = line.replace(/^[\s\-\*•]+/, '').trim();
+              if (clean) text += `* ${clean}\n`;
+            });
           }
+          if (exp.highlights && Array.isArray(exp.highlights)) {
+            exp.highlights.forEach((h: string) => {
+              if (h && h.trim()) text += `* ${h.trim()}\n`;
+            });
+          }
+
+          // Client sub-sections
+          if (Array.isArray(exp.clients) && exp.clients.length > 0) {
+            exp.clients.forEach((client: any) => {
+              const label = [client.name, client.domain].filter(Boolean).join(' - ');
+              if (label) text += `\n**Client:** ${label}\n\n`;
+              if (client.description) {
+                client.description.split('\n').filter((l: string) => l.trim()).forEach((line: string) => {
+                  const clean = line.replace(/^[\s\-\*•]+/, '').trim();
+                  if (clean) text += `* ${clean}\n`;
+                });
+              }
+            });
+          }
+
           text += '\n';
         });
       }

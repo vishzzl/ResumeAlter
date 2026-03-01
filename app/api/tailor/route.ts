@@ -91,8 +91,8 @@ JOB DESCRIPTION:
 ${jobDescription}
 
 INSTRUCTIONS:
-1. **requiredKeywords**: Extract every hard skill, technology, tool, framework, platform, certification, methodology, and domain term that is explicitly required. Include exact phrasing from the JD.
-2. **preferredKeywords**: Extract skills/tools listed as "nice to have", "preferred", "bonus", or "plus".
+1. **requiredKeywords**: Extract EVERY HARD TECHNICAL SKILL: technologies, tools, frameworks, programming languages, platforms, and databases. DO NOT extract soft skills (e.g. leadership, communication) or generic terms (e.g. software engineering, agile).
+2. **preferredKeywords**: Extract HARD TECHNICAL SKILLS listed as "nice to have", "preferred", "bonus", etc. Again, NO SOFT SKILLS.
 3. **actionVerbs**: Extract strong action verbs used in the JD's responsibilities section.
 4. **jobTitle**: The exact job title from the JD.
 5. **industry**: The industry/domain.
@@ -198,10 +198,12 @@ ${sections.other}
    - CRITICAL: Do NOT mention the company name from the JD.
 
 3. **Skills** (ATS CRITICAL — this section gets scanned first):
+   - STRICTLY HARD TECHNICAL SKILLS ONLY (e.g., Languages, Frameworks, Cloud, Databases, Tools).
+   - DO NOT include soft skills, generic professional skills, or methodologies (e.g., absolutely NO "leadership", "communication", "Agile", "problem solving", "software engineering", "application support").
    - Group into categories (e.g., **Languages**: ..., **Frameworks**: ..., **Cloud/DevOps**: ...).
    - MUST include EVERY required keyword from the list above that the candidate has demonstrated ANYWHERE in their resume.
    - Use EXACT keyword phrasing from the JD.
-   - Limit to 10-15 skills maximum, prioritizing JD keywords. Be selective — only the most relevant skills.
+   - Limit to 10-15 skills maximum, prioritizing JD technical keywords. Be selective.
 
 4. **Experience** (ATS CRITICAL — keyword density matters here):
    - **Primary Structure** (COMPANY FIRST, then role, then dates):
@@ -217,12 +219,14 @@ ${sections.other}
        * Tailored bullet about work done for this client
    - **Formatting**: Use a star \`*\` for bullet points. CRITICAL: There MUST be a BLANK LINE (an extra \\n) between the company/role header line and the first bullet point. Each bullet MUST start on its own line. In JSON output, use \\n\\n before the first bullet.
    - **Content**:
+     - Each bullet point must be exactly ONE concise, quantified sentence. Two sentences MAX if context demands it.
      - For each role, include 2-4 bullets ordered by relevance to the JD.
      - WEAVE required keywords into bullet points where truthful.
+     - Quantify impact: use numbers, percentages, dollar amounts, or scale wherever possible.
      - Use action verbs from the JD: ${actionVerbList || 'standard strong verbs'}
      - Do NOT mention the company name from the JD.
      - Use the STAR Method and quantify results.
-     - NEVER drop a client entry that appears in the original.
+     - NEVER drop a client entry that appears in the original. Make sure client bullets are also 1-2 sentences.
 
 5. **Education** (NO BULLET POINTS — clean and minimal):
    - Keep all education entries.
@@ -338,6 +342,7 @@ INSTRUCTIONS:
    - Ensure no bullets were fabricated entirely.
    - If the original says "improved by 20%", the tailored version must not claim more than 25%. If no number existed in the original, none should appear.
    - Ensure the target company's name (from the JD) was NOT inserted.
+   - Bullets must be concise (1-2 sentences max). If any bullet exceeds 2 sentences, trim it while preserving key metrics.
    - CRITICAL: If the Original Resume experience section contains \`**Client:**\` sub-sections, they MUST appear in the output.
 3. **Summary**: Ensure it accurately reflects the original resume's level of experience. Keyword inclusion is FINE.
 4. **Education**: Ensure no degrees, institutions, or honors were fabricated.
