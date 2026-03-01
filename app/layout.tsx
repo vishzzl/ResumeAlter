@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { MainNav } from "@/components/main-nav";
 import { AIConfigProvider } from "@/app/context/AIConfigContext";
+import { ParseProvider } from "@/app/context/ParseContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { auth } from "@/auth";
 import { Toaster } from "sonner";
@@ -56,13 +57,15 @@ export default async function RootLayout({
       <body className={inter.className}>
         <ErrorBoundary>
           <AIConfigProvider>
-            <div className="min-h-screen pb-4 md:pb-8">
-              <MainNav user={session?.user} />
-              <main className="container mx-auto mt-3 md:mt-6 px-3 md:px-6">
-                {children}
-              </main>
-            </div>
-            <Toaster richColors position="top-right" />
+            <ParseProvider>
+              <div className="min-h-screen pb-4 md:pb-8">
+                <MainNav user={session?.user} />
+                <main className="container mx-auto mt-3 md:mt-6 px-3 md:px-6">
+                  {children}
+                </main>
+              </div>
+              <Toaster richColors position="top-right" />
+            </ParseProvider>
           </AIConfigProvider>
         </ErrorBoundary>
       </body>
