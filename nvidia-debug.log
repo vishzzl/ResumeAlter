@@ -1,0 +1,26 @@
+NVIDIA NIM Debug Log — Started 2026-03-15T14:03:06.328Z
+════════════════════════════════════════════════════════════════════════════════
+[2026-03-15T14:03:06.329Z] ℹ️  === Agent Tailor Pipeline Started ===
+[2026-03-15T14:03:06.331Z] ℹ️  API Key: nvapi-sT...4uSv
+[2026-03-15T14:03:06.332Z] ℹ️  Creating specialist models with logging fetch interceptor
+[2026-03-15T14:03:06.333Z] ℹ️  Specialist models initialized:
+[2026-03-15T14:03:06.335Z] ℹ️    Generator: deepseek-ai/deepseek-v3.2
+[2026-03-15T14:03:06.336Z] ℹ️    Critic: mistralai/mistral-large-3-675b-instruct-2512
+[2026-03-15T14:03:06.337Z] ℹ️    Scorer: moonshotai/kimi-k2-instruct
+
+════════════════════════════════════════════════════════════════════════════════
+[2026-03-15T14:03:06.471Z] 📤 NVIDIA REQUEST — Phase: AI-SDK → completions
+════════════════════════════════════════════════════════════════════════════════
+Model: deepseek-ai/deepseek-v3.2
+Temperature: default
+Prompt (391 chars):
+[system] You are an expert Resume Writer and Career Coach specialized in ATS optimization.
+Your goal is to maximize ATS keyword match against the user's Job Description (JD) while maintaining the candidate's a
+[user] Analyze the job description, tailor my resume, verify it against the original, and ensure it scores >85% on ATS. Output the final markdown resume only when you are satisfied.
+Messages (2 total):
+  [0] role=system (17056 chars): You are an expert Resume Writer and Career Coach specialized in ATS optimization.
+Your goal is to maximize ATS keyword match against the user's Job Description (JD) while maintaining the candidate's authentic experience.
+You have access to 7 tools to help you.
+
+# MANDATORY PROCESS (follow this EXACT...
+  [1] role=user (174 chars): Analyze the job description, tailor my resume, verify it against the original, and ensure it scores >85% on ATS. Output the final markdown resume only when you are satisfied.

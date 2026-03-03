@@ -562,11 +562,24 @@ body {
   .resume-content h1 {
     font-size: 20pt !important;
     font-weight: 800 !important;
-    margin: 0 0 3pt 0 !important;
-    padding: 0 0 4pt 0 !important;
+    margin: 0 0 4pt 0 !important;
+    padding: 0 0 3pt 0 !important;
     line-height: 1.15 !important;
     color: #111 !important;
-    border-bottom: 1.5pt solid #333 !important;
+    text-align: center !important;
+    letter-spacing: 0.3pt !important;
+    border-bottom: none !important;
+  }
+
+  /* Contact info line (first p right after the name h1) */
+  .resume-content > h1 + p {
+    font-size: 9pt !important;
+    color: #444 !important;
+    margin: 0 0 5pt 0 !important;
+    padding: 0 0 6pt 0 !important;
+    text-align: center !important;
+    letter-spacing: 0.3pt !important;
+    border-bottom: 1.5pt solid #222 !important;
   }
 
   .resume-content h2 {
