@@ -141,7 +141,9 @@ OUTPUT FORMAT (JSON ONLY):
                 const requiredKeywordList = (jdKeywords.requiredKeywords || []).join(', ');
                 const actionVerbList = (jdKeywords.actionVerbs || []).join(', ');
 
-                const tailoringSystemInstruction = `You are an expert Resume Writer and Career Coach, specialized in ATS optimization. You output ONLY valid JSON. You never fabricate skills, metrics, or experiences that are not in the original resume. Your #1 goal is to maximize ATS keyword match while keeping the resume truthful.`;
+                const tailoringSystemInstruction = `You are an expert Resume Writer and Career Coach, specialized in ATS optimization. You output ONLY valid JSON. You never fabricate skills, metrics, or experiences that are not in the original resume. Your #1 goal is to maximize ATS keyword match while keeping the resume truthful.
+
+CRITICAL LENGTH RULE: The ENTIRE resume MUST fit on ONE page when printed. This is non-negotiable. Keep all sections concise. If in doubt, cut bullets — never cut keywords from the skills section.`;
 
                 const tailoringPrompt = `
 Your goal is to rewrite the resume sections to MAXIMIZE ATS keyword match against the Job Description (JD) while maintaining the candidate's authentic experience.
@@ -187,14 +189,15 @@ ${sections.other}
 1. **Header**: 
    - **Name**: MUST start with \`# \` followed by the candidate's name (Markdown H1 format). Do NOT omit the \`# \`.
    - **Contact**: On the SECOND line, provide email, phone, location, and links EXACTLY separated by \` | \`. Do NOT use bullet points. Do NOT use multiple lines for contact info.
+   - **CRITICAL for links**: LinkedIn, GitHub, Portfolio and any URLs MUST use Markdown link format: \`[LinkedIn](https://linkedin.com/in/...)\`, \`[GitHub](https://github.com/...)\`. NEVER output a bare URL like \`linkedin.com/in/...\` — it will break PDF formatting.
    - You MUST output EXACTLY 2 lines for the header. Example:
      # John Doe
-     john@email.com | (555) 123-4567 | San Francisco, CA | [LinkedIn](https://linkedin.com/in/johndoe) | [GitHub](https://github.com)
+     john@email.com | (555) 123-4567 | San Francisco, CA | [LinkedIn](https://linkedin.com/in/johndoe) | [GitHub](https://github.com/johndoe)
 
 2. **Summary** (ATS CRITICAL — front-load keywords here):
-   - Write a 3-4 sentence professional summary.
+   - Write EXACTLY 2-3 sentences. No more — this must be very concise to leave room for experience.
    - MUST include the exact job title "${jdKeywords.jobTitle || 'from the JD'}" in the first sentence.
-   - MUST mention 3-5 of the top required keywords naturally in the summary.
+   - MUST mention 3-5 of the top required keywords naturally.
    - CRITICAL: Do NOT mention the company name from the JD.
 
 3. **Skills** (ATS CRITICAL — this section gets scanned first):
@@ -203,7 +206,7 @@ ${sections.other}
    - Group into categories (e.g., **Languages**: ..., **Frameworks**: ..., **Cloud/DevOps**: ...).
    - MUST include EVERY required keyword from the list above that the candidate has demonstrated ANYWHERE in their resume.
    - Use EXACT keyword phrasing from the JD.
-   - Limit to 10-15 skills maximum, prioritizing JD technical keywords. Be selective.
+   - Include up to 20 technical skills, prioritizing JD required keywords. Do NOT artificially drop keywords to hit a lower number — ATS systems reward comprehensive coverage.
 
 4. **Experience** (ATS CRITICAL — keyword density matters here):
    - **Primary Structure** (COMPANY FIRST, then role, then dates):
@@ -218,9 +221,10 @@ ${sections.other}
 
        * Tailored bullet about work done for this client
    - **Formatting**: Use a star \`*\` for bullet points. CRITICAL: There MUST be a BLANK LINE (an extra \\n) between the company/role header line and the first bullet point. Each bullet MUST start on its own line. In JSON output, use \\n\\n before the first bullet.
-   - **Content**:
-     - Each bullet point must be exactly ONE concise, quantified sentence. Two sentences MAX if context demands it.
-     - For each role, include 2-4 bullets ordered by relevance to the JD.
+   - **Content (ONE-PAGE RULE)**:
+     - MAX 2-3 bullets per role — keep only the most impactful ones.
+     - MAX 3 job roles total — include only the 3 most recent or most relevant.
+     - Each bullet must be ONE sentence, ≤25 words.
      - WEAVE required keywords into bullet points where truthful.
      - Quantify impact: use numbers, percentages, dollar amounts, or scale wherever possible.
      - Use action verbs from the JD: ${actionVerbList || 'standard strong verbs'}
@@ -253,6 +257,10 @@ DO NOT:
 - Copy JD sentences verbatim as resume achievements.
 - Add skills the candidate has never demonstrated.
 - Insert the hiring company's name anywhere.
+- Write more than 3 bullets per job role.
+- Include more than 3 job roles.
+- Write a summary longer than 3 sentences.
+- Generate content that would cause the resume to exceed one printed page.
 
 OUTPUT FORMAT (JSON ONLY, use \\\\n for newlines inside strings):
 {
@@ -345,18 +353,21 @@ INSTRUCTIONS:
    - Bullets must be concise (1-2 sentences max). If any bullet exceeds 2 sentences, trim it while preserving key metrics.
    - CRITICAL: If the Original Resume experience section contains \`**Client:**\` sub-sections, they MUST appear in the output.
 3. **Summary**: Ensure it accurately reflects the original resume's level of experience. Keyword inclusion is FINE.
-4. **Education**: Ensure no degrees, institutions, or honors were fabricated.
+4. **Header**: Ensure the candidate's name and contact details are unchanged from the original. Format MUST be: \`# Name\` on line 1, contact info on line 2 separated by \` | \`.
+5. **Education**: Ensure no degrees, institutions, or honors were fabricated. Return education unchanged if it is correct.
 
-OUTPUT FORMAT (JSON ONLY, use \\n for newlines inside strings. ONLY output the sections below):
+OUTPUT FORMAT (JSON ONLY, use \\\\n for newlines inside strings. Output ALL sections below):
 {
+    "header": "# Name\\\\nemail | phone | ...",
     "summary": "...",
     "skills": "...",
     "experience": "...",
+    "education": "**Degree** | **University** | **Dates**",
     "projects": "...",
     "corrections": [
         {"section": "skills", "action": "removed", "detail": "Kubernetes - not in original resume"}
     ]
-}`;
+}`
 
                 try {
                     console.log("Phase 1.5: Verifying Content (CoVe)...");
@@ -559,9 +570,23 @@ ${tailoredSections.skills}
 
                 console.log(`Final ATS Metrics — Required KW: ${finalRequiredCoverage.score}%, All KW: ${finalAllCoverage.score}%, Formatting: ${formattingScore}%`);
 
+                // ── Deterministic score components ──
+                // keyword match (40%) and skills alignment (20%) and formatting (10%) are calculated
+                // programmatically. Only experienceRelevance (30%) comes from the LLM.
+                const originalKeywordScore = originalRequiredCoverage.score;
+                const tailoredKeywordScore = finalRequiredCoverage.score;
+                const originalSkillsScore = originalAllCoverage.score;
+                const tailoredSkillsScore = finalAllCoverage.score;
+                // Estimate original formatting score similarly
+                const hasOriginalHeader = /^#\s+/.test(resume);
+                const hasOriginalSections = (resume.match(/^##\s+/gm) || []).length >= 3;
+                const hasOriginalBullets = (resume.match(/^\s*\*/gm) || []).length >= 5;
+                const originalFormattingScore = (hasOriginalHeader ? 30 : 0) + (hasOriginalSections ? 40 : 0) + (hasOriginalBullets ? 30 : 0);
+
                 const analysisPrompt = `
-You are an ATS (Applicant Tracking System) scoring algorithm.
-Score BOTH the original and tailored resumes against the Job Description.
+You are a resume analysis assistant.
+Evaluate ONLY the "Experience Relevance" dimension for both the original and tailored resumes against the Job Description.
+Do NOT compute overall ATS scores — those are calculated deterministically.
 
 JOB DESCRIPTION:
 ${jobDescription}
@@ -572,46 +597,24 @@ ${resume}
 TAILORED RESUME:
 ${tailoredResume}
 
-═══ PRE-CALCULATED SCORES (use these as ground truth) ═══
-ORIGINAL — Required Keyword Match: ${originalRequiredCoverage.score}%, Keywords found: ${originalRequiredCoverage.matched.length}/${(jdKeywords.requiredKeywords || []).length}
-TAILORED — Required Keyword Match: ${finalRequiredCoverage.score}%, Keywords found: ${finalRequiredCoverage.matched.length}/${(jdKeywords.requiredKeywords || []).length}
-TAILORED — Missing Required Keywords: [${finalRequiredCoverage.missing.join(', ')}]
-TAILORED — All Keywords Match: ${finalAllCoverage.score}%, Found: ${finalAllCoverage.matched.length}/${allKeywords.length}
-ORIGINAL — All Keywords Match: ${originalAllCoverage.score}%, Found: ${originalAllCoverage.matched.length}/${allKeywords.length}
-TAILORED — Formatting Score: ${formattingScore}%
-
-SCORING RUBRIC (weighted):
-- **Keyword Match (40%)**: Use the pre-calculated Required Keyword Match scores above.
-- **Experience Relevance (30%)**: How well does the experience align with the JD requirements?
-- **Skills Alignment (20%)**: Use the pre-calculated All Keywords Match scores above.
-- **Formatting (10%)**: Use the pre-calculated formatting score.
-
-IMPORTANT: The overall scores MUST be consistent with the pre-calculated keyword coverage numbers.
+SCORING GUIDANCE:
+- **Experience Relevance (0-100)**: How well does the candidate's experience align with JD responsibilities? Focus on role, industry, seniority, and achievement quality.
 
 OUTPUT FORMAT (JSON ONLY):
 {
-    "atsScore": {
-        "before": 45,
-        "after": 82,
-        "breakdown": {
-            "keywordMatch": {"before": 30, "after": 85},
-            "experienceRelevance": {"before": 50, "after": 80},
-            "skillsAlignment": {"before": 40, "after": 90},
-            "formatting": {"before": 70, "after": 80}
-        },
-        "analysis": "Added 'React' and 'Node.js', quantified achievements."
-    },
+    "experienceRelevance": {"before": 50, "after": 80},
+    "analysis": "Two sentence summary of what changed and why the tailored version is better.",
     "changes": [
         { "section": "Experience", "original": "Managed team...", "new": "Spearheaded team of 10...", "reason": "Added leadership keyword." }
     ]
 }`;
 
-                let analysisData = { atsScore: null as any, changes: [] as any[] };
+                let analysisData = { experienceRelevance: null as any, analysis: '' as string, changes: [] as any[] };
                 try {
                     console.log("Phase 2: Analyzing (Deterministic + LLM Hybrid)...");
                     const analysisText = await generateText({
                         prompt: analysisPrompt,
-                        systemInstruction: 'You are an ATS scoring algorithm. Output ONLY valid JSON. Use the pre-calculated keyword scores as ground truth.',
+                        systemInstruction: 'You are a resume evaluation assistant. Output ONLY valid JSON.',
                         provider,
                         apiKey,
                         modelName,
@@ -624,11 +627,31 @@ OUTPUT FORMAT (JSON ONLY):
                     console.error("Failed to generate analysis", e);
                 }
 
+                // ── Deterministic composite ATS score calculation ──
+                // LLM only provides experienceRelevance (30%). Everything else is math.
+                const expRelBefore = analysisData.experienceRelevance?.before ?? 50;
+                const expRelAfter = analysisData.experienceRelevance?.after ?? 70;
+
+                const calcScore = (kw: number, skills: number, fmt: number, expRel: number) =>
+                    Math.round(0.40 * kw + 0.20 * skills + 0.10 * fmt + 0.30 * expRel);
+
+                const deterministicAtsScore = {
+                    before: calcScore(originalKeywordScore, originalSkillsScore, originalFormattingScore, expRelBefore),
+                    after: calcScore(tailoredKeywordScore, tailoredSkillsScore, formattingScore, expRelAfter),
+                    breakdown: {
+                        keywordMatch: { before: originalKeywordScore, after: tailoredKeywordScore },
+                        experienceRelevance: { before: expRelBefore, after: expRelAfter },
+                        skillsAlignment: { before: originalSkillsScore, after: tailoredSkillsScore },
+                        formatting: { before: originalFormattingScore, after: formattingScore },
+                    },
+                    analysis: analysisData.analysis || '',
+                };
+
                 // Send final result via SSE
                 sendSSE(controller, encoder, {
                     phase: 'complete',
                     data: {
-                        atsScore: analysisData.atsScore,
+                        atsScore: deterministicAtsScore,
                         changes: analysisData.changes
                     }
                 });
@@ -638,7 +661,7 @@ OUTPUT FORMAT (JSON ONLY):
                     await db.update(applications).set({
                         analysis: JSON.stringify({
                             changes: analysisData.changes || [],
-                            atsScore: analysisData.atsScore || null,
+                            atsScore: deterministicAtsScore,
                         }),
                         tailorStatus: 'complete',
                     }).where(eq(applications.id, appId));

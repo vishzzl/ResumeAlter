@@ -11,12 +11,14 @@ export function formatProfileToText(profile: any): string {
 
   let text = '';
 
-  // Contact Info
-  if (profile.name) text += `${profile.name}\n`;
-  if (profile.email) text += `Email: ${profile.email}\n`;
-  if (profile.phone) text += `Phone: ${profile.phone}\n`;
-  if (profile.linkedin) text += `LinkedIn: ${profile.linkedin}\n`;
-  if (profile.website) text += `Website: ${profile.website}\n`;
+  // Header — Markdown H1 + pipe-separated contact (matches tailor prompt & resume-parser expectations)
+  if (profile.name) text += `# ${profile.name}\n`;
+  const contactParts: string[] = [];
+  if (profile.email) contactParts.push(profile.email);
+  if (profile.phone) contactParts.push(profile.phone);
+  if (profile.linkedin) contactParts.push(`[LinkedIn](${profile.linkedin})`);
+  if (profile.website) contactParts.push(`[Website](${profile.website})`);
+  if (contactParts.length > 0) text += `${contactParts.join(' | ')}\n`;
   text += '\n';
 
   // Summary

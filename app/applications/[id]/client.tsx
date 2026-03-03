@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Application, applications } from '@/lib/db/schema';
 import { updateApplication, getProfile } from '@/lib/actions';
@@ -62,6 +62,7 @@ function ScoreRing({ score, size = 80, strokeWidth = 7 }: { score: number; size?
 export default function ApplicationClient({ initialApplication }: ApplicationClientProps) {
     const [app, setApp] = useState(initialApplication);
     const [loading, setLoading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false); // separate from loading (which is used for tailoring)
     const [activeTab, setActiveTab] = useState<'job' | 'resume'>('job');
     const [mobileTab, setMobileTab] = useState<'job' | 'resume' | 'result'>('job');
     const router = useRouter();
@@ -69,6 +70,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     // Resume State
     const [resumeText, setResumeText] = useState(app.baseResume || '');
     const [isUploading, setIsUploading] = useState(false);
+    const resumeAutoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Job Description State
     const [jobDescription, setJobDescription] = useState(app.jobDescription || '');
@@ -122,12 +124,18 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const [resultViewMode, setResultViewMode] = useState<'preview' | 'diff' | 'edit'>('preview');
     const [tailorPhase, setTailorPhase] = useState<'extracting' | 'tailoring' | 'verifying' | 'gap_check' | 'analyzing' | 'complete' | null>(null);
 
-    // Keyword Coverage State
+    // Keyword Coverage State — pre-fix (before gap injection) and post-fix (final)
+    const [preFixCoverage, setPreFixCoverage] = useState<{
+        required: { score: number; matched: string[]; missing: string[]; total: number };
+        preferred: { score: number; matched: string[]; missing: string[]; total: number };
+    } | null>(null);
     const [keywordCoverage, setKeywordCoverage] = useState<{
         required: { score: number; matched: string[]; missing: string[]; total: number };
         preferred: { score: number; matched: string[]; missing: string[]; total: number };
     } | null>(null);
     const [gapFixResults, setGapFixResults] = useState<{ injected: string[]; skipped: string[] } | null>(null);
+    // SSE completion tracking
+    const [sseIncomplete, setSseIncomplete] = useState(false);
 
     // Cover Letter State
     const [coverLetter, setCoverLetter] = useState(app.coverLetter || '');
@@ -152,6 +160,10 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const hasJobData = !!(jobDescription || jobDetails);
     const hasResume = !!resumeText;
     const hasResult = !!tailoredResume;
+
+    // Input validation — prevent tailoring with obviously insufficient data
+    const inputTooShort = resumeText.length < 200 || jobDescription.length < 100;
+    const canTailor = !loading && !!resumeText && !!jobDescription && !inputTooShort;
 
     // Certifications State
     const [profileCertifications, setProfileCertifications] = useState<any[]>([]);
@@ -232,6 +244,14 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                 }),
             });
             const data = await res.json();
+
+            // Handle auth-wall / bot-detection
+            if (data.scrapeBlocked) {
+                toast.warning('⚠️ Job page requires login or is blocking scraping. Please paste the job description manually.', { duration: 6000 });
+                setIsScraping(false);
+                return;
+            }
+
             if (data.description) {
                 setJobDescription(data.description);
                 let newTitle = app.jobTitle;
@@ -257,16 +277,36 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     };
 
     const handleSave = async () => {
-        setLoading(true);
-        await updateApplication(app.id, {
-            jobDescription,
-            jobDetails: jobDetails ? JSON.stringify(jobDetails) : undefined,
-            baseResume: resumeText,
-            tailoredResume,
-            coverLetter: coverLetter || undefined,
-            selectedCertifications: JSON.stringify(selectedCertifications),
-        });
-        setLoading(false);
+        setIsSaving(true);
+        try {
+            await updateApplication(app.id, {
+                jobDescription,
+                jobDetails: jobDetails ? JSON.stringify(jobDetails) : undefined,
+                baseResume: resumeText,
+                tailoredResume,
+                coverLetter: coverLetter || undefined,
+                selectedCertifications: JSON.stringify(selectedCertifications),
+            });
+            toast.success('Saved successfully!');
+        } catch (err) {
+            console.error('Save failed', err);
+            toast.error('Save failed. Please try again.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    // Debounced auto-save for resume text (saves 1.5s after the user stops typing)
+    const handleResumeTextChange = (value: string) => {
+        setResumeText(value);
+        if (resumeAutoSaveRef.current) clearTimeout(resumeAutoSaveRef.current);
+        resumeAutoSaveRef.current = setTimeout(async () => {
+            try {
+                await updateApplication(app.id, { baseResume: value });
+            } catch (e) {
+                console.error('Auto-save failed', e);
+            }
+        }, 1500);
     };
 
     const handleGenerateCoverLetter = async () => {
@@ -504,7 +544,9 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
         setError(null);
         setTailorPhase('extracting');
         setKeywordCoverage(null);
+        setPreFixCoverage(null);
         setGapFixResults(null);
+        setSseIncomplete(false);
         toast.info('🚀 Tailoring started...', { id: 'tailor-status' });
 
         try {
@@ -586,6 +628,8 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                 setTailorPhase('gap_check');
                                 toast.info('🔧 Optimizing keyword coverage...', { id: 'tailor-status' });
                                 if (event.data?.preFixCoverage) {
+                                    // Store pre-fix separately so post-fix can be compared
+                                    setPreFixCoverage(event.data.preFixCoverage);
                                     setKeywordCoverage(event.data.preFixCoverage);
                                 }
                             } else if (event.phase === 'gap_fix_result') {
@@ -602,6 +646,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                 toast.info('📊 Running ATS analysis...', { id: 'tailor-status' });
                             } else if (event.phase === 'complete') {
                                 setTailorPhase('complete');
+                                setSseIncomplete(false);
                                 if (event.data.atsScore) setAtsScore(event.data.atsScore);
                                 if (event.data.changes) setChanges(event.data.changes);
 
@@ -635,34 +680,31 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             setError(err instanceof Error ? err.message : 'Failed to tailor resume.');
             toast.error('❌ Tailoring failed. Please try again.', { id: 'tailor-status' });
         } finally {
-            setLoading(false);
-            setTailorPhase(null);
+            setLoading(prevLoading => {
+                // If we finished loading but never reached 'complete' phase, the stream was cut
+                setTailorPhase(prev => {
+                    if (prev !== null && prev !== 'complete') {
+                        setSseIncomplete(true);
+                        toast.warning('⚠️ Tailoring may be incomplete — some phases did not finish.', { id: 'tailor-status', duration: 8000 });
+                    }
+                    return null;
+                });
+                return false;
+            });
         }
     };
 
     const handleDownloadPDF = async () => {
-        // Force preview mode (diff view doesn't make sense in PDF)
-        if (resultViewMode !== 'preview') {
-            setResultViewMode('preview');
+        if (!tailoredResume) {
+            setError('No tailored resume to export. Please tailor the resume first.');
+            return;
         }
 
         setPdfGenerating(true);
         try {
-            // Small delay to let React re-render to preview mode
-            await new Promise(r => setTimeout(r, 300));
-
             const { exportResumePDF } = await import('@/lib/pdf-export');
-            const container = document.getElementById('print-container');
-            const resumeEl = container?.querySelector('.resume-content') as HTMLElement | null;
-
-            if (!resumeEl) {
-                setError('Could not find resume content to export.');
-                return;
-            }
-
-            await exportResumePDF(resumeEl, {
-                fileName: `Resume - ${app.companyName || 'Untitled'} - ${app.jobTitle || 'Resume'}`,
-            });
+            const fileName = ['Resume', app.companyName, app.jobTitle].filter(Boolean).join(' - ');
+            await exportResumePDF(tailoredResume, { fileName });
         } catch (err) {
             console.error('PDF export failed:', err);
             setError('PDF export failed. Please try again.');
@@ -710,15 +752,16 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                 <div className="flex items-center gap-2 shrink-0">
                     <button
                         onClick={handleSave}
-                        disabled={loading}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
+                        disabled={isSaving || loading}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                        <span className="hidden sm:inline">Save</span>
+                        {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                        <span className="hidden sm:inline">{isSaving ? 'Saving...' : 'Save'}</span>
                     </button>
                     <button
                         onClick={handleTailor}
-                        disabled={loading || !resumeText || !jobDescription}
+                        disabled={!canTailor}
+                        title={inputTooShort ? 'Resume must be at least 200 characters and job description at least 100 characters' : undefined}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-md hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all min-w-[120px] justify-center"
                     >
                         {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 text-indigo-300" />}
@@ -781,6 +824,19 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     <X className="h-4 w-4 text-red-500 shrink-0" />
                     <p className="flex-1 min-w-0 text-xs truncate"><span className="font-semibold">Error:</span> {error}</p>
                     <button onClick={() => setError(null)} className="p-1 rounded hover:bg-red-100 transition-colors shrink-0">
+                        <X className="h-3.5 w-3.5" />
+                    </button>
+                </div>
+            )}
+
+                        {/* ━━━ SSE Incomplete Warning ━━━ */}
+            {sseIncomplete && (
+                <div className="animate-fade-in-up mb-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm print:hidden" role="alert">
+                    <span className="shrink-0">⚠️</span>
+                    <p className="flex-1 min-w-0 text-xs">
+                        <span className="font-semibold">Tailoring may be incomplete</span> — the process was interrupted. Try tailoring again if anything looks off.
+                    </p>
+                    <button onClick={() => setSseIncomplete(false)} className="p-1 rounded hover:bg-amber-100 transition-colors shrink-0">
                         <X className="h-3.5 w-3.5" />
                     </button>
                 </div>

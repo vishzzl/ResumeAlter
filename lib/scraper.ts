@@ -1,7 +1,27 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 
-export async function scrapeJobDescription(url: string): Promise<{ content: string | null; error?: string }> {
+export interface ScrapeResult {
+    content: string | null;
+    error?: string;
+    scrapeBlocked?: boolean; // true when auth-wall / bot-detection is suspected
+}
+
+// Phrases that indicate a login/bot-detection wall
+const AUTH_WALL_SIGNALS = [
+    'sign in', 'log in', 'login', 'create account', 'register to view',
+    'please log in', 'access denied', 'captcha', 'verify you are human',
+    'enable javascript', 'javascript is required',
+];
+
+function detectAuthWall(content: string): boolean {
+    const lower = content.toLowerCase();
+    // If content is very short OR contains multiple auth-wall signals, flag it
+    const signalMatches = AUTH_WALL_SIGNALS.filter(s => lower.includes(s)).length;
+    return content.length < 300 || signalMatches >= 2;
+}
+
+export async function scrapeJobDescription(url: string): Promise<ScrapeResult> {
     try {
         const { data } = await axios.get(url, {
             headers: {
@@ -22,7 +42,6 @@ export async function scrapeJobDescription(url: string): Promise<{ content: stri
         const $ = cheerio.load(data);
 
         // Attempt to find the main job description container
-        // These selectors are common but might need to be adjusted for specific sites
         const selectors = [
             '.job-description',
             '#job-description',
@@ -43,7 +62,7 @@ export async function scrapeJobDescription(url: string): Promise<{ content: stri
             }
         }
 
-        // Fallback: if no specific container found, get body text but clean it up
+        // Fallback: get body text
         if (!content) {
             $('script, style, nav, footer, header, asides, iframe, noscript').remove();
             content = $('body').text().trim();
@@ -51,6 +70,17 @@ export async function scrapeJobDescription(url: string): Promise<{ content: stri
 
         // Clean up excessive whitespace
         const cleaned = content.replace(/\s+/g, ' ').trim();
+
+        // Quality check — detect auth-wall / bot-detection pages
+        if (detectAuthWall(cleaned)) {
+            console.warn(`Scrape quality check failed for ${url}: likely auth-wall or bot-detection (${cleaned.length} chars)`);
+            return {
+                content: null,
+                scrapeBlocked: true,
+                error: 'The job page appears to require a login or is blocking automated access. Please paste the job description manually.',
+            };
+        }
+
         return { content: cleaned };
 
     } catch (error) {

@@ -15,7 +15,15 @@ export async function POST(req: NextRequest) {
         let rawDescription = text;
 
         if (!rawDescription && url) {
-            const { content, error: scrapeError } = await scrapeJobDescription(url);
+            const { content, error: scrapeError, scrapeBlocked } = await scrapeJobDescription(url);
+
+            if (scrapeBlocked) {
+                // Surface auth-wall detection to the client so the UI can auto-show the paste field
+                return NextResponse.json({
+                    scrapeBlocked: true,
+                    error: scrapeError || 'The job page requires a login or is blocking automated access. Please paste the job description manually.',
+                }, { status: 200 }); // 200 so the client can distinguish from network errors
+            }
 
             if (!content) {
                 return NextResponse.json({
@@ -29,7 +37,7 @@ export async function POST(req: NextRequest) {
         const structuredData = await parseJobDescriptionWithAI(rawDescription, apiKey, modelProvider, modelName, customConfig);
 
         return NextResponse.json({
-            description: rawDescription, // Keep raw description for backward compatibility or reference
+            description: rawDescription,
             details: structuredData
         });
     } catch (error) {
