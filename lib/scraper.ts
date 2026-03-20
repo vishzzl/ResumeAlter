@@ -23,7 +23,7 @@ function detectAuthWall(content: string): boolean {
 
 function isDisallowedHost(hostname: string): boolean {
     const lowered = hostname.toLowerCase();
-    
+
     // Explicit localhost and IPv6 localhost
     if (lowered === 'localhost' || lowered === '::1') return true;
 
@@ -34,9 +34,9 @@ function isDisallowedHost(hostname: string): boolean {
     // Class B private: 172.16-31.x.x
     // Class C private: 192.168.x.x
     if (
-        lowered.startsWith('127.') || 
-        lowered.startsWith('10.') || 
-        lowered.startsWith('192.168.') || 
+        lowered.startsWith('127.') ||
+        lowered.startsWith('10.') ||
+        lowered.startsWith('192.168.') ||
         lowered === '169.254.169.254'
     ) {
         return true;
