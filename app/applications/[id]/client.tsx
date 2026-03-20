@@ -309,6 +309,14 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
         }, 1500);
     };
 
+    const getSelectedSkillBuckets = () => {
+        const selectedSkillSet = new Set(selectedJobDetails.skills);
+        return {
+            required: selectedJobDetails.requiredSkills.filter(skill => selectedSkillSet.has(skill)),
+            preferred: selectedJobDetails.preferredSkills.filter(skill => selectedSkillSet.has(skill)),
+        };
+    };
+
     const handleGenerateCoverLetter = async () => {
         setCoverLetterLoading(true);
         setError(null);
@@ -318,17 +326,18 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             const apiKey = localStorage.getItem('gemini_api_key');
             let finalJobDescription = jobDescription;
             if (jobDetails && !selectedJobDetails.useFullDescription) {
+                const selectedSkills = getSelectedSkillBuckets();
                 const parts = [];
                 parts.push(`Job Title: ${jobDetails.title || app.jobTitle}`);
                 parts.push(`Company: ${jobDetails.company || app.companyName}`);
                 if (selectedJobDetails.requirements.length > 0) {
                     parts.push(`\nRequirements:\n${selectedJobDetails.requirements.map(r => `- ${r}`).join('\n')}`);
                 }
-                if (selectedJobDetails.requiredSkills.length > 0) {
-                    parts.push(`\nRequired Skills:\n${selectedJobDetails.requiredSkills.map(s => `- ${s}`).join('\n')}`);
+                if (selectedSkills.required.length > 0) {
+                    parts.push(`\nRequired Skills:\n${selectedSkills.required.map(s => `- ${s}`).join('\n')}`);
                 }
-                if (selectedJobDetails.preferredSkills.length > 0) {
-                    parts.push(`\nPreferred Skills:\n${selectedJobDetails.preferredSkills.map(s => `- ${s}`).join('\n')}`);
+                if (selectedSkills.preferred.length > 0) {
+                    parts.push(`\nPreferred Skills:\n${selectedSkills.preferred.map(s => `- ${s}`).join('\n')}`);
                 }
                 parts.push(`\nDescription:\n${jobDetails.description || jobDescription}`);
                 finalJobDescription = parts.join('\n');
@@ -566,17 +575,18 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             const apiKey = localStorage.getItem('gemini_api_key');
             let finalJobDescription = jobDescription;
             if (jobDetails && !selectedJobDetails.useFullDescription) {
+                const selectedSkills = getSelectedSkillBuckets();
                 const parts = [];
                 parts.push(`Job Title: ${jobDetails.title || app.jobTitle}`);
                 parts.push(`Company: ${jobDetails.company || app.companyName}`);
                 if (selectedJobDetails.requirements.length > 0) {
                     parts.push(`\nSelected Requirements: \n${selectedJobDetails.requirements.map(r => `- ${r}`).join('\n')}`);
                 }
-                if (selectedJobDetails.requiredSkills.length > 0) {
-                    parts.push(`\nRequired Skills (must target): \n${selectedJobDetails.requiredSkills.map(s => `- ${s}`).join('\n')}`);
+                if (selectedSkills.required.length > 0) {
+                    parts.push(`\nRequired Skills (must target): \n${selectedSkills.required.map(s => `- ${s}`).join('\n')}`);
                 }
-                if (selectedJobDetails.preferredSkills.length > 0) {
-                    parts.push(`\nPreferred Skills (nice to have): \n${selectedJobDetails.preferredSkills.map(s => `- ${s}`).join('\n')}`);
+                if (selectedSkills.preferred.length > 0) {
+                    parts.push(`\nPreferred Skills (nice to have): \n${selectedSkills.preferred.map(s => `- ${s}`).join('\n')}`);
                 }
                 if (selectedJobDetails.experience.length > 0) {
                     parts.push(`\nSelected Experience: \n${selectedJobDetails.experience.map(e => `- ${e}`).join('\n')}`);
