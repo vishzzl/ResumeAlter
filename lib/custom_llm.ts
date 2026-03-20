@@ -1,10 +1,6 @@
 
 const DEFAULT_CUSTOM_URL = process.env.CUSTOM_LLM_URL;
 
-interface CustomLLMResponse {
-    generated_text: string;
-}
-
 export async function generateWithCustom(prompt: string, apiUrl?: string, apiKey?: string) {
     const targetUrl = apiUrl || DEFAULT_CUSTOM_URL;
 

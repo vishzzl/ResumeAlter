@@ -10,7 +10,7 @@ interface ResumePreviewProps {
     template?: 'modern' | 'classic' | 'minimal';
 }
 
-export function ResumePreview({ content, title, company, template = 'modern' }: ResumePreviewProps) {
+export function ResumePreview({ content, template = 'modern' }: ResumePreviewProps) {
 
     // Template-specific classes
     const styles = {
@@ -79,15 +79,15 @@ export function ResumePreview({ content, title, company, template = 'modern' }: 
             <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
-                    h1: ({ node, ...props }) => <h1 className={s.h1} {...props} />,
-                    h2: ({ node, ...props }) => <h2 className={s.h2} {...props} />,
+                    h1: ({ ...props }) => <h1 className={s.h1} {...props} />,
+                    h2: ({ ...props }) => <h2 className={s.h2} {...props} />,
                     // Handle H3 specifically to avoid it looking like body text if AI uses it for job titles
-                    h3: ({ node, ...props }) => <h3 className={s.h3} {...props} />,
+                    h3: ({ ...props }) => <h3 className={s.h3} {...props} />,
                     // Map H4/H5/H6 to H3 style but slightly smaller if needed, or same
-                    h4: ({ node, ...props }) => <h4 className={s.h3} {...props} />,
-                    ul: ({ node, ...props }) => <ul className={s.ul} {...props} />,
-                    ol: ({ node, ...props }) => <ol className="list-decimal list-outside ml-5 mb-4 space-y-1 text-sm" {...props} />,
-                    li: ({ node, children, ...props }) => {
+                    h4: ({ ...props }) => <h4 className={s.h3} {...props} />,
+                    ul: ({ ...props }) => <ul className={s.ul} {...props} />,
+                    ol: ({ ...props }) => <ol className="list-decimal list-outside ml-5 mb-4 space-y-1 text-sm" {...props} />,
+                    li: ({ children, ...props }) => {
                         // Fix for when "li" contains a "p" tag (common in some markdown parsers) which breaks spacing
                         // We unwrap the p if it's the only child, or style it to be inline
                         return (
@@ -97,12 +97,12 @@ export function ResumePreview({ content, title, company, template = 'modern' }: 
                         );
                     },
                     // Paragraphs
-                    p: ({ node, ...props }) => <p className={s.p} {...props} />,
-                    strong: ({ node, ...props }) => <strong className={s.strong} {...props} />,
-                    b: ({ node, ...props }) => <strong className={s.strong} {...props} />,
-                    a: ({ node, ...props }) => <a className={s.a} {...props} target="_blank" rel="noopener noreferrer" />,
-                    hr: ({ node, ...props }) => <hr className={s.hr} {...props} />,
-                    blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-gray-200 pl-4 py-1 my-4 italic text-gray-600" {...props} />,
+                    p: ({ ...props }) => <p className={s.p} {...props} />,
+                    strong: ({ ...props }) => <strong className={s.strong} {...props} />,
+                    b: ({ ...props }) => <strong className={s.strong} {...props} />,
+                    a: ({ ...props }) => <a className={s.a} {...props} target="_blank" rel="noopener noreferrer" />,
+                    hr: ({ ...props }) => <hr className={s.hr} {...props} />,
+                    blockquote: ({ ...props }) => <blockquote className="border-l-4 border-gray-200 pl-4 py-1 my-4 italic text-gray-600" {...props} />,
                 }}
             >
                 {cleanContent}

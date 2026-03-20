@@ -2,31 +2,35 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Application, applications } from '@/lib/db/schema';
+import { Application } from '@/lib/db/schema';
 import { updateApplication, getProfile } from '@/lib/actions';
 import {
     Loader2, Save, Wand2, Upload, FileText, ChevronLeft, ChevronRight,
     RefreshCw, Download, CheckSquare, Square, UserCheck, Briefcase,
     Sparkles, X, Eye, GitCompare, LayoutGrid, Mail, Copy, Check,
-    PenLine, BookOpen, Zap, Crown, Award, Target, ChevronDown, ChevronUp
+    PenLine, BookOpen, Zap, Crown, Target
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { JobDetails } from '@/lib/parser';
 import { useAIConfig } from '@/app/context/AIConfigContext';
 import { ResumePreview } from '@/components/ResumePreview';
 import { DiffViewer } from '@/components/DiffViewer';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
+interface AnalysisChange {
+    section?: string;
+    reason?: string;
+    original?: string;
+    new?: string;
+    oldText?: string[];
+}
+
 interface ApplicationClientProps {
     initialApplication: Application;
 }
 
-// Helper for constructing job description strings
-function constructJobString(parts: string[]) {
-    return parts.join('\n');
-}
+
 
 // ─── Score Ring Component ───
 function ScoreRing({ score, size = 80, strokeWidth = 7 }: { score: number; size?: number; strokeWidth?: number }) {
@@ -65,7 +69,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const [isSaving, setIsSaving] = useState(false); // separate from loading (which is used for tailoring)
     const [activeTab, setActiveTab] = useState<'job' | 'resume'>('job');
     const [mobileTab, setMobileTab] = useState<'job' | 'resume' | 'result'>('job');
-    const router = useRouter();
+
 
     // Resume State
     const [resumeText, setResumeText] = useState(app.baseResume || '');
@@ -118,14 +122,14 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     // Result State
     const [tailoredResume, setTailoredResume] = useState(app.tailoredResume || '');
     const initialAnalysis = app.analysis ? JSON.parse(app.analysis) : { changes: [], atsScore: null, executionTime: null };
-    const [changes, setChanges] = useState<any[]>(initialAnalysis.changes || []);
-    const [atsScore, setAtsScore] = useState<{ before: number, after: number, analysis: string } | null>(initialAnalysis.atsScore || null);
-    const [executionTime, setExecutionTime] = useState<number | null>(initialAnalysis.executionTime || null);
+    const [changes, setChanges] = useState<AnalysisChange[]>(initialAnalysis.changes || []);
+    const [atsScore, setAtsScore] = useState<{ before: number; after: number; analysis: string } | null>(initialAnalysis.atsScore || null);
+    const [, setExecutionTime] = useState<number | null>(initialAnalysis.executionTime || null);
     const [resultViewMode, setResultViewMode] = useState<'preview' | 'diff' | 'edit'>('preview');
     const [tailorPhase, setTailorPhase] = useState<'extracting' | 'tailoring' | 'verifying' | 'gap_check' | 'analyzing' | 'complete' | null>(null);
 
     // Keyword Coverage State — pre-fix (before gap injection) and post-fix (final)
-    const [preFixCoverage, setPreFixCoverage] = useState<{
+    const [, setPreFixCoverage] = useState<{
         required: { score: number; matched: string[]; missing: string[]; total: number };
         preferred: { score: number; matched: string[]; missing: string[]; total: number };
     } | null>(null);
@@ -157,7 +161,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const [pdfGenerating, setPdfGenerating] = useState(false);
 
     // Workflow step status
-    const hasJobData = !!(jobDescription || jobDetails);
+
     const hasResume = !!resumeText;
     const hasResult = !!tailoredResume;
 
@@ -166,8 +170,8 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const canTailor = !loading && !!resumeText && !!jobDescription && !inputTooShort;
 
     // Certifications State
-    const [profileCertifications, setProfileCertifications] = useState<any[]>([]);
-    const [selectedCertifications, setSelectedCertifications] = useState<any[]>(
+    const [, setProfileCertifications] = useState<Record<string, unknown>[]>([]);
+    const [selectedCertifications] = useState<Record<string, unknown>[]>(
         app.selectedCertifications ? JSON.parse(app.selectedCertifications) : []
     );
 
@@ -199,34 +203,11 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
         });
     }, []);
 
-    // Save selected certifications when changed
-    useEffect(() => {
-        const saveSelection = async () => {
-            // Debounce or just save?
-            // Since this might trigger on every click, maybe better to save in handleSave?
-            // But for now let's keep it in sync with handleSave or update lazily.
-            // Actually, the main handleSave should include it.
-        };
-    }, [selectedCertifications]);
 
 
-    useEffect(() => {
-        if (!app.jobDescription && app.jobUrl && !jobDescription) {
-            scrapeJob();
-        }
-    }, [app.jobDescription, app.jobUrl]);
 
-    useEffect(() => {
-        if (app.jobTitle && app.companyName) {
-            document.title = `${app.jobTitle} at ${app.companyName}`;
-        } else if (app.jobTitle) {
-            document.title = `${app.jobTitle}`;
-        }
-    }, [app.jobTitle, app.companyName]);
-
-    // ─── Handlers (all business logic unchanged) ───
-
-    const scrapeJob = async () => {
+    // Wrap scrapeJob in useCallback so it can be safely used in useEffect deps
+    const scrapeJob = useCallback(async () => {
         if (!app.jobUrl && !jobDescription) return;
         setIsScraping(true);
         try {
@@ -261,7 +242,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     if (data.details.title) newTitle = data.details.title;
                     if (data.details.company) newCompany = data.details.company;
                 }
-                setApp((prev: any) => ({ ...prev, jobTitle: newTitle, companyName: newCompany }));
+                setApp((prev: Application) => ({ ...prev, jobTitle: newTitle, companyName: newCompany }));
                 await updateApplication(app.id, {
                     jobDescription: data.description,
                     jobDetails: data.details ? JSON.stringify(data.details) : undefined,
@@ -274,7 +255,25 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
         } finally {
             setIsScraping(false);
         }
-    };
+    }, [app.jobUrl, app.id, app.jobTitle, app.companyName, jobDescription, selectedProvider, selectedModel, customModelConfig]);
+
+    useEffect(() => {
+        if (!app.jobDescription && app.jobUrl && !jobDescription) {
+            scrapeJob();
+        }
+    }, [app.jobDescription, app.jobUrl, jobDescription, scrapeJob]);
+
+    useEffect(() => {
+        if (app.jobTitle && app.companyName) {
+            document.title = `${app.jobTitle} at ${app.companyName}`;
+        } else if (app.jobTitle) {
+            document.title = `${app.jobTitle}`;
+        }
+    }, [app.jobTitle, app.companyName]);
+
+    // ─── Handlers (all business logic unchanged) ───
+
+
 
     const handleSave = async () => {
         setIsSaving(true);
@@ -296,18 +295,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
         }
     };
 
-    // Debounced auto-save for resume text (saves 1.5s after the user stops typing)
-    const handleResumeTextChange = (value: string) => {
-        setResumeText(value);
-        if (resumeAutoSaveRef.current) clearTimeout(resumeAutoSaveRef.current);
-        resumeAutoSaveRef.current = setTimeout(async () => {
-            try {
-                await updateApplication(app.id, { baseResume: value });
-            } catch (e) {
-                console.error('Auto-save failed', e);
-            }
-        }, 1500);
-    };
+
 
     const getSelectedSkillBuckets = () => {
         const selectedSkillSet = new Set(selectedJobDetails.skills);
