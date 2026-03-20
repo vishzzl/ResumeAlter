@@ -80,424 +80,237 @@ export async function POST(req: NextRequest) {
             try {
                 const sections = parseResumeSections(resume);
 
-                // ═══ PHASE 0: KEYWORD EXTRACTION ═══
+                // ═══ PHASE 0, 1, 1.5, 1.7: MASTER TAILORING PASS ═══
                 sendSSE(controller, encoder, { phase: 'extracting' });
                 if (appId) await setTailorStatus(appId, 'tailoring');
 
-                const keywordExtractionPrompt = `
-You are an ATS keyword extraction engine. Analyze the following Job Description and extract ALL keywords that an ATS system would scan for.
+                // ── Fix 1: Full persona lives in systemInstruction (not here)
+                // ── Fix 2: Structured "reasoning" scratchpad before output
+                // ── Fix 3: Explicit priority hierarchy
+                // ── Fix 4: All instructions are positive (tell what TO do)
+                // ── Fix 5: Nested structured experience JSON schema
+                // ── Fix 9: jobTitle restored to extracted fields
+                const masterTailoringPrompt = `
+PRIORITY HIERARCHY (in case of conflict, resolve in this order):
+1. TRUTH — Only include facts, skills, and metrics from the ORIGINAL RESUME.
+2. ATS MATCH — Maximize coverage of extracted keywords from the JD.
+3. EXECUTIVE TONE — Use powerful, authoritative language throughout.
+4. ONE PAGE — Keep total content concise enough to fit a single printed page.
 
 JOB DESCRIPTION:
 ${jobDescription}
 
-INSTRUCTIONS:
-1. **requiredKeywords**: Extract EVERY HARD TECHNICAL SKILL: technologies, tools, frameworks, programming languages, platforms, and databases. DO NOT extract soft skills (e.g. leadership, communication) or generic terms (e.g. software engineering, agile).
-2. **preferredKeywords**: Extract HARD TECHNICAL SKILLS listed as "nice to have", "preferred", "bonus", etc. Again, NO SOFT SKILLS.
-3. **actionVerbs**: Extract strong action verbs used in the JD's responsibilities section.
-4. **jobTitle**: The exact job title from the JD.
-5. **industry**: The industry/domain.
+ORIGINAL RESUME (The absolute source of truth — do not invent anything outside of this):
+--- HEADER ---
+${sections.header}
+--- SUMMARY ---
+${sections.summary}
+--- SKILLS ---
+${sections.skills}
+--- EXPERIENCE ---
+${sections.experience}
+--- EDUCATION ---
+${sections.education}
+--- PROJECTS ---
+${sections.projects}
+--- CERTIFICATIONS & OTHER ---
+${sections.other}
 
-Be EXHAUSTIVE. Include variations (e.g., both "JavaScript" and "JS" if both appear).
+═══ STEP 1: ANALYZE ═══
+Before writing anything, analyze the JD and resume. Extract:
+1. requiredKeywords: Every hard technical skill in the JD (technologies, tools, languages, platforms). Technical terms only.
+2. preferredKeywords: "Nice to have" or "preferred" hard technical skills.
+3. actionVerbs: Strongest action verbs from the JD responsibility statements.
+4. jobTitle: The exact target job title from the JD.
 
-OUTPUT FORMAT (JSON ONLY):
+═══ STEP 2: REWRITE ═══
+Rewrite each resume section following these rules precisely:
+
+HEADER:
+- Line 1: # [Candidate Name] (H1 markdown, name exactly as in original)
+- Line 2: email | phone | location | [LinkedIn](url) | [GitHub](url) — pipe-separated, all on one line, use Markdown link format for URLs.
+
+SUMMARY (2–3 sentences maximum):
+- Sentence 1: Incorporate the exact jobTitle extracted from the JD and the candidate's years of experience.
+- Sentences 2–3: Include 3–5 top required keywords naturally, focusing on value delivered — not objectives.
+
+SKILLS:
+- Group by category: **Languages**, **Frameworks**, **Cloud/DevOps**, **Databases**, **Tools**.
+- Include every required keyword the candidate has demonstrated anywhere in their original resume.
+- Use exact keyword phrasing from the JD (e.g., if JD says "Node.js", use "Node.js" not "NodeJS").
+
+EXPERIENCE (HIGHEST PRIORITY SECTION):
+- Format each role as a structured entry:
+  { "company": "...", "role": "...", "dates": "...", "clients": [], "bullets": [] }
+- CONSULTING / AGENCY ROLES: If the original resume shows multiple clients under one employer, each client becomes a separate entry inside "clients" with its own bullets.
+  { "name": "Client Name", "domain": "e.g. FinTech", "bullets": ["..."] }
+- Each bullet: exactly 1 sentence, follows STAR method (Action + Task + Result), uses an executive action verb from the JD.
+- Use only metrics that are present in the original resume — do not add new numbers.
+- Use only company names from the original resume, never the hiring company's name from the JD.
+- Maximum 3 roles. Maximum 3–4 bullets per role or per client.
+
+EDUCATION: Keep exactly as original. Format: **Degree** | **Institution** | **Dates** (no bullet points).
+
+PROJECTS: Limit to 5 items. Format: **Project Name** | [Link](URL)\\\\n* 1-sentence description.
+
+CERTIFICATIONS: Format: **Cert Name** | Issuer | Date
+
+═══ STEP 3: VERIFY ═══
+Before producing output, perform a fast internal audit:
+- Any skill not demonstrable from the ORIGINAL RESUME → remove it.
+- Any metric not present in the ORIGINAL RESUME → remove it.
+- Education and header contact details → must match original exactly.
+- Confirm all client entries from the original are present in the output.
+
+═══ OUTPUT FORMAT (JSON ONLY) ═══
+Use \\\\n for newlines in string fields. No markdown outside of JSON.
 {
-    "requiredKeywords": ["Python", "React", "AWS", "CI/CD", "Docker"],
-    "preferredKeywords": ["Kubernetes", "GraphQL", "Terraform"],
-    "actionVerbs": ["architect", "optimize", "lead", "deploy", "scale"],
-    "jobTitle": "Senior Software Engineer",
-    "industry": "fintech"
+    "reasoning": "Brief internal audit: confirm jobTitle used, list skills added/removed vs original, confirm clients preserved.",
+    "extractedKeywords": {
+        "requiredKeywords": ["Python", "React", "AWS"],
+        "preferredKeywords": ["GraphQL", "Terraform"],
+        "actionVerbs": ["architect", "scale", "deploy"],
+        "jobTitle": "Senior Software Engineer"
+    },
+    "tailoredSections": {
+        "header": "# Name\\\\nemail | phone | location | [LinkedIn](url)",
+        "summary": "...",
+        "skills": "**Languages**: Python, JavaScript\\\\n**Frameworks**: React, FastAPI",
+        "experience": [
+            {
+                "company": "Accenture",
+                "role": "Senior Developer",
+                "dates": "Jan 2022 – Present",
+                "bullets": ["General role bullet if no clients."],
+                "clients": [
+                    { "name": "HDFC Bank", "domain": "FinTech", "bullets": ["Architected real-time payment gateway..."] },
+                    { "name": "Reliance Jio", "domain": "Telecom", "bullets": ["Engineered microservices platform..."] }
+                ]
+            }
+        ],
+        "education": "**B.Tech Computer Science** | IIT Bombay | 2018–2022",
+        "projects": "**ResumeAI** | [GitHub](https://github.com/...)\\\\n* Built an LLM-powered resume tailoring tool...",
+        "other": "**AWS Solutions Architect** | Amazon | 2023"
+    }
 }`;
+
+                // ── Fix 7: Higher temperature (0.45) for creative professional rewriting
 
                 let jdKeywords = {
                     requiredKeywords: [] as string[],
                     preferredKeywords: [] as string[],
                     actionVerbs: [] as string[],
-                    jobTitle: '',
-                    industry: '',
                 };
-
-                try {
-                    console.log("Phase 0: Extracting JD Keywords...");
-                    const kwText = await generateText({
-                        prompt: keywordExtractionPrompt,
-                        systemInstruction: 'You are an ATS keyword extraction engine. Output ONLY valid JSON. Be exhaustive.',
-                        provider,
-                        apiKey,
-                        modelName,
-                        customConfig: customConfig as CustomConfig,
-                        temperature: 0.1,
-                        jsonMode: true,
-                    });
-                    jdKeywords = JSON.parse(cleanJson(kwText));
-                    console.log(`Extracted ${jdKeywords.requiredKeywords?.length || 0} required keywords, ${jdKeywords.preferredKeywords?.length || 0} preferred keywords`);
-                } catch (e) {
-                    console.error("Failed to extract keywords, continuing with basic tailoring", e);
-                }
-
-                // ═══ PHASE 1: TAILORING (ATS-Optimized) ═══
-                sendSSE(controller, encoder, { phase: 'tailoring' });
-
-                const allKeywords = [...(jdKeywords.requiredKeywords || []), ...(jdKeywords.preferredKeywords || [])];
-                const requiredKeywordList = (jdKeywords.requiredKeywords || []).join(', ');
-                const actionVerbList = (jdKeywords.actionVerbs || []).join(', ');
-
-                const tailoringSystemInstruction = `You are an expert Resume Writer and Career Coach, specialized in ATS optimization. You output ONLY valid JSON. You never fabricate skills, metrics, or experiences that are not in the original resume. Your #1 goal is to maximize ATS keyword match while keeping the resume truthful.
-
-CRITICAL LENGTH RULE: The ENTIRE resume MUST fit on ONE page when printed. This is non-negotiable. Keep all sections concise. If in doubt, cut bullets — never cut keywords from the skills section.`;
-
-                const tailoringPrompt = `
-Your goal is to rewrite the resume sections to MAXIMIZE ATS keyword match against the Job Description (JD) while maintaining the candidate's authentic experience.
-
-First, identify the JD's industry/domain: ${jdKeywords.industry || 'Determine from context'}
-
-═══ CRITICAL ATS KEYWORD TARGETS ═══
-You MUST incorporate as many of these keywords as possible into the resume.
-
-REQUIRED KEYWORDS (MUST appear at least once each): ${requiredKeywordList || 'See JD below'}
-PREFERRED KEYWORDS (include where truthful): ${(jdKeywords.preferredKeywords || []).join(', ') || 'See JD below'}
-STRONG ACTION VERBS (use these where they fit naturally): ${actionVerbList || 'Use standard action verbs'}
-TARGET JOB TITLE: ${jdKeywords.jobTitle || 'Determine from JD'}
-
-JOB DESCRIPTION:
-${jobDescription}
-
-CURRENT RESUME SECTIONS:
-
---- HEADER ---
-${sections.header}
-
---- SUMMARY ---
-${sections.summary}
-
---- SKILLS ---
-${sections.skills}
-
---- EXPERIENCE ---
-${sections.experience}
-
---- EDUCATION ---
-${sections.education}
-
---- PROJECTS ---
-${sections.projects}
-
---- CERTIFICATIONS & OTHER ---
-${sections.other}
-
-═══ ATS-OPTIMIZED INSTRUCTIONS ═══
-
-1. **Header**: 
-   - **Name**: MUST start with \`# \` followed by the candidate's name (Markdown H1 format). Do NOT omit the \`# \`.
-   - **Contact**: On the SECOND line, provide email, phone, location, and links EXACTLY separated by \` | \`. Do NOT use bullet points. Do NOT use multiple lines for contact info.
-   - **CRITICAL for links**: LinkedIn, GitHub, Portfolio and any URLs MUST use Markdown link format: \`[LinkedIn](https://linkedin.com/in/...)\`, \`[GitHub](https://github.com/...)\`. NEVER output a bare URL like \`linkedin.com/in/...\` — it will break PDF formatting.
-   - You MUST output EXACTLY 2 lines for the header. Example:
-     # John Doe
-     john@email.com | (555) 123-4567 | San Francisco, CA | [LinkedIn](https://linkedin.com/in/johndoe) | [GitHub](https://github.com/johndoe)
-
-2. **Summary** (ATS CRITICAL — front-load keywords here):
-   - Write EXACTLY 2-3 sentences. No more — this must be very concise to leave room for experience.
-   - MUST include the exact job title "${jdKeywords.jobTitle || 'from the JD'}" in the first sentence.
-   - MUST mention 3-5 of the top required keywords naturally.
-   - CRITICAL: Do NOT mention the company name from the JD.
-
-3. **Skills** (ATS CRITICAL — this section gets scanned first):
-   - STRICTLY HARD TECHNICAL SKILLS ONLY (e.g., Languages, Frameworks, Cloud, Databases, Tools).
-   - DO NOT include soft skills, generic professional skills, or methodologies (e.g., absolutely NO "leadership", "communication", "Agile", "problem solving", "software engineering", "application support").
-   - Group into categories (e.g., **Languages**: ..., **Frameworks**: ..., **Cloud/DevOps**: ...).
-   - MUST include EVERY required keyword from the list above that the candidate has demonstrated ANYWHERE in their resume.
-   - Use EXACT keyword phrasing from the JD.
-   - Include up to 20 technical skills, prioritizing JD required keywords. Do NOT artificially drop keywords to hit a lower number — ATS systems reward comprehensive coverage.
-
-4. **Experience** (ATS CRITICAL — keyword density matters here):
-   - **Primary Structure** (COMPANY FIRST, then role, then dates):
-     **Company Name** | **Role** | **Start - End**
-
-     * General achievement bullet 1
-     * General achievement bullet 2
-   - **Client Sub-sections** (REQUIRED if the original resume has \`**Client:**\` entries):
-     - If the EXPERIENCE section contains lines like \`**Client:** Name - Domain\`, you MUST preserve ALL of them.
-     - Output each client exactly as:
-       **Client:** Client Name - Client Domain
-
-       * Tailored bullet about work done for this client
-   - **Formatting**: Use a star \`*\` for bullet points. CRITICAL: There MUST be a BLANK LINE (an extra \\n) between the company/role header line and the first bullet point. Each bullet MUST start on its own line. In JSON output, use \\n\\n before the first bullet.
-   - **Content (ONE-PAGE RULE)**:
-     - MAX 2-3 bullets per role — keep only the most impactful ones.
-     - MAX 3 job roles total — include only the 3 most recent or most relevant.
-     - Each bullet must be ONE sentence, ≤25 words.
-     - WEAVE required keywords into bullet points where truthful.
-     - Quantify impact: use numbers, percentages, dollar amounts, or scale wherever possible.
-     - Use action verbs from the JD: ${actionVerbList || 'standard strong verbs'}
-     - Do NOT mention the company name from the JD.
-     - Use the STAR Method and quantify results.
-     - NEVER drop a client entry that appears in the original. Make sure client bullets are also 1-2 sentences.
-
-5. **Education** (NO BULLET POINTS — clean and minimal):
-   - Keep all education entries.
-   - Do NOT use bullet points or stars.
-   - **Format** (each entry on its own line):
-     **Degree** | **Institution** | **Dates**
-   - If there is a GPA or honors, append to the same line.
-
-6. **Projects**:
-   - Limit to a MAXIMUM of 5 bullet points or items ALL TOGETHER.
-   - **Format**: **Project Name** | [Link](URL)\\n* Description bullet
-
-7. **Certifications** (just "Certifications", NOT "Certifications & Other"):
-   - **Format**: **Certification Name** | Issuer | Date
-
-═══ KEYWORD PLACEMENT RULES ═══
-- The SKILLS section must contain the HIGHEST density of JD keywords
-- The SUMMARY must front-load with the job title and 3-5 top keywords
-- EXPERIENCE bullets must weave in keywords naturally
-- If a keyword from the required list matches something the candidate has done (even if phrased differently), USE THE JD'S EXACT PHRASING
-
-DO NOT:
-- Invent metrics, numbers, or percentages not in the original resume.
-- Copy JD sentences verbatim as resume achievements.
-- Add skills the candidate has never demonstrated.
-- Insert the hiring company's name anywhere.
-- Write more than 3 bullets per job role.
-- Include more than 3 job roles.
-- Write a summary longer than 3 sentences.
-- Generate content that would cause the resume to exceed one printed page.
-
-OUTPUT FORMAT (JSON ONLY, use \\\\n for newlines inside strings):
-{
-    "header": "# Name\\\\nemail@example.com | (555) 123-4567 | City, ST | [LinkedIn](url)",
-    "summary": "Professional summary...",
-    "skills": "**Languages**: A, B, C\\\\n**Frameworks**: X, Y, Z",
-    "experience": "**Company** | **Role** | **Date**\\\\n\\\\n* Achievement 1\\\\n* Achievement 2...",
-    "education": "**Degree** | **University** | **Dates**",
-    "projects": "**Project Name** | [Link](URL)\\\\n\\\\n* Description...",
-    "other": "**Cert** | Issuer | Date"
-}`;
-
                 let tailoredSections = { ...sections };
 
                 try {
-                    console.log("Phase 1: Tailoring Content (ATS-Optimized)...");
-                    const tailoredText = await generateText({
-                        prompt: tailoringPrompt,
-                        systemInstruction: tailoringSystemInstruction,
+                    console.log("Phase 1: Master Tailoring Pass (Extraction + Tailoring + Verification)...");
+                    
+                    const t1 = setTimeout(() => sendSSE(controller, encoder, { phase: 'tailoring' }), 3000);
+                    const t2 = setTimeout(() => sendSSE(controller, encoder, { phase: 'verifying' }), 8000);
+
+                    const masterText = await generateText({
+                        prompt: masterTailoringPrompt,
+                        // Fix 1: Full, precise persona lives here — user prompt is data + tasks only
+                        systemInstruction: 'You are an elite Executive Career Coach, Expert Resume Writer, and uncompromising Fact-Checker. You craft high-impact, results-driven professional narratives with ATS precision. You NEVER fabricate skills, metrics, or experiences. You ONLY output strictly valid JSON.',
                         provider,
                         apiKey,
                         modelName,
                         customConfig: customConfig as CustomConfig,
-                        temperature: 0.3,
+                        temperature: 0.45, // Fix 7: Higher temp for varied, compelling language in rewrites
                         jsonMode: true,
                     });
 
-                    const data = JSON.parse(cleanJson(tailoredText));
+                    clearTimeout(t1);
+                    clearTimeout(t2);
+
+                    const data = JSON.parse(cleanJson(masterText));
+
+                    if (data.reasoning) {
+                        console.log('[Prompt Reasoning Audit]', data.reasoning);
+                    }
+                    
+                    if (data.extractedKeywords) {
+                        jdKeywords = {
+                            requiredKeywords: data.extractedKeywords.requiredKeywords || [],
+                            preferredKeywords: data.extractedKeywords.preferredKeywords || [],
+                            actionVerbs: data.extractedKeywords.actionVerbs || [],
+                        };
+                        // Fix 9: Restore jobTitle used in Summary sentence
+                        if (data.extractedKeywords.jobTitle) {
+                            (jdKeywords as typeof jdKeywords & { jobTitle?: string }).jobTitle = data.extractedKeywords.jobTitle;
+                        }
+                    }
+
                     const normalizeNewlines = (s: string) => s.replace(/\\n/g, '\n');
+                    if (data.tailoredSections) {
+                        const ts = data.tailoredSections;
+                        if (ts.header) tailoredSections.header = normalizeNewlines(ts.header);
+                        if (ts.summary) tailoredSections.summary = normalizeNewlines(ts.summary);
+                        if (ts.skills) tailoredSections.skills = normalizeNewlines(ts.skills);
+                        if (ts.education) tailoredSections.education = normalizeNewlines(ts.education);
+                        if (ts.projects) tailoredSections.projects = normalizeNewlines(ts.projects);
+                        if (ts.other) tailoredSections.other = normalizeNewlines(ts.other);
 
-                    if (data.header) tailoredSections.header = normalizeNewlines(data.header);
-                    if (data.summary) tailoredSections.summary = normalizeNewlines(data.summary);
-                    if (data.skills) tailoredSections.skills = normalizeNewlines(data.skills);
-                    if (data.experience) tailoredSections.experience = normalizeNewlines(data.experience);
-                    if (data.education) tailoredSections.education = normalizeNewlines(data.education);
-                    if (data.projects) tailoredSections.projects = normalizeNewlines(data.projects);
-                    if (data.other) tailoredSections.other = normalizeNewlines(data.other);
-
-                } catch (e) {
-                    console.error("Failed to tailor content", e);
-                }
-
-                // ═══ PHASE 1.5: CHAIN OF VERIFICATION (CoVe) ═══
-                sendSSE(controller, encoder, { phase: 'verifying' });
-                if (appId) await setTailorStatus(appId, 'verifying');
-
-                const verificationPrompt = `
-You are an uncompromising strict Fact-Checker and Auditor.
-Your job is to compare a "Tailored Resume" against the "Original Resume" and eliminate ANY hallucinations.
-IMPORTANT: Do NOT remove keywords or skills that were REPHRASED from the original. Only remove truly FABRICATED content.
-
-ORIGINAL RESUME (The absolute truth — section by section):
---- HEADER ---
-${sections.header}
---- SUMMARY ---
-${sections.summary}
---- SKILLS ---
-${sections.skills}
---- EXPERIENCE ---
-${sections.experience}
---- EDUCATION ---
-${sections.education}
---- PROJECTS ---
-${sections.projects}
---- CERTIFICATIONS & OTHER ---
-${sections.other}
-
-TAILORED RESUME (Contains potential hallucinations):
---- HEADER ---
-${tailoredSections.header}
---- SUMMARY ---
-${tailoredSections.summary}
---- SKILLS ---
-${tailoredSections.skills}
---- EXPERIENCE ---
-${tailoredSections.experience}
---- EDUCATION ---
-${tailoredSections.education}
---- PROJECTS ---
-${tailoredSections.projects}
---- CERTIFICATIONS & OTHER ---
-${tailoredSections.other}
-
-INSTRUCTIONS:
-1. **Skills**: If the Tailored Resume lists a skill NOT even remotely implied in the Original Resume, REMOVE IT. However, if a skill is a SYNONYM or INDUSTRY TERM for something in the original (e.g., "CI/CD" for someone who mentions "Jenkins"), KEEP IT.
-2. **Experience & Projects**: 
-   - Ensure no bullets were fabricated entirely.
-   - If the original says "improved by 20%", the tailored version must not claim more than 25%. If no number existed in the original, none should appear.
-   - Ensure the target company's name (from the JD) was NOT inserted.
-   - Bullets must be concise (1-2 sentences max). If any bullet exceeds 2 sentences, trim it while preserving key metrics.
-   - CRITICAL: If the Original Resume experience section contains \`**Client:**\` sub-sections, they MUST appear in the output.
-3. **Summary**: Ensure it accurately reflects the original resume's level of experience. Keyword inclusion is FINE.
-4. **Header**: Ensure the candidate's name and contact details are unchanged from the original. Format MUST be: \`# Name\` on line 1, contact info on line 2 separated by \` | \`.
-5. **Education**: Ensure no degrees, institutions, or honors were fabricated. Return education unchanged if it is correct.
-
-OUTPUT FORMAT (JSON ONLY, use \\\\n for newlines inside strings. Output ALL sections below):
-{
-    "header": "# Name\\\\nemail | phone | ...",
-    "summary": "...",
-    "skills": "...",
-    "experience": "...",
-    "education": "**Degree** | **University** | **Dates**",
-    "projects": "...",
-    "corrections": [
-        {"section": "skills", "action": "removed", "detail": "Kubernetes - not in original resume"}
-    ]
-}`
-
-                try {
-                    console.log("Phase 1.5: Verifying Content (CoVe)...");
-                    const verifiedText = await generateText({
-                        prompt: verificationPrompt,
-                        systemInstruction: 'You are an uncompromising Fact-Checker. Output ONLY valid JSON. Do NOT strip valid keyword rephrasings — only remove truly fabricated content.',
-                        provider,
-                        apiKey,
-                        modelName,
-                        customConfig: customConfig as CustomConfig,
-                        temperature: 0.2,
-                        jsonMode: true,
-                    });
-                    const data = JSON.parse(cleanJson(verifiedText));
-                    const normalizeNewlines = (s: string) => s.replace(/\\n/g, '\n');
-
-                    if (data.header) tailoredSections.header = normalizeNewlines(data.header);
-                    if (data.summary) tailoredSections.summary = normalizeNewlines(data.summary);
-                    if (data.skills) tailoredSections.skills = normalizeNewlines(data.skills);
-                    if (data.experience) tailoredSections.experience = normalizeNewlines(data.experience);
-                    if (data.education) tailoredSections.education = normalizeNewlines(data.education);
-                    if (data.projects) tailoredSections.projects = normalizeNewlines(data.projects);
-                    if (data.other) tailoredSections.other = normalizeNewlines(data.other);
-
-                    if (data.corrections?.length > 0) {
-                        console.log('CoVe Corrections:', JSON.stringify(data.corrections, null, 2));
+                        // Fix 5: Reconstruct experience from nested JSON schema
+                        if (Array.isArray(ts.experience)) {
+                            const expLines: string[] = [];
+                            for (const role of ts.experience) {
+                                expLines.push(`**${role.company}** | **${role.role}** | **${role.dates}**`);
+                                // General role bullets (when no clients exist)
+                                if (role.bullets?.length > 0 && (!role.clients || role.clients.length === 0)) {
+                                    expLines.push('');
+                                    for (const b of role.bullets) expLines.push(`* ${b}`);
+                                }
+                                // Client sub-sections (consulting/agency roles)
+                                if (role.clients?.length > 0) {
+                                    for (const client of role.clients) {
+                                        expLines.push('');
+                                        expLines.push(`**Client:** ${client.name} - ${client.domain}`);
+                                        expLines.push('');
+                                        for (const b of client.bullets) expLines.push(`* ${b}`);
+                                    }
+                                }
+                                expLines.push('');
+                            }
+                            tailoredSections.experience = expLines.join('\n').trim();
+                        } else if (typeof ts.experience === 'string') {
+                            // Fallback: model returned flat string
+                            tailoredSections.experience = normalizeNewlines(ts.experience);
+                        }
                     }
                 } catch (e) {
-                    console.error("Failed during verification phase (CoVe).", e);
+                    console.error("Master Tailoring Pass failed", e);
+                    throw new Error(e instanceof Error ? e.message : 'Tailoring failed');
                 }
 
-                // ═══ PHASE 1.7: KEYWORD GAP CHECK & INJECTION ═══
-                const fullTailoredText = [
+                const fullTailoredTextForCoverage = [
                     tailoredSections.header, tailoredSections.summary, tailoredSections.skills,
                     tailoredSections.experience, tailoredSections.education,
                     tailoredSections.projects, tailoredSections.other,
                 ].join('\n');
 
-                const requiredCoverage = calculateKeywordCoverage(fullTailoredText, jdKeywords.requiredKeywords || []);
-                const preferredCoverage = calculateKeywordCoverage(fullTailoredText, jdKeywords.preferredKeywords || []);
+                const initialRequiredCoverage = calculateKeywordCoverage(fullTailoredTextForCoverage, jdKeywords.requiredKeywords || []);
+                const initialPreferredCoverage = calculateKeywordCoverage(fullTailoredTextForCoverage, jdKeywords.preferredKeywords || []);
 
-                console.log(`Keyword Coverage — Required: ${requiredCoverage.score}% (${requiredCoverage.matched.length}/${(jdKeywords.requiredKeywords || []).length}), Missing: [${requiredCoverage.missing.join(', ')}]`);
-
-                // Send pre-fix coverage data to client
+                // Send preFixCoverage for gap_check UI phase compatibility
                 sendSSE(controller, encoder, {
                     phase: 'gap_check',
                     data: {
                         preFixCoverage: {
-                            required: { score: requiredCoverage.score, matched: requiredCoverage.matched, missing: requiredCoverage.missing, total: (jdKeywords.requiredKeywords || []).length },
-                            preferred: { score: preferredCoverage.score, matched: preferredCoverage.matched, missing: preferredCoverage.missing, total: (jdKeywords.preferredKeywords || []).length },
+                            required: { score: initialRequiredCoverage.score, matched: initialRequiredCoverage.matched, missing: initialRequiredCoverage.missing, total: jdKeywords.requiredKeywords.length },
+                            preferred: { score: initialPreferredCoverage.score, matched: initialPreferredCoverage.matched, missing: initialPreferredCoverage.missing, total: jdKeywords.preferredKeywords.length },
                         }
                     }
                 });
 
-                if (requiredCoverage.missing.length > 0) {
-                    try {
-                        console.log(`Phase 1.7: Injecting ${requiredCoverage.missing.length} missing required keywords...`);
+                // We skip gap injection to save API calls, so emit empty result immediately
+                sendSSE(controller, encoder, {
+                    phase: 'gap_fix_result',
+                    data: { injected: [], skipped: [] }
+                });
 
-                        const gapFixPrompt = `
-You are an ATS optimization specialist. The following tailored resume is MISSING some required keywords from the Job Description.
-
-MISSING REQUIRED KEYWORDS: ${requiredCoverage.missing.join(', ')}
-${preferredCoverage.missing.length > 0 ? `MISSING PREFERRED KEYWORDS: ${preferredCoverage.missing.join(', ')}` : ''}
-
-ORIGINAL RESUME (for truth-checking):
---- SKILLS ---
-${sections.skills}
---- EXPERIENCE ---
-${sections.experience}
---- PROJECTS ---
-${sections.projects}
-
-CURRENT TAILORED RESUME SECTIONS:
---- SUMMARY ---
-${tailoredSections.summary}
---- SKILLS ---
-${tailoredSections.skills}
---- EXPERIENCE ---
-${tailoredSections.experience}
-
-INSTRUCTIONS:
-1. For each missing keyword, determine if the candidate has ANY related experience in the ORIGINAL resume (even if phrased differently).
-2. If YES: Add the keyword to the SKILLS section AND weave it into a relevant EXPERIENCE bullet.
-3. If NO: Do NOT add it. Skip it entirely.
-4. Prefer adding keywords to SKILLS first, then SUMMARY, then EXPERIENCE.
-5. Do NOT remove any existing content — only ADD or REPHRASE.
-
-OUTPUT FORMAT (JSON ONLY, use \\\\n for newlines inside strings):
-{
-    "summary": "...(updated summary)...",
-    "skills": "...(updated skills)...",
-    "experience": "...(updated experience)...",
-    "injected": ["keyword1 - added to skills"],
-    "skipped": ["keyword3 - no related experience"]
-}`;
-
-                        const gapFixText = await generateText({
-                            prompt: gapFixPrompt,
-                            systemInstruction: 'You are an ATS optimization specialist. Output ONLY valid JSON. Never fabricate experience.',
-                            provider,
-                            apiKey,
-                            modelName,
-                            customConfig: customConfig as CustomConfig,
-                            temperature: 0.2,
-                            jsonMode: true,
-                        });
-
-                        const gapData = JSON.parse(cleanJson(gapFixText));
-                        const normalizeNewlines = (s: string) => s.replace(/\\n/g, '\n');
-
-                        if (gapData.summary) tailoredSections.summary = normalizeNewlines(gapData.summary);
-                        if (gapData.skills) tailoredSections.skills = normalizeNewlines(gapData.skills);
-                        if (gapData.experience) tailoredSections.experience = normalizeNewlines(gapData.experience);
-
-                        if (gapData.injected?.length > 0) console.log('Gap-fix injected:', gapData.injected);
-                        if (gapData.skipped?.length > 0) console.log('Gap-fix skipped:', gapData.skipped);
-
-                        // Send gap-fix results to client
-                        sendSSE(controller, encoder, {
-                            phase: 'gap_fix_result',
-                            data: {
-                                injected: gapData.injected || [],
-                                skipped: gapData.skipped || [],
-                            }
-                        });
-
-                    } catch (e) {
-                        console.error("Failed during keyword gap-fix.", e);
-                    }
-                }
+                const allKeywords = [...(jdKeywords.requiredKeywords || []), ...(jdKeywords.preferredKeywords || [])];
 
                 // Reconstruct Full Resume
                 let tailoredResume = `
@@ -583,29 +396,41 @@ ${tailoredSections.skills}
                 const hasOriginalBullets = (resume.match(/^\s*\*/gm) || []).length >= 5;
                 const originalFormattingScore = (hasOriginalHeader ? 30 : 0) + (hasOriginalSections ? 40 : 0) + (hasOriginalBullets ? 30 : 0);
 
-                const analysisPrompt = `
-You are a resume analysis assistant.
-Evaluate ONLY the "Experience Relevance" dimension for both the original and tailored resumes against the Job Description.
-Do NOT compute overall ATS scores — those are calculated deterministically.
+                // Fix 6: Send only Experience + Summary (not full resume) to trim token load
+                const originalExcerpt = [
+                    sections.summary ? `SUMMARY:\n${sections.summary}` : '',
+                    sections.experience ? `EXPERIENCE:\n${sections.experience}` : '',
+                ].filter(Boolean).join('\n\n');
 
-JOB DESCRIPTION:
+                const tailoredExcerpt = [
+                    tailoredSections.summary ? `SUMMARY:\n${tailoredSections.summary}` : '',
+                    tailoredSections.experience ? `EXPERIENCE:\n${tailoredSections.experience}` : '',
+                ].filter(Boolean).join('\n\n');
+
+                const analysisPrompt = `
+You are assessing a single dimension: Experience Relevance (0–100).
+Do not compute any other ATS scores — those are calculated separately.
+
+JOB DESCRIPTION (Requirements only — focus on role, seniority, responsibilities):
 ${jobDescription}
 
-ORIGINAL RESUME:
-${resume}
+ORIGINAL CANDIDATE EXCERPTS (Summary + Experience only):
+${originalExcerpt}
 
-TAILORED RESUME:
-${tailoredResume}
+TAILORED CANDIDATE EXCERPTS (Summary + Experience only):
+${tailoredExcerpt}
 
-SCORING GUIDANCE:
-- **Experience Relevance (0-100)**: How well does the candidate's experience align with JD responsibilities? Focus on role, industry, seniority, and achievement quality.
+SCORING CRITERIA:
+- Score based on: role alignment, industry depth, seniority match, strength of achievements, and keyword integration quality.
+- Score the original resume fairly — do not assume it is weak just because it was tailored.
+- Score the tailored resume on demonstrated improvement in professional narrative and ATS alignment.
 
 OUTPUT FORMAT (JSON ONLY):
 {
-    "experienceRelevance": {"before": 50, "after": 80},
-    "analysis": "Two sentence summary of what changed and why the tailored version is better.",
+    "experienceRelevance": {"before": 50, "after": 85},
+    "analysis": "Two-sentence executive summary — state what specifically improved in the tailored version and why it resonates better with this role.",
     "changes": [
-        { "section": "Experience", "original": "Managed team...", "new": "Spearheaded team of 10...", "reason": "Added leadership keyword." }
+        { "section": "Experience", "original": "Worked on backend services", "new": "Architected event-driven microservices platform handling 2M daily transactions", "reason": "Elevated to a results-driven, JD-aligned achievement demonstrating scale and technical ownership." }
     ]
 }`;
 
@@ -614,12 +439,13 @@ OUTPUT FORMAT (JSON ONLY):
                     console.log("Phase 2: Analyzing (Deterministic + LLM Hybrid)...");
                     const analysisText = await generateText({
                         prompt: analysisPrompt,
-                        systemInstruction: 'You are a resume evaluation assistant. Output ONLY valid JSON.',
+                        // Fix 1: Precise, aligned system persona for the analysis call
+                        systemInstruction: 'You are a Senior Technical Recruiter and ATS Evaluation Expert. You assess resume-to-JD fit with precision and objectivity. You output ONLY strictly valid JSON.',
                         provider,
                         apiKey,
                         modelName,
                         customConfig: customConfig as CustomConfig,
-                        temperature: 0.2,
+                        temperature: 0.1, // Keep low for scoring — we want consistent, calibrated scores
                         jsonMode: true,
                     });
                     analysisData = JSON.parse(cleanJson(analysisText));

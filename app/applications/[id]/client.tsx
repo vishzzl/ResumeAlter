@@ -333,6 +333,9 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                 finalJobDescription = parts.join('\n');
             }
 
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 seconds max
+
             const res = await fetch('/api/cover-letter', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -348,7 +351,9 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     style: coverLetterStyle,
                     customInstructions: coverLetterInstructions || undefined,
                 }),
+                signal: controller.signal,
             });
+            clearTimeout(timeoutId);
 
             const data = await res.json();
             if (!res.ok) {
@@ -360,9 +365,15 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                 setIsEditingCoverLetter(false);
                 await updateApplication(app.id, { coverLetter: data.coverLetter });
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error('Cover letter generation failed', err);
-            setError(err instanceof Error ? err.message : 'Failed to generate cover letter.');
+            let errorMessage = err instanceof Error ? err.message : 'Failed to generate cover letter.';
+            if (err?.name === 'AbortError') {
+                errorMessage = '⚠️ The AI is taking too long to respond. The model might be overloaded. Please try again or switch to a faster model.';
+            } else if (errorMessage.toLowerCase().includes('timeout')) {
+                errorMessage = '⚠️ The AI timed out: ' + errorMessage;
+            }
+            setError(errorMessage);
         } finally {
             setCoverLetterLoading(false);
         }
@@ -574,6 +585,9 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
 
             const startTime = performance.now();
 
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s overall max for SSE stream
+
             const res = await fetch('/api/tailor', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -586,7 +600,9 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     customConfig: customModelConfig,
                     applicationId: app.id,
                 }),
+                signal: controller.signal,
             });
+            clearTimeout(timeoutId);
 
             if (!res.ok) {
                 const data = await res.json();
@@ -675,10 +691,18 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                 }
             }
 
-        } catch (err) {
+        } catch (err: any) {
             console.error('Tailoring failed', err);
-            setError(err instanceof Error ? err.message : 'Failed to tailor resume.');
-            toast.error('❌ Tailoring failed. Please try again.', { id: 'tailor-status' });
+            
+            let errorMessage = err instanceof Error ? err.message : 'Failed to tailor resume.';
+            if (err?.name === 'AbortError') {
+                errorMessage = '⚠️ The AI is taking too long to respond. The model might be overloaded. Please try again or switch to a faster model.';
+            } else if (errorMessage.toLowerCase().includes('timeout')) {
+                errorMessage = '⚠️ ' + errorMessage;
+            }
+            
+            setError(errorMessage);
+            toast.error('❌ Tailoring failed. See error banner for details.', { id: 'tailor-status', duration: 8000 });
         } finally {
             setLoading(prevLoading => {
                 // If we finished loading but never reached 'complete' phase, the stream was cut

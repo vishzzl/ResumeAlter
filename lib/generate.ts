@@ -20,8 +20,24 @@ export interface GenerateOptions {
     jsonMode?: boolean;
 }
 
+export class TimeoutError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'TimeoutError';
+    }
+}
+
+export function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
+    let timeoutId: NodeJS.Timeout;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new TimeoutError(errorMessage)), timeoutMs);
+    });
+    return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
+}
+
 // ── Retry helper ──────────────────────────────────────────────────────────────
 const RETRY_DELAYS_MS = [1000, 2000]; // 2 retries: wait 1s then 2s
+
 
 function isRetryable(error: any): boolean {
     const msg: string = error?.message ?? '';
@@ -64,10 +80,15 @@ export async function generateText(opts: GenerateOptions): Promise<string> {
     } = opts;
 
     const defaultModel = 'gemini-flash-latest';
+    const TIMEOUT_MS = 60000; // 60 seconds
 
     if (provider === 'custom') {
         return withRetry(async () => {
-            const result = await generateWithCustom(prompt, customConfig?.customUrl, customConfig?.customKey);
+            const result = await withTimeout(
+                generateWithCustom(prompt, customConfig?.customUrl, customConfig?.customKey),
+                TIMEOUT_MS,
+                `Custom model timed out after 60s`
+            );
             return result.response.text();
         });
     }
@@ -75,7 +96,11 @@ export async function generateText(opts: GenerateOptions): Promise<string> {
     if (provider === 'local') {
         const localModel = customConfig?.localModel || modelName || 'llama3';
         return withRetry(async () => {
-            const result = await generateWithLocal(prompt, localModel, customConfig?.localUrl);
+            const result = await withTimeout(
+                generateWithLocal(prompt, localModel, customConfig?.localUrl),
+                TIMEOUT_MS,
+                `Local model timed out after 60s`
+            );
             return result.response.text();
         });
     }
@@ -90,7 +115,11 @@ export async function generateText(opts: GenerateOptions): Promise<string> {
 
             if (!model) throw new Error('Gemini API Key missing or invalid');
 
-            const result = await model.generateContent(prompt);
+            const result = await withTimeout(
+                model.generateContent(prompt),
+                TIMEOUT_MS,
+                `Gemini model ${modelName} timed out after 60s`
+            );
             return result.response.text();
         } catch (error: any) {
             console.error(`Model ${modelName} failed. Error: ${error.message}`);
@@ -106,7 +135,11 @@ export async function generateText(opts: GenerateOptions): Promise<string> {
                 }, systemInstruction);
 
                 if (!fallbackModel) throw new Error('Gemini API Key missing or invalid (Fallback)');
-                const result = await fallbackModel.generateContent(prompt);
+                const result = await withTimeout(
+                    fallbackModel.generateContent(prompt),
+                    TIMEOUT_MS,
+                    `Gemini fallback model ${defaultModel} timed out after 60s`
+                );
                 return result.response.text();
             }
             throw error;
