@@ -7,7 +7,9 @@ function createDb() {
 
     if (tursoUrl && tursoToken) {
         // Production: use Turso (libSQL)
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { drizzle } = require('drizzle-orm/libsql');
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { createClient } = require('@libsql/client');
 
         const client = createClient({
@@ -19,7 +21,9 @@ function createDb() {
         return drizzle(client, { schema });
     } else {
         // Development: use local SQLite
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { drizzle } = require('drizzle-orm/better-sqlite3');
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const Database = require('better-sqlite3');
 
         const sqlite = new Database('sqlite.db');

@@ -21,6 +21,7 @@ export const applications = sqliteTable('applications', {
     coverLetter: text('cover_letter'), // Generated cover letter text
     status: text('status').default('draft'), // draft, applied, interview, rejected, offer
     analysis: text('analysis'), // JSON string of ATS score and changes
+    tailorStatus: text('tailor_status').default('idle'), // idle, tailoring, verifying, analyzing, complete, error
     selectedCertifications: text('selected_certifications'), // JSON array of selected certs
     createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
     dateApplied: text('date_applied'), // ISO 8601 string

@@ -12,12 +12,21 @@ if (model) {
     console.log('Gemini API key not found, skipping Gemini initialization');
 }
 
-export function getGeminiModel(apiKey?: string, modelName: string = 'gemini-flash-latest') {
+export function getGeminiModel(
+    apiKey?: string,
+    modelName: string = 'gemini-flash-latest',
+    generationConfig?: Record<string, any>,
+    systemInstruction?: string
+) {
     const key = apiKey || envApiKey;
     if (key) {
         const genAI = new GoogleGenerativeAI(key);
         console.log(`Initializing Gemini with model: ${modelName}`);
-        return genAI.getGenerativeModel({ model: modelName });
+        return genAI.getGenerativeModel({
+            model: modelName,
+            ...(generationConfig ? { generationConfig } : {}),
+            ...(systemInstruction ? { systemInstruction } : {}),
+        });
     }
     return model;
 }

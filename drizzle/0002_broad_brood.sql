@@ -1,0 +1,1 @@
+ALTER TABLE `applications` ADD `tailor_status` text DEFAULT 'idle';

@@ -1,49 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGeminiModel } from '@/lib/gemini';
-import { generateWithLocal } from '@/lib/ollama';
-import { generateWithCustom } from '@/lib/custom_llm';
+import { generateText as sharedGenerateText, CustomConfig } from '@/lib/generate';
 
 export const maxDuration = 60;
 
-interface CustomConfig {
-    localUrl?: string;
-    localModel?: string;
-    customUrl?: string;
-    customKey?: string;
-}
-
-async function generateText(prompt: string, provider: string, apiKey?: string, modelName?: string, customConfig?: CustomConfig) {
-    const defaultModel = 'gemini-flash-latest';
-
-    if (provider === 'custom') {
-        const result = await generateWithCustom(prompt, customConfig?.customUrl, customConfig?.customKey);
-        return result.response.text();
-    } else if (provider === 'local') {
-        const localModel = customConfig?.localModel || modelName || 'llama3';
-        const result = await generateWithLocal(prompt, localModel, customConfig?.localUrl);
-        return result.response.text();
-    } else {
-        try {
-            const model = getGeminiModel(apiKey, modelName);
-            if (!model) throw new Error("Gemini API Key missing or invalid");
-            const result = await model.generateContent(prompt);
-            return result.response.text();
-        } catch (error: any) {
-            console.error(`Model ${modelName} failed. Error: ${error.message}`);
-            const isTransient = error.message?.includes('429') || error.message?.includes('503');
-            const isNotFound = error.message?.includes('404');
-
-            if (modelName !== defaultModel && (isTransient || isNotFound)) {
-                console.log(`Falling back to ${defaultModel}...`);
-                const fallbackModel = getGeminiModel(apiKey, defaultModel);
-                if (!fallbackModel) throw new Error("Gemini API Key missing or invalid (Fallback)");
-                const result = await fallbackModel.generateContent(prompt);
-                return result.response.text();
-            }
-            throw error;
-        }
-    }
-}
 
 // Style presets for cover letter customization
 const STYLE_PRESETS: Record<string, { lengthGuide: string; toneGuide: string; structureGuide: string }> = {
@@ -155,7 +114,15 @@ RULES:
 OUTPUT: Return ONLY the cover letter text. No markdown headers, no JSON, no code blocks. Just the plain text cover letter.
 `;
 
-        const coverLetterText = await generateText(prompt, provider, apiKey, modelName, customConfig);
+        const coverLetterText = await sharedGenerateText({
+            prompt,
+            systemInstruction: 'You are an expert Career Coach and Cover Letter Writer. Output ONLY the cover letter text.',
+            provider,
+            apiKey,
+            modelName,
+            customConfig: customConfig as CustomConfig,
+            temperature: 0.5,
+        });
 
         // Clean up: remove any markdown artifacts the model might add
         const cleaned = coverLetterText

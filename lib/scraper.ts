@@ -1,8 +1,74 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 
-export async function scrapeJobDescription(url: string): Promise<{ content: string | null; error?: string }> {
+export interface ScrapeResult {
+    content: string | null;
+    error?: string;
+    scrapeBlocked?: boolean; // true when auth-wall / bot-detection is suspected
+}
+
+// Phrases that indicate a login/bot-detection wall
+const AUTH_WALL_SIGNALS = [
+    'sign in', 'log in', 'login', 'create account', 'register to view',
+    'please log in', 'access denied', 'captcha', 'verify you are human',
+    'enable javascript', 'javascript is required',
+];
+
+function detectAuthWall(content: string): boolean {
+    const lower = content.toLowerCase();
+    // If content is very short OR contains multiple auth-wall signals, flag it
+    const signalMatches = AUTH_WALL_SIGNALS.filter(s => lower.includes(s)).length;
+    return content.length < 300 || signalMatches >= 2;
+}
+
+function isDisallowedHost(hostname: string): boolean {
+    const lowered = hostname.toLowerCase();
+
+    // Explicit localhost and IPv6 localhost
+    if (lowered === 'localhost' || lowered === '::1') return true;
+
+    // Reject direct IPv4 matches for private/local/link-local scopes
+    // Cloud metadata: 169.254.169.254
+    // Loopback: 127.x.x.x
+    // Class A private: 10.x.x.x
+    // Class B private: 172.16-31.x.x
+    // Class C private: 192.168.x.x
+    if (
+        lowered.startsWith('127.') ||
+        lowered.startsWith('10.') ||
+        lowered.startsWith('192.168.') ||
+        lowered === '169.254.169.254'
+    ) {
+        return true;
+    }
+
+    // Class B (172.16.0.0 - 172.31.255.255) needs more precise check
+    const parts = lowered.split('.');
+    if (parts.length === 4 && parts[0] === '172') {
+        const secondOctet = parseInt(parts[1], 10);
+        if (secondOctet >= 16 && secondOctet <= 31) return true;
+    }
+
+    return false;
+}
+
+export async function scrapeJobDescription(url: string): Promise<ScrapeResult> {
     try {
+        let parsedUrl: URL;
+        try {
+            parsedUrl = new URL(url);
+        } catch {
+            throw new Error('Invalid URL format');
+        }
+
+        if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+            throw new Error('Only HTTP and HTTPS protocols are permitted');
+        }
+
+        if (isDisallowedHost(parsedUrl.hostname)) {
+            throw new Error('Scraping internal network resources is prohibited');
+        }
+
         const { data } = await axios.get(url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -17,12 +83,12 @@ export async function scrapeJobDescription(url: string): Promise<{ content: stri
                 'Sec-Fetch-User': '?1',
             },
             timeout: 10000, // 10s timeout
+            maxRedirects: 3, // Prevent infinite redirect loops or redirect SSRF bypasses
         });
 
         const $ = cheerio.load(data);
 
         // Attempt to find the main job description container
-        // These selectors are common but might need to be adjusted for specific sites
         const selectors = [
             '.job-description',
             '#job-description',
@@ -43,7 +109,7 @@ export async function scrapeJobDescription(url: string): Promise<{ content: stri
             }
         }
 
-        // Fallback: if no specific container found, get body text but clean it up
+        // Fallback: get body text
         if (!content) {
             $('script, style, nav, footer, header, asides, iframe, noscript').remove();
             content = $('body').text().trim();
@@ -51,6 +117,17 @@ export async function scrapeJobDescription(url: string): Promise<{ content: stri
 
         // Clean up excessive whitespace
         const cleaned = content.replace(/\s+/g, ' ').trim();
+
+        // Quality check — detect auth-wall / bot-detection pages
+        if (detectAuthWall(cleaned)) {
+            console.warn(`Scrape quality check failed for ${url}: likely auth-wall or bot-detection (${cleaned.length} chars)`);
+            return {
+                content: null,
+                scrapeBlocked: true,
+                error: 'The job page appears to require a login or is blocking automated access. Please paste the job description manually.',
+            };
+        }
+
         return { content: cleaned };
 
     } catch (error) {

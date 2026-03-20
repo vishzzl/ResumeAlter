@@ -36,6 +36,7 @@ export function ModelSelector() {
 
     // Sync tab with selected provider when opening
     useEffect(() => {
+        // eslint-disable-next-line
         if (open) setActiveTab(selectedProvider);
     }, [open, selectedProvider]);
 

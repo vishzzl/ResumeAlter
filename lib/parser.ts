@@ -1,85 +1,98 @@
-import { model, getGeminiModel } from './gemini';
-import { generateWithLocal } from './ollama';
-import { generateWithCustom } from './custom_llm';
+import { generateText, cleanJson, CustomConfig } from './generate';
 
 export interface JobDetails {
     description: string;
     requirements: string[];
+    requiredSkills: string[];
+    preferredSkills: string[];
+    /** @deprecated Use requiredSkills / preferredSkills instead */
     skills: string[];
     experience: string[];
+    experienceLevel: string;
     jobType: string;
     company: string;
     title: string;
+    location: string;
+    remote: boolean;
+    salary: string;
 }
 
-interface CustomConfig {
-    localUrl?: string;
-    localModel?: string;
-    customUrl?: string;
-    customKey?: string;
-}
-
-export async function parseJobDescriptionWithAI(text: string, apiKey?: string, provider: 'gemini' | 'local' | 'custom' = 'gemini', modelName: string = 'gemini-1.5-flash', customConfig?: CustomConfig): Promise<JobDetails | null> {
-    // Uses gemini-2.0-flash from lib/gemini.ts
-    // const aiModel = getGeminiModel(apiKey);
-
-    // if (!aiModel) {
-    //     console.error('Gemini model not initialized');
-    //     return null;
-    // }
-
+export async function parseJobDescriptionWithAI(
+    text: string,
+    apiKey?: string,
+    provider: 'gemini' | 'local' | 'custom' = 'gemini',
+    modelName: string = 'gemini-1.5-flash',
+    customConfig?: CustomConfig
+): Promise<JobDetails | null> {
     try {
         const prompt = `
-        You are an expert job description analyzer.
-        Extract the following details from the job description below:
-        1. Requirements (list of bullet points)
-        2. Skills (list of specific skills)
-        3. Experience (list of experience requirements)
-        4. Job Type (Full-time, Part-time, Contract, etc.)
-        5. Company Name (The name of the hiring company)
-        6. Job Title (The official title of the role)
-        7. Cleaned Job Description (the main body of the text, cleaned of clutter)
+Extract the following details from the job description below.
 
-        Output ONLY valid JSON with the following structure:
-        {
-            "description": "Cleaned description text",
-            "requirements": ["req1", "req2"],
-            "skills": ["skill1", "skill2"],
-            "experience": ["exp1", "exp2"],
-            "jobType": "Type",
-            "company": "Company Name",
-            "title": "Job Title"
+EXAMPLE INPUT:
+"""
+Software Engineer II at Acme Corp (Remote, San Francisco, CA)
+$130k-$160k/year
+Requirements: 3+ years of experience in Python, React, AWS. Nice to have: Kubernetes, GraphQL.
+"""
+
+EXAMPLE OUTPUT:
+{
+    "description": "Software Engineer II role at Acme Corp focused on full-stack development...",
+    "requirements": ["3+ years of experience in Python", "Experience with React", "AWS experience"],
+    "requiredSkills": ["Python", "React", "AWS"],
+    "preferredSkills": ["Kubernetes", "GraphQL"],
+    "experience": ["3+ years of software engineering experience"],
+    "experienceLevel": "Mid-level (3+ years)",
+    "jobType": "Full-time",
+    "company": "Acme Corp",
+    "title": "Software Engineer II",
+    "location": "San Francisco, CA",
+    "remote": true,
+    "salary": "$130k-$160k/year"
+}
+
+NOW EXTRACT FROM THIS JOB DESCRIPTION:
+${text}
+
+INSTRUCTIONS:
+1. **requiredSkills**: Skills explicitly listed as required or mandatory.
+2. **preferredSkills**: Skills listed as nice-to-have, preferred, or bonus.
+3. **experienceLevel**: The seniority level and years required (e.g. "Senior (5+ years)", "Entry-level", "Mid-level (3-5 years)").
+4. **location**: City/state/country, or "Not specified".
+5. **remote**: true if fully remote or hybrid, false otherwise.
+6. **salary**: Salary range if mentioned, or "Not specified".
+7. **description**: The cleaned main body of the JD, without boilerplate/legal text.
+8. Keep the legacy "skills" field as the union of requiredSkills + preferredSkills for backward compatibility.
+
+Output ONLY valid JSON matching the structure above.`;
+
+        const responseText = await generateText({
+            prompt,
+            systemInstruction: 'You are an expert job description analyzer. Output ONLY valid JSON.',
+            provider,
+            apiKey,
+            modelName,
+            customConfig,
+            temperature: 0.2,
+            jsonMode: true,
+        });
+
+        const parsed = JSON.parse(cleanJson(responseText));
+
+        // Ensure backward compatibility: populate 'skills' from required + preferred if missing
+        if (!parsed.skills && (parsed.requiredSkills || parsed.preferredSkills)) {
+            parsed.skills = [...(parsed.requiredSkills || []), ...(parsed.preferredSkills || [])];
         }
 
-        Job Description:
-        ${text}
-        `;
+        // Ensure new fields have defaults
+        parsed.requiredSkills = parsed.requiredSkills || parsed.skills || [];
+        parsed.preferredSkills = parsed.preferredSkills || [];
+        parsed.experienceLevel = parsed.experienceLevel || 'Not specified';
+        parsed.location = parsed.location || 'Not specified';
+        parsed.remote = parsed.remote ?? false;
+        parsed.salary = parsed.salary || 'Not specified';
 
-        let responseText = '';
-
-        if (provider === 'local') {
-            const localModel = customConfig?.localModel || modelName || 'llama3';
-            const result = await generateWithLocal(prompt, localModel, customConfig?.localUrl);
-            responseText = result.response.text();
-        } else if (provider === 'custom') {
-            const result = await generateWithCustom(prompt, customConfig?.customUrl, customConfig?.customKey);
-            responseText = result.response.text();
-        } else {
-            // Default to Gemini
-            const aiModel = getGeminiModel(apiKey, modelName);
-            if (!aiModel) {
-                console.error('Gemini model not initialized');
-                return null;
-            }
-            const result = await aiModel.generateContent(prompt);
-            const response = await result.response;
-            responseText = response.text();
-        }
-
-        // Clean up markdown code blocks if Gemini adds them
-        const jsonString = responseText.replace(/```json\n|\n```/g, '').replace(/```/g, '').trim();
-
-        return JSON.parse(jsonString);
+        return parsed;
     } catch (error) {
         console.error('Error parsing job description with AI:', error);
         return null;

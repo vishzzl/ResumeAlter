@@ -11,12 +11,14 @@ export function formatProfileToText(profile: any): string {
 
   let text = '';
 
-  // Contact Info
-  if (profile.name) text += `${profile.name}\n`;
-  if (profile.email) text += `Email: ${profile.email}\n`;
-  if (profile.phone) text += `Phone: ${profile.phone}\n`;
-  if (profile.linkedin) text += `LinkedIn: ${profile.linkedin}\n`;
-  if (profile.website) text += `Website: ${profile.website}\n`;
+  // Header — Markdown H1 + pipe-separated contact (matches tailor prompt & resume-parser expectations)
+  if (profile.name) text += `# ${profile.name}\n`;
+  const contactParts: string[] = [];
+  if (profile.email) contactParts.push(profile.email);
+  if (profile.phone) contactParts.push(profile.phone);
+  if (profile.linkedin) contactParts.push(`[LinkedIn](${profile.linkedin})`);
+  if (profile.website) contactParts.push(`[Website](${profile.website})`);
+  if (contactParts.length > 0) text += `${contactParts.join(' | ')}\n`;
   text += '\n';
 
   // Summary
@@ -53,12 +55,36 @@ export function formatProfileToText(profile: any): string {
       const experience = typeof profile.experience === 'string' ? JSON.parse(profile.experience) : profile.experience;
       if (Array.isArray(experience)) {
         experience.forEach((exp: any) => {
-          text += `${exp.role} at ${exp.company}\n`;
-          text += `${exp.dates || ''}\n`;
-          if (exp.description) text += `${exp.description}\n`;
-          if (exp.highlights && Array.isArray(exp.highlights)) {
-            exp.highlights.forEach((h: string) => text += `- ${h}\n`);
+          // Company | Role | Dates header (matches tailor prompt format)
+          text += `**${exp.company || 'Company'}** | **${exp.role || 'Role'}** | **${exp.dates || ''}**\n\n`;
+
+          // General description (not client-specific)
+          if (exp.description) {
+            exp.description.split('\n').filter((l: string) => l.trim()).forEach((line: string) => {
+              const clean = line.replace(/^[\s\-\*•]+/, '').trim();
+              if (clean) text += `* ${clean}\n`;
+            });
           }
+          if (exp.highlights && Array.isArray(exp.highlights)) {
+            exp.highlights.forEach((h: string) => {
+              if (h && h.trim()) text += `* ${h.trim()}\n`;
+            });
+          }
+
+          // Client sub-sections
+          if (Array.isArray(exp.clients) && exp.clients.length > 0) {
+            exp.clients.forEach((client: any) => {
+              const label = [client.name, client.domain].filter(Boolean).join(' - ');
+              if (label) text += `\n**Client:** ${label}\n\n`;
+              if (client.description) {
+                client.description.split('\n').filter((l: string) => l.trim()).forEach((line: string) => {
+                  const clean = line.replace(/^[\s\-\*•]+/, '').trim();
+                  if (clean) text += `* ${clean}\n`;
+                });
+              }
+            });
+          }
+
           text += '\n';
         });
       }

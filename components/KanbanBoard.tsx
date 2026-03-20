@@ -20,6 +20,7 @@ type Application = {
     tailoredResume?: string | null;
     dateApplied?: string | null;
     analysis?: string | null;
+    tailorStatus?: string | null;
 };
 
 const STATUS_COLUMNS = [
@@ -181,7 +182,7 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
             return;
         }
 
-        let updates: any = { status };
+        const updates: any = { status };
 
         // RULE: Auto-Timestamp
         if (status === 'applied' && !appToMove.dateApplied) {
@@ -344,6 +345,7 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
                                         const atsScore = getAtsScore(app.analysis);
                                         const hasResume = !!app.tailoredResume;
                                         const isDeleting = deletingIds.has(app.id);
+                                        const isTailoring = app.tailorStatus && ['tailoring', 'verifying', 'analyzing'].includes(app.tailorStatus);
 
                                         return (
                                             <div
@@ -417,15 +419,24 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
 
                                                     {/* Footer */}
                                                     <div className="mt-3 pt-3 border-t border-slate-50 flex items-center justify-between">
-                                                        <span className={cn(
-                                                            "inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full",
-                                                            hasResume
-                                                                ? "text-emerald-700 bg-emerald-50/50 ring-1 ring-emerald-100"
-                                                                : "text-slate-400 bg-slate-50 ring-1 ring-slate-100"
-                                                        )}>
-                                                            {hasResume ? <FileCheck className="h-3 w-3" /> : <FileX className="h-3 w-3" />}
-                                                            {hasResume ? 'Ready' : 'No Resume'}
-                                                        </span>
+                                                        {isTailoring ? (
+                                                            <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full text-indigo-700 bg-indigo-50/50 ring-1 ring-indigo-100 animate-pulse">
+                                                                <Sparkles className="h-3 w-3 animate-spin" />
+                                                                {app.tailorStatus === 'tailoring' ? 'Tailoring...' :
+                                                                    app.tailorStatus === 'verifying' ? 'Verifying...' :
+                                                                        'Analyzing...'}
+                                                            </span>
+                                                        ) : (
+                                                            <span className={cn(
+                                                                "inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full",
+                                                                hasResume
+                                                                    ? "text-emerald-700 bg-emerald-50/50 ring-1 ring-emerald-100"
+                                                                    : "text-slate-400 bg-slate-50 ring-1 ring-slate-100"
+                                                            )}>
+                                                                {hasResume ? <FileCheck className="h-3 w-3" /> : <FileX className="h-3 w-3" />}
+                                                                {hasResume ? 'Ready' : 'No Resume'}
+                                                            </span>
+                                                        )}
                                                         <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all" />
                                                     </div>
                                                 </Link>
