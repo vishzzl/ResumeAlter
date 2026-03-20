@@ -313,6 +313,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
         setCoverLetterLoading(true);
         setError(null);
         setOutputTab('coverLetter');
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
         try {
             const apiKey = localStorage.getItem('gemini_api_key');
             let finalJobDescription = jobDescription;
@@ -334,7 +335,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             }
 
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 seconds max
+            timeoutId = setTimeout(() => controller.abort(), 90000); // 90 seconds max
 
             const res = await fetch('/api/cover-letter', {
                 method: 'POST',
@@ -353,7 +354,6 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                 }),
                 signal: controller.signal,
             });
-            clearTimeout(timeoutId);
 
             const data = await res.json();
             if (!res.ok) {
@@ -375,6 +375,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             }
             setError(errorMessage);
         } finally {
+            clearTimeout(timeoutId);
             setCoverLetterLoading(false);
         }
     };
@@ -560,6 +561,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
         setSseIncomplete(false);
         toast.info('🚀 Tailoring started...', { id: 'tailor-status' });
 
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
         try {
             const apiKey = localStorage.getItem('gemini_api_key');
             let finalJobDescription = jobDescription;
@@ -586,7 +588,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             const startTime = performance.now();
 
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s overall max for SSE stream
+            timeoutId = setTimeout(() => controller.abort(), 120000); // 120s overall max for SSE stream
 
             const res = await fetch('/api/tailor', {
                 method: 'POST',
@@ -704,6 +706,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             setError(errorMessage);
             toast.error('❌ Tailoring failed. See error banner for details.', { id: 'tailor-status', duration: 8000 });
         } finally {
+            clearTimeout(timeoutId);
             setLoading(prevLoading => {
                 // If we finished loading but never reached 'complete' phase, the stream was cut
                 setTailorPhase(prev => {

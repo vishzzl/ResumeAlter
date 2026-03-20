@@ -3,7 +3,8 @@ import { generateText, cleanJson, CustomConfig } from '@/lib/generate';
 import { parseResumeSections } from '@/lib/resume-parser';
 import { db } from '@/lib/db';
 import { applications } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
+import { auth } from '@/auth';
 
 export const maxDuration = 120;
 
@@ -13,8 +14,12 @@ function sendSSE(controller: ReadableStreamDefaultController, encoder: TextEncod
 }
 
 // Helper to update tailor status in the DB (for dashboard visibility)
-async function setTailorStatus(appId: number, status: string) {
-    await db.update(applications).set({ tailorStatus: status }).where(eq(applications.id, appId));
+async function setTailorStatus(appId: number, status: string, userId: number | null) {
+    if (userId) {
+        await db.update(applications).set({ tailorStatus: status }).where(and(eq(applications.id, appId), eq(applications.userId, userId)));
+    } else {
+        await db.update(applications).set({ tailorStatus: status }).where(eq(applications.id, appId));
+    }
 }
 
 // ─── Programmatic keyword coverage calculator ───
@@ -50,8 +55,22 @@ function calculateKeywordCoverage(text: string, keywords: string[]): { matched: 
 }
 
 export async function POST(req: NextRequest) {
+    const session = await auth();
+    // Allow anonymous usage if no appId is provided, but if an appId IS provided, the route
+    // must verify session ownership to prevent IDOR.
+    const userId = session?.user?.id ? parseInt(session.user.id) : null;
+
     const body = await req.json();
     const { resume, jobDescription, apiKey, modelProvider, modelName, customConfig, applicationId } = body;
+
+    const appId = applicationId ? parseInt(applicationId) : null;
+
+    if (appId && !userId) {
+        return new Response(
+            JSON.stringify({ error: 'Unauthorized to update application' }),
+            { status: 401, headers: { 'Content-Type': 'application/json' } }
+        );
+    }
 
     if (!resume || !jobDescription) {
         return new Response(
@@ -72,7 +91,6 @@ export async function POST(req: NextRequest) {
 
     console.log(`Using Model Provider for Tailoring: ${provider}, Model: ${modelName || 'default'}`);
 
-    const appId = applicationId ? parseInt(applicationId) : null;
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
@@ -82,7 +100,7 @@ export async function POST(req: NextRequest) {
 
                 // ═══ PHASE 0, 1, 1.5, 1.7: MASTER TAILORING PASS ═══
                 sendSSE(controller, encoder, { phase: 'extracting' });
-                if (appId) await setTailorStatus(appId, 'tailoring');
+                if (appId) await setTailorStatus(appId, 'tailoring', userId);
 
                 // ── Fix 1: Full persona lives in systemInstruction (not here)
                 // ── Fix 2: Structured "reasoning" scratchpad before output
@@ -206,23 +224,26 @@ Use \\\\n for newlines in string fields. No markdown outside of JSON.
                 try {
                     console.log("Phase 1: Master Tailoring Pass (Extraction + Tailoring + Verification)...");
                     
+                    let masterText: string;
                     const t1 = setTimeout(() => sendSSE(controller, encoder, { phase: 'tailoring' }), 3000);
                     const t2 = setTimeout(() => sendSSE(controller, encoder, { phase: 'verifying' }), 8000);
 
-                    const masterText = await generateText({
-                        prompt: masterTailoringPrompt,
-                        // Fix 1: Full, precise persona lives here — user prompt is data + tasks only
-                        systemInstruction: 'You are an elite Executive Career Coach, Expert Resume Writer, and uncompromising Fact-Checker. You craft high-impact, results-driven professional narratives with ATS precision. You NEVER fabricate skills, metrics, or experiences. You ONLY output strictly valid JSON.',
-                        provider,
-                        apiKey,
-                        modelName,
-                        customConfig: customConfig as CustomConfig,
-                        temperature: 0.45, // Fix 7: Higher temp for varied, compelling language in rewrites
-                        jsonMode: true,
-                    });
-
-                    clearTimeout(t1);
-                    clearTimeout(t2);
+                    try {
+                        masterText = await generateText({
+                            prompt: masterTailoringPrompt,
+                            // Fix 1: Full, precise persona lives here — user prompt is data + tasks only
+                            systemInstruction: 'You are an elite Executive Career Coach, Expert Resume Writer, and uncompromising Fact-Checker. You craft high-impact, results-driven professional narratives with ATS precision. You NEVER fabricate skills, metrics, or experiences. You ONLY output strictly valid JSON.',
+                            provider,
+                            apiKey,
+                            modelName,
+                            customConfig: customConfig as CustomConfig,
+                            temperature: 0.45, // Fix 7: Higher temp for varied, compelling language in rewrites
+                            jsonMode: true,
+                        });
+                    } finally {
+                        clearTimeout(t1);
+                        clearTimeout(t2);
+                    }
 
                     const data = JSON.parse(cleanJson(masterText));
 
@@ -361,11 +382,11 @@ ${tailoredSections.skills}
                 });
 
                 // Persist to DB
-                if (appId) {
+                if (appId && userId) {
                     await db.update(applications).set({
                         tailoredResume,
                         tailorStatus: 'analyzing',
-                    }).where(eq(applications.id, appId));
+                    }).where(and(eq(applications.id, appId), eq(applications.userId, userId)));
                 }
 
                 // ═══ PHASE 2: ATS ANALYSIS (Deterministic + LLM Hybrid) ═══
@@ -483,14 +504,14 @@ OUTPUT FORMAT (JSON ONLY):
                 });
 
                 // Persist final result to DB
-                if (appId) {
+                if (appId && userId) {
                     await db.update(applications).set({
                         analysis: JSON.stringify({
                             changes: analysisData.changes || [],
                             atsScore: deterministicAtsScore,
                         }),
                         tailorStatus: 'complete',
-                    }).where(eq(applications.id, appId));
+                    }).where(and(eq(applications.id, appId), eq(applications.userId, userId)));
                 }
 
             } catch (error) {
@@ -499,7 +520,7 @@ OUTPUT FORMAT (JSON ONLY):
                     phase: 'error',
                     error: error instanceof Error ? error.message : 'Internal Server Error'
                 });
-                if (appId) await setTailorStatus(appId, 'error');
+                if (appId) await setTailorStatus(appId, 'error', userId);
             } finally {
                 controller.close();
             }
