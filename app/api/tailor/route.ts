@@ -219,7 +219,7 @@ Use \\\\n for newlines in string fields. No markdown outside of JSON.
                     preferredKeywords: [] as string[],
                     actionVerbs: [] as string[],
                 };
-                let tailoredSections = { ...sections };
+                const tailoredSections = { ...sections };
 
                 try {
                     console.log("Phase 1: Master Tailoring Pass (Extraction + Tailoring + Verification)...");

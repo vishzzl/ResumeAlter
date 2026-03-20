@@ -539,7 +539,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                         if (c.issuer) certLine += ` | ${c.issuer}`;
                         parts.push(certLine);
 
-                        let details = [];
+                        const details = [];
                         if (c.date) details.push(c.date);
                         if (c.url) details.push(`[Link](${c.url})`);
                         if (details.length > 0) parts.push(`* ${details.join(' | ')}`);

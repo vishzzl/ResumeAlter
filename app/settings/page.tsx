@@ -10,6 +10,7 @@ export default function SettingsPage() {
     useEffect(() => {
         // Load key from localStorage on mount
         const stored = localStorage.getItem('gemini_api_key');
+        // eslint-disable-next-line
         if (stored) setApiKey(stored);
     }, []);
 

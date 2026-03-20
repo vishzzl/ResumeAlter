@@ -182,7 +182,7 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
             return;
         }
 
-        let updates: any = { status };
+        const updates: any = { status };
 
         // RULE: Auto-Timestamp
         if (status === 'applied' && !appToMove.dateApplied) {

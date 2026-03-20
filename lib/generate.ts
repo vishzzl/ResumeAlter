@@ -158,7 +158,7 @@ export async function generateText(opts: GenerateOptions): Promise<string> {
  */
 function sanitizeJson(raw: string): string {
     // 1. Remove trailing commas before ] or }
-    let s = raw.replace(/,\s*([}\]])/g, '$1');
+    const s = raw.replace(/,\s*([}\]])/g, '$1');
 
     // 2. Fix raw control characters embedded inside string values.
     //    We scan char-by-char so we only touch content actually inside a JSON string.
@@ -193,7 +193,7 @@ function sanitizeJson(raw: string): string {
  */
 export function cleanJson(text: string): string {
     // Strip markdown fences
-    let str = text
+    const str = text
         .replace(/^```(?:json)?\s*/i, '')
         .replace(/\s*```\s*$/, '')
         .trim();

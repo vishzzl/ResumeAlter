@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
 interface ErrorBoundaryProps {
@@ -65,12 +66,12 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
                                 Reload Application
                             </button>
 
-                            <a
+                            <Link
                                 href="/"
                                 className="mt-4 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
                             >
                                 Go to Dashboard
-                            </a>
+                            </Link>
                         </div>
                     </div>
                 </div>
