@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Save, CheckCircle, AlertCircle } from 'lucide-react';
+import { Save, CheckCircle } from 'lucide-react';
 
 export default function SettingsPage() {
     const [apiKey, setApiKey] = useState('');

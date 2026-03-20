@@ -5,7 +5,7 @@ import { authenticate } from '@/actions/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+
 import Link from 'next/link';
 import { AlertCircle } from 'lucide-react';
 
