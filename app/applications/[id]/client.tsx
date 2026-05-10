@@ -2,31 +2,37 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Application, applications } from '@/lib/db/schema';
+import { Application } from '@/lib/db/schema';
 import { updateApplication, getProfile } from '@/lib/actions';
 import {
-    Loader2, Save, Wand2, Upload, FileText, ChevronLeft, ChevronRight,
+    Loader2, Save, Wand2, Upload, FileText, ChevronLeft, ChevronRight, ChevronDown,
     RefreshCw, Download, CheckSquare, Square, UserCheck, Briefcase,
     Sparkles, X, Eye, GitCompare, LayoutGrid, Mail, Copy, Check,
-    PenLine, BookOpen, Zap, Crown, Award, Target, ChevronDown, ChevronUp
+    PenLine, BookOpen, Zap, Crown, Target, Layers
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { JobDetails } from '@/lib/parser';
 import { useAIConfig } from '@/app/context/AIConfigContext';
 import { ResumePreview } from '@/components/ResumePreview';
 import { DiffViewer } from '@/components/DiffViewer';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { SectionWiseEditor, SectionName, SectionState, SectionsState, SECTION_ORDER } from '@/components/SectionWiseEditor';
+import { parseResumeSections } from '@/lib/resume-parser';
+
+interface AnalysisChange {
+    section?: string;
+    reason?: string;
+    original?: string;
+    new?: string;
+    oldText?: string[];
+}
 
 interface ApplicationClientProps {
     initialApplication: Application;
 }
 
-// Helper for constructing job description strings
-function constructJobString(parts: string[]) {
-    return parts.join('\n');
-}
+
 
 // ─── Score Ring Component ───
 function ScoreRing({ score, size = 80, strokeWidth = 7 }: { score: number; size?: number; strokeWidth?: number }) {
@@ -65,7 +71,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const [isSaving, setIsSaving] = useState(false); // separate from loading (which is used for tailoring)
     const [activeTab, setActiveTab] = useState<'job' | 'resume'>('job');
     const [mobileTab, setMobileTab] = useState<'job' | 'resume' | 'result'>('job');
-    const router = useRouter();
+
 
     // Resume State
     const [resumeText, setResumeText] = useState(app.baseResume || '');
@@ -118,14 +124,14 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     // Result State
     const [tailoredResume, setTailoredResume] = useState(app.tailoredResume || '');
     const initialAnalysis = app.analysis ? JSON.parse(app.analysis) : { changes: [], atsScore: null, executionTime: null };
-    const [changes, setChanges] = useState<any[]>(initialAnalysis.changes || []);
-    const [atsScore, setAtsScore] = useState<{ before: number, after: number, analysis: string } | null>(initialAnalysis.atsScore || null);
-    const [executionTime, setExecutionTime] = useState<number | null>(initialAnalysis.executionTime || null);
+    const [changes, setChanges] = useState<AnalysisChange[]>(initialAnalysis.changes || []);
+    const [atsScore, setAtsScore] = useState<{ before: number; after: number; analysis: string } | null>(initialAnalysis.atsScore || null);
+    const [, setExecutionTime] = useState<number | null>(initialAnalysis.executionTime || null);
     const [resultViewMode, setResultViewMode] = useState<'preview' | 'diff' | 'edit'>('preview');
     const [tailorPhase, setTailorPhase] = useState<'extracting' | 'tailoring' | 'verifying' | 'gap_check' | 'analyzing' | 'complete' | null>(null);
 
     // Keyword Coverage State — pre-fix (before gap injection) and post-fix (final)
-    const [preFixCoverage, setPreFixCoverage] = useState<{
+    const [, setPreFixCoverage] = useState<{
         required: { score: number; matched: string[]; missing: string[]; total: number };
         preferred: { score: number; matched: string[]; missing: string[]; total: number };
     } | null>(null);
@@ -142,7 +148,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const [coverLetterLoading, setCoverLetterLoading] = useState(false);
     const [coverLetterStyle, setCoverLetterStyle] = useState<'professional' | 'concise' | 'storytelling' | 'executive'>('professional');
     const [coverLetterInstructions, setCoverLetterInstructions] = useState('');
-    const [outputTab, setOutputTab] = useState<'resume' | 'coverLetter'>('resume');
+    const [outputTab, setOutputTab] = useState<'resume' | 'coverLetter' | 'sections'>('resume');
     const [copied, setCopied] = useState(false);
     const [isEditingCoverLetter, setIsEditingCoverLetter] = useState(false);
 
@@ -155,9 +161,70 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const [activeAnalysisTab, setActiveAnalysisTab] = useState<'changes' | 'coverage' | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pdfGenerating, setPdfGenerating] = useState(false);
+    const [tailorEngine, setTailorEngine] = useState<'standard' | 'ensemble'>('standard');
+
+    // ─── Section-wise generation state ───────────────────────────────────────────
+    const makeSectionState = useCallback((original: string): SectionState => ({
+        original,
+        tailored: '',
+        variants: [],
+        selectedVariantIndex: 0,
+        status: 'idle',
+        accepted: false,
+    }), []);
+
+    const buildInitialSections = useCallback((): SectionsState => {
+        const parsed = parseResumeSections(resumeText);
+        return {
+            summary: makeSectionState(parsed.summary),
+            skills: makeSectionState(parsed.skills),
+            experience: makeSectionState(parsed.experience),
+            education: makeSectionState(parsed.education),
+            projects: makeSectionState(parsed.projects),
+            other: makeSectionState(parsed.other),
+        };
+    }, [resumeText, makeSectionState]);
+
+    const [sectionStates, setSectionStates] = useState<SectionsState>(() => {
+        const empty = (s: string): SectionState => ({
+            original: s, tailored: '', variants: [], selectedVariantIndex: 0,
+            status: 'idle', accepted: false,
+        });
+        return {
+            summary: empty(''), skills: empty(''), experience: empty(''),
+            education: empty(''), projects: empty(''), other: empty(''),
+        };
+    });
+
+    // JD analysis state — fetched once when user opens Section Builder
+    const [jdAnalysis, setJdAnalysis] = useState<{
+        targetTitle: string; seniority: string; requiredSkills: string[];
+        preferredSkills: string[]; keyVerbs: string[]; companyDomain: string; keyPhrases: string[];
+    } | null>(null);
+    const [isAnalyzingJD, setIsAnalyzingJD] = useState(false);
+
+    const [ensembleData, setEnsembleData] = useState<{
+        winningModel: string;
+        finalScore: number;
+        candidates: Array<{
+            model: string;
+            focus: string;
+            text: string;
+            selfScore: number;
+            crossScore: number;
+            finalScore: number;
+            changes: Array<{ section: string; original: string; new: string; reason: string }>;
+        }>;
+        missingKeywords: string[];
+        addedKeywords: string[];
+        improvementSummary: string[];
+        _collapsed?: boolean;
+    } | null>(null);
+    const [selectedCandidate, setSelectedCandidate] = useState<number>(0);
+
 
     // Workflow step status
-    const hasJobData = !!(jobDescription || jobDetails);
+
     const hasResume = !!resumeText;
     const hasResult = !!tailoredResume;
 
@@ -166,8 +233,8 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const canTailor = !loading && !!resumeText && !!jobDescription && !inputTooShort;
 
     // Certifications State
-    const [profileCertifications, setProfileCertifications] = useState<any[]>([]);
-    const [selectedCertifications, setSelectedCertifications] = useState<any[]>(
+    const [, setProfileCertifications] = useState<Record<string, unknown>[]>([]);
+    const [selectedCertifications] = useState<Record<string, unknown>[]>(
         app.selectedCertifications ? JSON.parse(app.selectedCertifications) : []
     );
 
@@ -199,34 +266,11 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
         });
     }, []);
 
-    // Save selected certifications when changed
-    useEffect(() => {
-        const saveSelection = async () => {
-            // Debounce or just save?
-            // Since this might trigger on every click, maybe better to save in handleSave?
-            // But for now let's keep it in sync with handleSave or update lazily.
-            // Actually, the main handleSave should include it.
-        };
-    }, [selectedCertifications]);
 
 
-    useEffect(() => {
-        if (!app.jobDescription && app.jobUrl && !jobDescription) {
-            scrapeJob();
-        }
-    }, [app.jobDescription, app.jobUrl]);
 
-    useEffect(() => {
-        if (app.jobTitle && app.companyName) {
-            document.title = `${app.jobTitle} at ${app.companyName}`;
-        } else if (app.jobTitle) {
-            document.title = `${app.jobTitle}`;
-        }
-    }, [app.jobTitle, app.companyName]);
-
-    // ─── Handlers (all business logic unchanged) ───
-
-    const scrapeJob = async () => {
+    // Wrap scrapeJob in useCallback so it can be safely used in useEffect deps
+    const scrapeJob = useCallback(async () => {
         if (!app.jobUrl && !jobDescription) return;
         setIsScraping(true);
         try {
@@ -261,7 +305,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     if (data.details.title) newTitle = data.details.title;
                     if (data.details.company) newCompany = data.details.company;
                 }
-                setApp((prev: any) => ({ ...prev, jobTitle: newTitle, companyName: newCompany }));
+                setApp((prev: Application) => ({ ...prev, jobTitle: newTitle, companyName: newCompany }));
                 await updateApplication(app.id, {
                     jobDescription: data.description,
                     jobDetails: data.details ? JSON.stringify(data.details) : undefined,
@@ -274,7 +318,25 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
         } finally {
             setIsScraping(false);
         }
-    };
+    }, [app.jobUrl, app.id, app.jobTitle, app.companyName, jobDescription, selectedProvider, selectedModel, customModelConfig]);
+
+    useEffect(() => {
+        if (!app.jobDescription && app.jobUrl && !jobDescription) {
+            scrapeJob();
+        }
+    }, [app.jobDescription, app.jobUrl, jobDescription, scrapeJob]);
+
+    useEffect(() => {
+        if (app.jobTitle && app.companyName) {
+            document.title = `${app.jobTitle} at ${app.companyName}`;
+        } else if (app.jobTitle) {
+            document.title = `${app.jobTitle}`;
+        }
+    }, [app.jobTitle, app.companyName]);
+
+    // ─── Handlers (all business logic unchanged) ───
+
+
 
     const handleSave = async () => {
         setIsSaving(true);
@@ -296,42 +358,44 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
         }
     };
 
-    // Debounced auto-save for resume text (saves 1.5s after the user stops typing)
-    const handleResumeTextChange = (value: string) => {
-        setResumeText(value);
-        if (resumeAutoSaveRef.current) clearTimeout(resumeAutoSaveRef.current);
-        resumeAutoSaveRef.current = setTimeout(async () => {
-            try {
-                await updateApplication(app.id, { baseResume: value });
-            } catch (e) {
-                console.error('Auto-save failed', e);
-            }
-        }, 1500);
+
+
+    const getSelectedSkillBuckets = () => {
+        const selectedSkillSet = new Set(selectedJobDetails.skills);
+        return {
+            required: selectedJobDetails.requiredSkills.filter(skill => selectedSkillSet.has(skill)),
+            preferred: selectedJobDetails.preferredSkills.filter(skill => selectedSkillSet.has(skill)),
+        };
     };
 
     const handleGenerateCoverLetter = async () => {
         setCoverLetterLoading(true);
         setError(null);
         setOutputTab('coverLetter');
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
         try {
             const apiKey = localStorage.getItem('gemini_api_key');
             let finalJobDescription = jobDescription;
             if (jobDetails && !selectedJobDetails.useFullDescription) {
+                const selectedSkills = getSelectedSkillBuckets();
                 const parts = [];
                 parts.push(`Job Title: ${jobDetails.title || app.jobTitle}`);
                 parts.push(`Company: ${jobDetails.company || app.companyName}`);
                 if (selectedJobDetails.requirements.length > 0) {
                     parts.push(`\nRequirements:\n${selectedJobDetails.requirements.map(r => `- ${r}`).join('\n')}`);
                 }
-                if (selectedJobDetails.requiredSkills.length > 0) {
-                    parts.push(`\nRequired Skills:\n${selectedJobDetails.requiredSkills.map(s => `- ${s}`).join('\n')}`);
+                if (selectedSkills.required.length > 0) {
+                    parts.push(`\nRequired Skills:\n${selectedSkills.required.map(s => `- ${s}`).join('\n')}`);
                 }
-                if (selectedJobDetails.preferredSkills.length > 0) {
-                    parts.push(`\nPreferred Skills:\n${selectedJobDetails.preferredSkills.map(s => `- ${s}`).join('\n')}`);
+                if (selectedSkills.preferred.length > 0) {
+                    parts.push(`\nPreferred Skills:\n${selectedSkills.preferred.map(s => `- ${s}`).join('\n')}`);
                 }
                 parts.push(`\nDescription:\n${jobDetails.description || jobDescription}`);
                 finalJobDescription = parts.join('\n');
             }
+
+            const controller = new AbortController();
+            timeoutId = setTimeout(() => controller.abort(), 90000); // 90 seconds max
 
             const res = await fetch('/api/cover-letter', {
                 method: 'POST',
@@ -348,6 +412,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     style: coverLetterStyle,
                     customInstructions: coverLetterInstructions || undefined,
                 }),
+                signal: controller.signal,
             });
 
             const data = await res.json();
@@ -360,10 +425,17 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                 setIsEditingCoverLetter(false);
                 await updateApplication(app.id, { coverLetter: data.coverLetter });
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error('Cover letter generation failed', err);
-            setError(err instanceof Error ? err.message : 'Failed to generate cover letter.');
+            let errorMessage = err instanceof Error ? err.message : 'Failed to generate cover letter.';
+            if (err?.name === 'AbortError') {
+                errorMessage = '⚠️ The AI is taking too long to respond. The model might be overloaded. Please try again or switch to a faster model.';
+            } else if (errorMessage.toLowerCase().includes('timeout')) {
+                errorMessage = '⚠️ The AI timed out: ' + errorMessage;
+            }
+            setError(errorMessage);
         } finally {
+            clearTimeout(timeoutId);
             setCoverLetterLoading(false);
         }
     };
@@ -518,7 +590,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                         if (c.issuer) certLine += ` | ${c.issuer}`;
                         parts.push(certLine);
 
-                        let details = [];
+                        const details = [];
                         if (c.date) details.push(c.date);
                         if (c.url) details.push(`[Link](${c.url})`);
                         if (details.length > 0) parts.push(`* ${details.join(' | ')}`);
@@ -547,23 +619,73 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
         setPreFixCoverage(null);
         setGapFixResults(null);
         setSseIncomplete(false);
+        
+        if (tailorEngine === 'ensemble') {
+            toast.info('🚀 Generating Ensemble (Gemini + OpenRouter)...', { id: 'tailor-status' });
+            try {
+                const ensembleApiKey = localStorage.getItem('gemini_api_key');
+                const res = await fetch('/api/ensemble-tailor', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        resume: resumeText,
+                        jobDescription: jobDescription,
+                        applicationId: app.id,
+                        apiKey: ensembleApiKey,
+                        modelProvider: selectedProvider,
+                        modelName: selectedModel,
+                        customConfig: customModelConfig,
+                    })
+                });
+
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || `Server Error: ${res.status}`);
+                }
+
+                const data = await res.json();
+                
+                setTailoredResume(data.tailoredResume);
+                if (data.atsScore) setAtsScore(data.atsScore);
+                if (data.changes) setChanges(data.changes);
+                if (data.ensembleResult) {
+                    setEnsembleData(data.ensembleResult);
+                    setSelectedCandidate(0);
+                }
+                setTailorPhase('complete');
+                setSseIncomplete(false);
+                toast.success('🎉 Ensemble tailoring complete!', { id: 'tailor-status' });
+                
+            } catch (err: any) {
+                console.error('Ensemble Tailoring failed', err);
+                setError(err instanceof Error ? err.message : 'Failed to tailor using Ensemble.');
+                toast.error('❌ Tailoring failed. See error banner.', { id: 'tailor-status' });
+                setTailorPhase(null);
+            } finally {
+                setLoading(false);
+            }
+            return;
+        }
+
         toast.info('🚀 Tailoring started...', { id: 'tailor-status' });
 
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
         try {
             const apiKey = localStorage.getItem('gemini_api_key');
             let finalJobDescription = jobDescription;
             if (jobDetails && !selectedJobDetails.useFullDescription) {
+                const selectedSkills = getSelectedSkillBuckets();
                 const parts = [];
                 parts.push(`Job Title: ${jobDetails.title || app.jobTitle}`);
                 parts.push(`Company: ${jobDetails.company || app.companyName}`);
                 if (selectedJobDetails.requirements.length > 0) {
                     parts.push(`\nSelected Requirements: \n${selectedJobDetails.requirements.map(r => `- ${r}`).join('\n')}`);
                 }
-                if (selectedJobDetails.requiredSkills.length > 0) {
-                    parts.push(`\nRequired Skills (must target): \n${selectedJobDetails.requiredSkills.map(s => `- ${s}`).join('\n')}`);
+                if (selectedSkills.required.length > 0) {
+                    parts.push(`\nRequired Skills (must target): \n${selectedSkills.required.map(s => `- ${s}`).join('\n')}`);
                 }
-                if (selectedJobDetails.preferredSkills.length > 0) {
-                    parts.push(`\nPreferred Skills (nice to have): \n${selectedJobDetails.preferredSkills.map(s => `- ${s}`).join('\n')}`);
+                if (selectedSkills.preferred.length > 0) {
+                    parts.push(`\nPreferred Skills (nice to have): \n${selectedSkills.preferred.map(s => `- ${s}`).join('\n')}`);
                 }
                 if (selectedJobDetails.experience.length > 0) {
                     parts.push(`\nSelected Experience: \n${selectedJobDetails.experience.map(e => `- ${e}`).join('\n')}`);
@@ -573,6 +695,9 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             }
 
             const startTime = performance.now();
+
+            const controller = new AbortController();
+            timeoutId = setTimeout(() => controller.abort(), 120000); // 120s overall max for SSE stream
 
             const res = await fetch('/api/tailor', {
                 method: 'POST',
@@ -586,7 +711,9 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     customConfig: customModelConfig,
                     applicationId: app.id,
                 }),
+                signal: controller.signal,
             });
+            clearTimeout(timeoutId);
 
             if (!res.ok) {
                 const data = await res.json();
@@ -675,11 +802,20 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                 }
             }
 
-        } catch (err) {
+        } catch (err: any) {
             console.error('Tailoring failed', err);
-            setError(err instanceof Error ? err.message : 'Failed to tailor resume.');
-            toast.error('❌ Tailoring failed. Please try again.', { id: 'tailor-status' });
+            
+            let errorMessage = err instanceof Error ? err.message : 'Failed to tailor resume.';
+            if (err?.name === 'AbortError') {
+                errorMessage = '⚠️ The AI is taking too long to respond. The model might be overloaded. Please try again or switch to a faster model.';
+            } else if (errorMessage.toLowerCase().includes('timeout')) {
+                errorMessage = '⚠️ ' + errorMessage;
+            }
+            
+            setError(errorMessage);
+            toast.error('❌ Tailoring failed. See error banner for details.', { id: 'tailor-status', duration: 8000 });
         } finally {
+            clearTimeout(timeoutId);
             setLoading(prevLoading => {
                 // If we finished loading but never reached 'complete' phase, the stream was cut
                 setTailorPhase(prev => {
@@ -712,6 +848,230 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             setPdfGenerating(false);
         }
     };
+
+    // ─── Section-wise handlers ────────────────────────────────────────────────
+
+    /**
+     * Generate a single section using /api/tailor-section.
+     * ALWAYS sends the full original resume + full JD as context to prevent hallucinations.
+     * Only the OUTPUT is scoped to the requested section.
+     */
+    const handleGenerateSection = useCallback(async (sectionName: SectionName) => {
+        if (!resumeText || !jobDescription) {
+            toast.error('Add a resume and job description first.');
+            return;
+        }
+
+        setSectionStates(prev => ({
+            ...prev,
+            [sectionName]: { ...prev[sectionName], status: 'generating', error: undefined },
+        }));
+
+        try {
+            const apiKey = localStorage.getItem('gemini_api_key');
+            const res = await fetch('/api/tailor-section', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sectionName,
+                    resume: resumeText,       // FULL resume — anti-hallucination context
+                    jobDescription,           // FULL job description
+                    jdAnalysis,               // pre-analyzed JD intel (null if not yet ready)
+                    apiKey,
+                    modelProvider: selectedProvider,
+                    modelName: selectedModel,
+                    customConfig: customModelConfig,
+                }),
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || `Server Error: ${res.status}`);
+            }
+            if (!res.body) throw new Error('No response body');
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let accumulated = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                accumulated += decoder.decode(value, { stream: true });
+                const lines = accumulated.split('\n\n');
+                accumulated = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    try {
+                        const event = JSON.parse(line.slice(6));
+                        if (event.phase === 'complete' && event.data?.candidates?.length) {
+                            const candidates = event.data.candidates;
+                            // candidates are already sorted by score (highest first)
+                            const winner = candidates[0];
+                            setSectionStates(prev => ({
+                                ...prev,
+                                [sectionName]: {
+                                    ...prev[sectionName],
+                                    variants: candidates,
+                                    selectedVariantIndex: 0,
+                                    tailored: winner.text,
+                                    status: 'done',
+                                    accepted: false,
+                                },
+                            }));
+                            toast.success(`${sectionName.charAt(0).toUpperCase() + sectionName.slice(1)}: ${candidates.length} variants — best scored ${winner.score}%`, { duration: 3000 });
+                        } else if (event.phase === 'error') {
+                            throw new Error(event.error);
+                        }
+                    } catch { /* skip malformed events */ }
+                }
+            }
+        } catch (err: any) {
+            console.error(`[SectionBuilder] Failed to generate ${sectionName}:`, err);
+            setSectionStates(prev => ({
+                ...prev,
+                [sectionName]: {
+                    ...prev[sectionName],
+                    status: 'error',
+                    error: err instanceof Error ? err.message : 'Generation failed',
+                },
+            }));
+            toast.error(`Failed to generate ${sectionName}. Please try again.`);
+        }
+    }, [resumeText, jobDescription, selectedProvider, selectedModel, customModelConfig]);
+
+    /** Generate all sections sequentially so the user sees each card populate */
+    const handleGenerateAllSections = useCallback(async () => {
+        if (!resumeText || !jobDescription) {
+            toast.error('Add a resume and job description first.');
+            return;
+        }
+        toast.info('🚀 Generating all sections (3 variants each)...', { id: 'section-gen' });
+        for (const name of SECTION_ORDER) {
+            await handleGenerateSection(name as SectionName);
+        }
+        toast.success('✅ All sections generated! Review and accept the best variants.', { id: 'section-gen' });
+    }, [handleGenerateSection, resumeText, jobDescription]);
+
+    const handleAcceptSection = useCallback((name: SectionName) => {
+        setSectionStates(prev => ({
+            ...prev,
+            [name]: { ...prev[name], accepted: !prev[name].accepted },
+        }));
+    }, []);
+
+    const handleResetSection = useCallback((name: SectionName) => {
+        setSectionStates(prev => ({
+            ...prev,
+            [name]: {
+                ...prev[name],
+                tailored: '', variants: [], selectedVariantIndex: 0,
+                status: 'idle', accepted: false, error: undefined,
+            },
+        }));
+    }, []);
+
+    const handleSectionTailoredChange = useCallback((name: SectionName, value: string) => {
+        setSectionStates(prev => ({ ...prev, [name]: { ...prev[name], tailored: value } }));
+    }, []);
+
+    /** Switch the active variant for a section (updates tailored text to that variant) */
+    const handleSelectVariant = useCallback((name: SectionName, index: number) => {
+        setSectionStates(prev => {
+            const s = prev[name];
+            if (!s.variants[index]) return prev;
+            return {
+                ...prev,
+                [name]: {
+                    ...s,
+                    selectedVariantIndex: index,
+                    tailored: s.variants[index].text,
+                    accepted: false, // switching variant resets acceptance
+                },
+            };
+        });
+    }, []);
+
+    /**
+     * Assemble all accepted (or any generated) sections into a single markdown resume string.
+     * Uses the tailored content where accepted/generated, falls back to original for ungenerated sections.
+     */
+    const handleAssembleResume = useCallback(() => {
+        const s = sectionStates;
+        const get = (name: SectionName) =>
+            (s[name].accepted && s[name].tailored) ? s[name].tailored : s[name].original;
+
+        const header = (() => {
+            const parsed = parseResumeSections(resumeText);
+            return parsed.header || '';
+        })();
+
+        const parts: string[] = [];
+        if (header) parts.push(header);
+        const summary = get('summary');
+        if (summary) parts.push(`## Summary\n${summary}`);
+        const experience = get('experience');
+        if (experience) parts.push(`## Experience\n${experience}`);
+        const skills = get('skills');
+        if (skills) parts.push(`## Skills\n${skills}`);
+        const education = get('education');
+        if (education) parts.push(`## Education\n${education}`);
+        const projects = get('projects');
+        if (projects) parts.push(`## Projects\n${projects}`);
+        const other = get('other');
+        if (other) parts.push(`## Certifications\n${other}`);
+
+        const assembled = parts.join('\n\n');
+        setTailoredResume(assembled);
+        setOutputTab('resume');
+        setResultViewMode('preview');
+        toast.success('🎉 Resume assembled! Switching to preview.');
+
+        // Persist assembled resume
+        updateApplication(app.id, { tailoredResume: assembled }).catch(console.error);
+    }, [sectionStates, resumeText, app.id]);
+
+                    // Re-initialize section originals when user switches to Section Builder tab
+    const handleSwitchToSections = useCallback(() => {
+        const parsed = parseResumeSections(resumeText);
+        setSectionStates(prev => {
+            const updated = { ...prev };
+            (Object.keys(updated) as SectionName[]).forEach(name => {
+                if (updated[name].status === 'idle' && !updated[name].tailored) {
+                    updated[name] = { ...updated[name], original: parsed[name] || '' };
+                }
+            });
+            return updated;
+        });
+        setOutputTab('sections');
+
+        // Fire JD analysis if not done yet (adds ~2s upfront, improves all 6 sections)
+        if (!jdAnalysis && !isAnalyzingJD && jobDescription) {
+            setIsAnalyzingJD(true);
+            fetch('/api/analyze-jd', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jobDescription,
+                    apiKey: selectedProvider === 'gemini' ? undefined : undefined,
+                    modelProvider: selectedProvider,
+                    modelName: selectedModel || undefined,
+                }),
+            })
+                .then(r => r.json())
+                .then(data => { if (!data.error) setJdAnalysis(data); })
+                .catch(err => console.warn('[analyze-jd]', err))
+                .finally(() => setIsAnalyzingJD(false));
+        }
+    }, [resumeText, jdAnalysis, isAnalyzingJD, jobDescription, selectedProvider, selectedModel]);
+
+    const isAnySectionGenerating = SECTION_ORDER.some(
+        n => sectionStates[n as SectionName].status === 'generating'
+    );
+    const canAssembleSections = SECTION_ORDER.some(
+        n => sectionStates[n as SectionName].accepted
+    );
 
     // ─── RENDER ───
 
@@ -758,6 +1118,15 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                         {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                         <span className="hidden sm:inline">{isSaving ? 'Saving...' : 'Save'}</span>
                     </button>
+                    <select
+                        value={tailorEngine}
+                        onChange={(e) => setTailorEngine(e.target.value as 'standard' | 'ensemble')}
+                        disabled={loading || isSaving}
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-all shadow-sm outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                    >
+                        <option value="standard">⚡ Standard Engine</option>
+                        <option value="ensemble">🧪 Ensemble (Gemini + OpenRouter)</option>
+                    </select>
                     <button
                         onClick={handleTailor}
                         disabled={!canTailor}
@@ -1280,6 +1649,9 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                     <button onClick={() => setOutputTab('resume')} className={outputTab === 'resume' ? 'active' : ''}>
                                         <span className="flex items-center gap-1"><FileText className="h-3 w-3" /><span className="hidden sm:inline">Resume</span><span className="sm:hidden">Resume</span></span>
                                     </button>
+                                    <button onClick={handleSwitchToSections} className={outputTab === 'sections' ? 'active' : ''}>
+                                        <span className="flex items-center gap-1"><Layers className="h-3 w-3" /><span className="hidden sm:inline">Section Builder</span><span className="sm:hidden">Sections</span></span>
+                                    </button>
                                     <button onClick={() => setOutputTab('coverLetter')} className={outputTab === 'coverLetter' ? 'active' : ''}>
                                         <span className="flex items-center gap-1"><Mail className="h-3 w-3" /><span className="hidden sm:inline">Cover Letter</span><span className="sm:hidden">Letter</span></span>
                                     </button>
@@ -1404,6 +1776,27 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
 
                         {/* Content & Sidebar Wrapper */}
                         <div className="flex-1 flex min-h-0 overflow-hidden relative">
+                            {/* ── Section Builder tab ── */}
+                            {outputTab === 'sections' && (
+                                <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-slate-50">
+                                    <SectionWiseEditor
+                                        sections={sectionStates}
+                                        fullOriginalResume={resumeText}
+                                        jdAnalysisTitle={jdAnalysis?.targetTitle}
+                                        onGenerate={handleGenerateSection}
+                                        onGenerateAll={handleGenerateAllSections}
+                                        onAccept={handleAcceptSection}
+                                        onReset={handleResetSection}
+                                        onTailoredChange={handleSectionTailoredChange}
+                                        onSelectVariant={handleSelectVariant}
+                                        onAssemble={handleAssembleResume}
+                                        isAnyGenerating={isAnySectionGenerating}
+                                        canAssemble={canAssembleSections}
+                                    />
+                                </div>
+                            )}
+                            {/* ── Resume / Cover Letter tabs ── */}
+                            {outputTab !== 'sections' && (
                             <div id="print-container" className="flex-1 overflow-auto p-3 sm:p-4 md:p-8 bg-white custom-scrollbar print:p-0 print:overflow-visible pb-20 lg:pb-8">
                                 {outputTab === 'resume' ? (
                                     // Resume output
@@ -1542,8 +1935,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                     ) : null
                                 )}
                             </div>
-
-
+                            )}
 
                             {/* Combined Analysis — Desktop: Sidebar, Mobile: Bottom Sheet */}
                             {((changes.length > 0) || keywordCoverage) && activeAnalysisTab && resultViewMode === 'preview' && (
@@ -1779,6 +2171,140 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     </div>
                 </div>
             </div>
+
+            {/* ━━━ Ensemble Comparison Panel ━━━ */}
+            {ensembleData && tailorEngine === 'ensemble' && tailoredResume && (
+                <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-gradient-to-b from-white to-slate-50 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] print:hidden">
+                    {/* Collapse / Expand Toggle */}
+                    <button
+                        onClick={() => setEnsembleData(prev => prev ? { ...prev, _collapsed: !prev._collapsed } : null)}
+                        className="w-full flex items-center justify-center gap-2 py-1.5 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                    >
+                        <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", (ensembleData as any)?._collapsed && "rotate-180")} />
+                        <span className="font-semibold">{(ensembleData as any)?._collapsed ? 'Show' : 'Hide'} Ensemble Results</span>
+                    </button>
+
+                    {!(ensembleData as any)?._collapsed && (
+                        <div className="px-4 pb-4 pt-1 max-h-[45vh] overflow-y-auto">
+                            {/* Header */}
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                    <Target className="h-4 w-4 text-indigo-500" />
+                                    Ensemble Comparison — {ensembleData.candidates.length} Candidates
+                                </h3>
+                                <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
+                                    🏆 Winner: {ensembleData.winningModel}
+                                </span>
+                            </div>
+
+                            {/* Candidate Cards */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                                {ensembleData.candidates.map((c, i) => {
+                                    const isWinner = c.model === ensembleData.winningModel;
+                                    const isSelected = selectedCandidate === i;
+                                    return (
+                                        <button
+                                            key={c.model + i}
+                                            onClick={() => {
+                                                setSelectedCandidate(i);
+                                                setTailoredResume(c.text);
+                                                if (c.changes) setChanges(c.changes);
+                                            }}
+                                            className={cn(
+                                                "text-left p-3 rounded-xl border-2 transition-all duration-200 hover:shadow-md relative",
+                                                isWinner && isSelected
+                                                    ? "border-emerald-400 bg-emerald-50/60 shadow-md ring-2 ring-emerald-200"
+                                                    : isWinner
+                                                        ? "border-emerald-400 bg-emerald-50/50 shadow-sm"
+                                                        : isSelected
+                                                            ? "border-indigo-400 bg-indigo-50/40 shadow-sm ring-2 ring-indigo-200"
+                                                            : "border-slate-200 bg-white hover:border-slate-300"
+                                            )}
+                                        >
+                                            {/* Active indicator */}
+                                            {isSelected && (
+                                                <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                                            )}
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <span className="text-xs font-bold text-slate-800">{c.model}</span>
+                                                {isWinner && (
+                                                    <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-full">
+                                                        ★ WINNER
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-[10px] text-slate-500 mb-2.5">{c.focus}</p>
+                                            <div className="grid grid-cols-3 gap-1 text-center bg-slate-50/80 rounded-lg py-1.5">
+                                                <div>
+                                                    <span className="text-[8px] text-slate-400 block uppercase tracking-wider">Keywords</span>
+                                                    <span className="text-xs font-bold text-blue-600">{(c.selfScore * 100).toFixed(0)}%</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-[8px] text-slate-400 block uppercase tracking-wider">Fact-Check</span>
+                                                    <span className={cn(
+                                                        "text-xs font-bold",
+                                                        c.crossScore >= 0.8 ? "text-emerald-600" : c.crossScore >= 0.6 ? "text-amber-600" : "text-red-600"
+                                                    )}>{(c.crossScore * 100).toFixed(0)}%</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-[8px] text-slate-400 block uppercase tracking-wider">Final</span>
+                                                    <span className={cn(
+                                                        "text-xs font-bold",
+                                                        isWinner ? "text-emerald-600" : "text-slate-700"
+                                                    )}>{(c.finalScore * 100).toFixed(0)}%</span>
+                                                </div>
+                                            </div>
+                                            {/* Click hint */}
+                                            <p className="text-[9px] text-center mt-2 text-slate-400">
+                                                {isSelected ? '✓ Viewing this resume' : 'Click to preview'}
+                                            </p>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Keywords Row */}
+                            <div className="flex flex-wrap gap-4">
+                                {ensembleData.addedKeywords.length > 0 && (
+                                    <div>
+                                        <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider block mb-1">✅ Added Keywords</span>
+                                        <div className="flex flex-wrap gap-1">
+                                            {ensembleData.addedKeywords.map((kw, i) => (
+                                                <span key={i} className="px-2 py-0.5 text-[10px] bg-emerald-50 text-emerald-700 rounded-md border border-emerald-100 font-medium">{kw}</span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                {ensembleData.missingKeywords.length > 0 && (
+                                    <div>
+                                        <span className="text-[9px] font-bold text-amber-600 uppercase tracking-wider block mb-1">⚠️ Still Missing</span>
+                                        <div className="flex flex-wrap gap-1">
+                                            {ensembleData.missingKeywords.slice(0, 15).map((kw, i) => (
+                                                <span key={i} className="px-2 py-0.5 text-[10px] bg-amber-50 text-amber-700 rounded-md border border-amber-100 font-medium">{kw}</span>
+                                            ))}
+                                            {ensembleData.missingKeywords.length > 15 && (
+                                                <span className="text-[10px] text-slate-400 self-center">+{ensembleData.missingKeywords.length - 15} more</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Improvement Summary */}
+                            {ensembleData.improvementSummary.length > 0 && (
+                                <div className="mt-3 p-2.5 rounded-lg bg-indigo-50/50 border border-indigo-100">
+                                    <span className="text-[9px] font-bold text-indigo-600 uppercase tracking-wider block mb-1">Pipeline Summary</span>
+                                    <ul className="space-y-0.5">
+                                        {ensembleData.improvementSummary.map((s, i) => (
+                                            <li key={i} className="text-[11px] text-slate-600">• {s}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* ━━━ Floating Expand Button (Desktop Only) ━━━ */}
             {!isLeftPanelOpen && (

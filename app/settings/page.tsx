@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Save, CheckCircle, AlertCircle } from 'lucide-react';
+import { Save, CheckCircle } from 'lucide-react';
 
 export default function SettingsPage() {
     const [apiKey, setApiKey] = useState('');
@@ -10,6 +10,7 @@ export default function SettingsPage() {
     useEffect(() => {
         // Load key from localStorage on mount
         const stored = localStorage.getItem('gemini_api_key');
+        // eslint-disable-next-line
         if (stored) setApiKey(stored);
     }, []);
 

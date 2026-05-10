@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
         // Minimal generation to check quota
         const result = await model.generateContent("Ping");
         const response = await result.response;
-        const text = response.text();
+        response.text(); // consume response to verify quota
 
         return NextResponse.json({
             status: 'ok',
@@ -37,12 +37,13 @@ export async function GET(req: NextRequest) {
             latency: 'Normal' // Placeholder
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Quota check failed:", error);
+        const errMsg = error instanceof Error ? error.message : String(error);
 
-        const isQuota = error.message?.includes('429') || error.message?.includes('Quota exceeded');
-        const isAuth = error.message?.includes('403') || error.message?.includes('API key not valid');
-        const isModel = error.message?.includes('404') || error.message?.includes('not found');
+        const isQuota = errMsg.includes('429') || errMsg.includes('Quota exceeded');
+        const isAuth = errMsg.includes('403') || errMsg.includes('API key not valid');
+        const isModel = errMsg.includes('404') || errMsg.includes('not found');
 
         let message = 'Unknown error occurred.';
         if (isQuota) message = 'Quota exceeded. Please check your usage limits.';
@@ -54,7 +55,7 @@ export async function GET(req: NextRequest) {
             message: message,
             quotaExceeded: isQuota,
             model: modelName,
-            rawError: error.message
+            rawError: errMsg
         }, { status: 200 }); // Return 200 so UI can handle the JSON body, or use 429/400? 
         // Better to return 200 with error details for this specific "check" endpoint
     }

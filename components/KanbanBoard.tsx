@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { updateApplication, deleteApplication } from '@/lib/actions';
 import {
-    Briefcase, Calendar, Plus, Trash2, GripVertical,
+    Briefcase, Plus, Trash2,
     Sparkles, Clock, FileCheck, FileX, ArrowRight,
-    ChevronRight, Zap, Trophy, XCircle, Send, Filter
+    ChevronRight, Zap, Trophy, XCircle, Send
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -182,7 +181,7 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
             return;
         }
 
-        let updates: any = { status };
+        const updates: Record<string, string> = { status };
 
         // RULE: Auto-Timestamp
         if (status === 'applied' && !appToMove.dateApplied) {
@@ -472,7 +471,7 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
                                                                                     return;
                                                                                 }
 
-                                                                                const updates: any = { status: targetCol.id };
+                                                                                const updates: Record<string, string> = { status: targetCol.id };
                                                                                 if (targetCol.id === 'applied' && !app.dateApplied) {
                                                                                     updates.dateApplied = new Date().toISOString();
                                                                                 }

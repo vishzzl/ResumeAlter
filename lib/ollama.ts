@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+
 
 const DEFAULT_API_URL = 'http://127.0.0.1:11434';
 const DEFAULT_LOCAL_MODEL = process.env.OLLAMA_MODEL || 'llama3.1:latest';

@@ -5,7 +5,7 @@ import { getProfile, createProfile, updateProfile } from '@/lib/actions';
 import { useAIConfig } from '@/app/context/AIConfigContext';
 import { useParse } from '@/app/context/ParseContext';
 import { toast } from 'sonner';
-import { Loader2, Save, Upload, User, Briefcase, GraduationCap, Code, ChevronRight, FileText, Settings, CheckCircle2, AlertCircle, Sparkles, Trash2, Plus, Award, LayoutGrid } from 'lucide-react';
+import { Loader2, Save, Upload, User, Briefcase, GraduationCap, Code, ChevronRight, FileText, CheckCircle2, AlertCircle, Sparkles, Trash2, Plus, Award, LayoutGrid } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
@@ -35,7 +35,7 @@ export default function ProfilePage() {
     const [isUploading, setIsUploading] = useState(false);
 
     // Global AI Config
-    const { selectedModel, selectedProvider, customModelConfig } = useAIConfig();
+    useAIConfig();
 
     const [activeTab, setActiveTab] = useState('basics');
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');

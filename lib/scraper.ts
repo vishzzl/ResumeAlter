@@ -21,8 +21,54 @@ function detectAuthWall(content: string): boolean {
     return content.length < 300 || signalMatches >= 2;
 }
 
+function isDisallowedHost(hostname: string): boolean {
+    const lowered = hostname.toLowerCase();
+
+    // Explicit localhost and IPv6 localhost
+    if (lowered === 'localhost' || lowered === '::1') return true;
+
+    // Reject direct IPv4 matches for private/local/link-local scopes
+    // Cloud metadata: 169.254.169.254
+    // Loopback: 127.x.x.x
+    // Class A private: 10.x.x.x
+    // Class B private: 172.16-31.x.x
+    // Class C private: 192.168.x.x
+    if (
+        lowered.startsWith('127.') ||
+        lowered.startsWith('10.') ||
+        lowered.startsWith('192.168.') ||
+        lowered === '169.254.169.254'
+    ) {
+        return true;
+    }
+
+    // Class B (172.16.0.0 - 172.31.255.255) needs more precise check
+    const parts = lowered.split('.');
+    if (parts.length === 4 && parts[0] === '172') {
+        const secondOctet = parseInt(parts[1], 10);
+        if (secondOctet >= 16 && secondOctet <= 31) return true;
+    }
+
+    return false;
+}
+
 export async function scrapeJobDescription(url: string): Promise<ScrapeResult> {
     try {
+        let parsedUrl: URL;
+        try {
+            parsedUrl = new URL(url);
+        } catch {
+            throw new Error('Invalid URL format');
+        }
+
+        if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+            throw new Error('Only HTTP and HTTPS protocols are permitted');
+        }
+
+        if (isDisallowedHost(parsedUrl.hostname)) {
+            throw new Error('Scraping internal network resources is prohibited');
+        }
+
         const { data } = await axios.get(url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -37,6 +83,7 @@ export async function scrapeJobDescription(url: string): Promise<ScrapeResult> {
                 'Sec-Fetch-User': '?1',
             },
             timeout: 10000, // 10s timeout
+            maxRedirects: 3, // Prevent infinite redirect loops or redirect SSRF bypasses
         });
 
         const $ = cheerio.load(data);

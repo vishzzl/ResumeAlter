@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-// @ts-ignore
 import pdf from 'pdf-parse';
 
 export const runtime = 'nodejs';
@@ -13,6 +12,13 @@ export async function POST(req: NextRequest) {
         if (!file) {
             console.error('No file in request');
             return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
+        }
+
+        // Limit to 5MB to prevent memory exhaustion DoS
+        const MAX_FILE_SIZE = 5 * 1024 * 1024;
+        if (file.size > MAX_FILE_SIZE) {
+            console.error(`File rejected. Size: ${file.size} exceeds 5MB limit`);
+            return NextResponse.json({ error: 'File size exceeds the 5MB maximum limit. Please upload a smaller file.' }, { status: 413 });
         }
 
         console.log('File received:', file.name, file.type, file.size);

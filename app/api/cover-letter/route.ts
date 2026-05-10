@@ -67,7 +67,6 @@ export async function POST(req: NextRequest) {
 
         // Determine model provider
         const customUrl = process.env.CUSTOM_LLM_URL;
-        const forceLocal = process.env.USE_LOCAL_MODEL === 'true';
         const hasGeminiKey = !!apiKey || !!process.env.GEMINI_API_KEY;
 
         let provider = modelProvider;
