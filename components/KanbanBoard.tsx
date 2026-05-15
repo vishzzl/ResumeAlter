@@ -27,56 +27,51 @@ const STATUS_COLUMNS = [
         id: 'draft',
         label: 'Draft',
         icon: FileX,
-        gradient: 'from-slate-500 to-slate-600',
-        bg: 'bg-slate-50/50',
-        border: 'border-slate-200/60',
-        headerBg: 'bg-slate-100/80',
-        dot: 'bg-slate-400',
-        badge: 'bg-slate-100 text-slate-600',
+        gradient: 'from-slate-400 to-slate-600',
+        bg: 'bg-slate-50/50 dark:bg-slate-900/40',
+        border: 'border-slate-200/60 dark:border-slate-800/60',
+        headerBg: 'bg-white/60 dark:bg-slate-950/60',
+        badge: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
     },
     {
         id: 'applied',
         label: 'Applied',
         icon: Send,
         gradient: 'from-blue-500 to-indigo-500',
-        bg: 'bg-blue-50/30',
-        border: 'border-blue-200/60',
-        headerBg: 'bg-blue-50/80',
-        dot: 'bg-blue-500',
-        badge: 'bg-blue-50 text-blue-600',
+        bg: 'bg-blue-50/30 dark:bg-blue-950/20',
+        border: 'border-blue-200/60 dark:border-blue-900/40',
+        headerBg: 'bg-white/60 dark:bg-slate-950/60',
+        badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300',
     },
     {
         id: 'interview',
         label: 'Interview',
         icon: Zap,
-        gradient: 'from-violet-500 to-purple-500',
-        bg: 'bg-violet-50/30',
-        border: 'border-violet-200/60',
-        headerBg: 'bg-violet-50/80',
-        dot: 'bg-violet-500',
-        badge: 'bg-violet-50 text-violet-600',
+        gradient: 'from-violet-500 to-fuchsia-500',
+        bg: 'bg-violet-50/30 dark:bg-violet-950/20',
+        border: 'border-violet-200/60 dark:border-violet-900/40',
+        headerBg: 'bg-white/60 dark:bg-slate-950/60',
+        badge: 'bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300',
     },
     {
         id: 'offer',
         label: 'Offer',
         icon: Trophy,
-        gradient: 'from-emerald-500 to-green-500',
-        bg: 'bg-emerald-50/30',
-        border: 'border-emerald-200/60',
-        headerBg: 'bg-emerald-50/80',
-        dot: 'bg-emerald-500',
-        badge: 'bg-emerald-50 text-emerald-600',
+        gradient: 'from-emerald-400 to-teal-500',
+        bg: 'bg-emerald-50/30 dark:bg-emerald-950/20',
+        border: 'border-emerald-200/60 dark:border-emerald-900/40',
+        headerBg: 'bg-white/60 dark:bg-slate-950/60',
+        badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300',
     },
     {
         id: 'rejected',
         label: 'Rejected',
         icon: XCircle,
-        gradient: 'from-red-400 to-rose-500',
-        bg: 'bg-red-50/30',
-        border: 'border-red-200/60',
-        headerBg: 'bg-red-50/80',
-        dot: 'bg-red-400',
-        badge: 'bg-red-50 text-red-500',
+        gradient: 'from-rose-400 to-red-500',
+        bg: 'bg-rose-50/30 dark:bg-rose-950/20',
+        border: 'border-rose-200/60 dark:border-rose-900/40',
+        headerBg: 'bg-white/60 dark:bg-slate-950/60',
+        badge: 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300',
     },
 ];
 
@@ -233,23 +228,23 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
     const offerCount = applications.filter(a => a.status === 'offer').length;
 
     return (
-        <div className="flex flex-col h-full overflow-hidden animate-fade-in-up">
+        <div className="flex flex-col h-[calc(100vh-5rem)] lg:h-[calc(100vh-4rem)] overflow-hidden animate-fade-in-up">
             {/* ━━━ Dashboard Header ━━━ */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-3 sm:mb-5 shrink-0 px-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 sm:mb-6 shrink-0 px-2 lg:px-4">
                 <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
                         Dashboard
                     </h1>
-                    <p className="text-xs sm:text-sm text-slate-500 mt-0.5 sm:mt-1 flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                        <span className="font-medium text-slate-700">{totalApps} Apps</span>
-                        {appliedCount > 0 && <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide">Applied {appliedCount}</span>}
-                        {interviewCount > 0 && <span className="inline-flex items-center gap-1 bg-violet-50 text-violet-700 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide">Interview {interviewCount}</span>}
-                        {offerCount > 0 && <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide">Offers {offerCount}</span>}
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 sm:mt-1.5 flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">{totalApps} Applications</span>
+                        {appliedCount > 0 && <span className="inline-flex items-center gap-1.5 bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide">Applied {appliedCount}</span>}
+                        {interviewCount > 0 && <span className="inline-flex items-center gap-1.5 bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide">Interview {interviewCount}</span>}
+                        {offerCount > 0 && <span className="inline-flex items-center gap-1.5 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide">Offers {offerCount}</span>}
                     </p>
                 </div>
                 <Link
                     href="/new"
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 px-4 sm:px-5 py-2 sm:py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:from-indigo-600 hover:to-violet-600 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-fuchsia-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:from-indigo-600 hover:to-fuchsia-700 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
                 >
                     <Plus className="h-4 w-4" />
                     New Application
@@ -257,8 +252,8 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
             </div>
 
             {/* ━━━ Mobile Tabs (Visible only on small screens) ━━━ */}
-            <div className="lg:hidden mb-3 shrink-0 px-1">
-                <div className="grid grid-cols-5 gap-1 bg-slate-100/80 rounded-xl p-1">
+            <div className="lg:hidden mb-4 shrink-0 px-2">
+                <div className="grid grid-cols-5 gap-1 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md rounded-2xl p-1.5 border border-slate-200/50 dark:border-slate-800/50 shadow-sm">
                     {STATUS_COLUMNS.map(col => {
                         const isActive = mobileTab === col.id;
                         const count = getColumnApps(col.id).length;
@@ -269,17 +264,17 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
                                 key={col.id}
                                 onClick={() => setMobileTab(col.id)}
                                 className={cn(
-                                    "flex flex-col items-center gap-0.5 py-1.5 px-1 rounded-lg transition-all duration-200 min-w-0",
+                                    "flex flex-col items-center gap-1 py-2 px-1 rounded-xl transition-all duration-300 min-w-0",
                                     isActive
-                                        ? "bg-white text-slate-900 shadow-sm"
-                                        : "text-slate-500 hover:text-slate-700"
+                                        ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200/50 dark:ring-slate-700/50"
+                                        : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50/50 dark:hover:bg-slate-800/30"
                                 )}
                             >
-                                <Icon className={cn("h-3.5 w-3.5 shrink-0", isActive ? "text-indigo-600" : "text-slate-400")} />
-                                <span className="text-[10px] font-semibold truncate w-full text-center leading-tight">{col.label}</span>
+                                <Icon className={cn("h-4 w-4 shrink-0 transition-colors", isActive ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400 dark:text-slate-500")} />
+                                <span className="text-[11px] font-semibold truncate w-full text-center leading-tight">{col.label}</span>
                                 <span className={cn(
-                                    "text-[9px] font-bold min-w-[16px] text-center rounded-full px-1",
-                                    isActive ? "bg-indigo-100 text-indigo-700" : "text-slate-400"
+                                    "text-[10px] font-bold min-w-[18px] text-center rounded-full px-1.5 py-0.5 transition-colors",
+                                    isActive ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                                 )}>
                                     {count}
                                 </span>
@@ -290,8 +285,8 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
             </div>
 
             {/* ━━━ Kanban Columns ━━━ */}
-            <div className="flex-1 overflow-auto custom-scrollbar lg:overflow-x-auto pb-2">
-                <div className="lg:flex lg:gap-4 lg:min-w-[1100px] h-full">
+            <div className="flex-1 overflow-auto custom-scrollbar lg:overflow-x-auto pb-4 px-2 lg:px-4">
+                <div className="lg:flex lg:gap-6 lg:min-w-[1400px] 3xl:min-w-[1800px] h-full">
                     {STATUS_COLUMNS.map(col => {
                         // On mobile, only show valid column. On Desktop, show all.
                         const isVisibleMobile = mobileTab === col.id;
@@ -303,9 +298,9 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
                             <div
                                 key={col.id}
                                 className={cn(
-                                    "flex-1 min-w-[280px] rounded-2xl border flex flex-col h-full transition-all duration-300",
+                                    "flex-1 min-w-[300px] 3xl:min-w-[340px] rounded-3xl border flex flex-col h-full transition-all duration-300 glass-card !shadow-none",
                                     col.bg, col.border,
-                                    isDropTarget && "ring-2 ring-indigo-400/50 scale-[1.01] shadow-xl",
+                                    isDropTarget && "ring-2 ring-indigo-400/50 dark:ring-indigo-500/50 scale-[1.01] shadow-2xl bg-indigo-50/30 dark:bg-indigo-900/20",
                                     !isVisibleMobile && "hidden lg:flex" // Hide on mobile if not active tab
                                 )}
                                 onDragOver={(e) => handleDragOver(e, col.id)}
@@ -313,26 +308,26 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
                                 onDrop={() => handleDrop(col.id)}
                             >
                                 {/* Column Header */}
-                                <div className={cn("px-4 py-3 rounded-t-2xl flex items-center justify-between border-b backdrop-blur-sm", col.headerBg, col.border)}>
-                                    <div className="flex items-center gap-2.5">
-                                        <div className={cn("w-7 h-7 rounded-lg bg-gradient-to-br flex items-center justify-center shadow-sm", col.gradient)}>
+                                <div className={cn("px-5 py-4 rounded-t-3xl flex items-center justify-between border-b backdrop-blur-xl z-10", col.headerBg, col.border)}>
+                                    <div className="flex items-center gap-3">
+                                        <div className={cn("w-8 h-8 rounded-xl bg-gradient-to-br flex items-center justify-center shadow-md", col.gradient)}>
                                             <Icon className="h-4 w-4 text-white" />
                                         </div>
-                                        <h3 className="font-bold text-slate-800 text-sm tracking-tight">{col.label}</h3>
+                                        <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-sm tracking-wide uppercase">{col.label}</h3>
                                     </div>
-                                    <span className={cn("text-[11px] font-bold px-2.5 py-1 rounded-full shadow-sm/50", col.badge)}>
+                                    <span className={cn("text-[12px] font-bold px-3 py-1 rounded-full shadow-inner", col.badge)}>
                                         {colApps.length}
                                     </span>
                                 </div>
 
                                 {/* Cards */}
-                                <div className="p-3 flex-1 overflow-y-auto space-y-3 custom-scrollbar">
+                                <div className="p-4 flex-1 overflow-y-auto space-y-4 custom-scrollbar relative">
                                     {colApps.length === 0 && (
-                                        <div className="flex flex-col items-center justify-center py-12 text-center select-none opacity-60">
-                                            <div className="w-12 h-12 rounded-2xl bg-white/50 border border-slate-200/50 flex items-center justify-center mb-3">
-                                                <Icon className="h-6 w-6 text-slate-300" />
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none opacity-50">
+                                            <div className="w-16 h-16 rounded-3xl bg-slate-200/50 dark:bg-slate-800/50 border border-slate-300/50 dark:border-slate-700/50 flex items-center justify-center mb-4 backdrop-blur-sm">
+                                                <Icon className="h-8 w-8 text-slate-400 dark:text-slate-500" />
                                             </div>
-                                            <p className="text-xs text-slate-500 font-medium">
+                                            <p className="text-sm text-slate-500 dark:text-slate-400 font-semibold tracking-wide uppercase">
                                                 Empty
                                             </p>
                                         </div>
@@ -353,46 +348,46 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
                                                 onDragStart={(e) => handleDragStart(e, app.id)}
                                                 onDragEnd={handleDragEnd}
                                                 className={cn(
-                                                    "group relative bg-white rounded-xl border border-slate-200/60 shadow-sm cursor-grab active:cursor-grabbing transition-all duration-200 ease-out",
-                                                    "hover:shadow-md hover:border-indigo-200/60 hover:-translate-y-0.5",
+                                                    "group relative bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-sm cursor-grab active:cursor-grabbing transition-all duration-300 ease-out",
+                                                    "hover:shadow-xl hover:shadow-indigo-500/10 hover:border-indigo-300/60 dark:hover:border-indigo-500/50 hover:-translate-y-1",
                                                     isDeleting && "opacity-40 scale-95 pointer-events-none",
-                                                    draggedAppId === app.id && "opacity-50 scale-95 rotate-1"
+                                                    draggedAppId === app.id && "opacity-50 scale-95 rotate-2 shadow-2xl"
                                                 )}
                                             >
                                                 {/* Drag Handle + Delete (Desktop) */}
-                                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 lg:flex hidden">
+                                                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 lg:flex hidden">
                                                     <button
                                                         onClick={(e) => handleDelete(app.id, e)}
                                                         disabled={isDeleting}
-                                                        className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                                        className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
                                                         title="Delete"
                                                     >
-                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                        <Trash2 className="h-4 w-4" />
                                                     </button>
                                                 </div>
 
-                                                <Link href={`/applications/${app.id}`} className="block p-4">
+                                                <Link href={`/applications/${app.id}`} className="block p-5">
                                                     {/* Title */}
                                                     <div className="flex justify-between items-start gap-3">
-                                                        <h4 className="font-bold text-sm text-slate-800 truncate leading-snug group-hover:text-indigo-600 transition-colors">
+                                                        <h4 className="font-extrabold text-base text-slate-800 dark:text-slate-100 truncate leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                                                             {app.jobTitle || 'Untitled Position'}
                                                         </h4>
                                                     </div>
 
                                                     {/* Company */}
-                                                    <div className="flex items-center gap-1.5 mt-1">
-                                                        <Briefcase className="h-3 w-3 text-slate-400 shrink-0" />
-                                                        <p className="text-xs font-medium text-slate-500 truncate">
+                                                    <div className="flex items-center gap-2 mt-1.5 opacity-80">
+                                                        <Briefcase className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
+                                                        <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 truncate">
                                                             {app.companyName || 'Unknown Company'}
                                                         </p>
                                                     </div>
 
                                                     {/* Metadata Row */}
-                                                    <div className="flex items-center gap-2 mt-3 flex-wrap">
+                                                    <div className="flex items-center gap-2.5 mt-4 flex-wrap">
                                                         {/* Days ago badge */}
                                                         {daysAgo && (
-                                                            <span className="inline-flex items-center gap-1 text-[10px] lowercase text-slate-400 font-medium bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-md">
-                                                                <Clock className="h-2.5 w-2.5" />
+                                                            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200/50 dark:border-slate-700/50 px-2 py-0.5 rounded-lg shadow-sm">
+                                                                <Clock className="h-3 w-3" />
                                                                 {daysAgo}
                                                             </span>
                                                         )}
@@ -400,12 +395,12 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
                                                         {/* Days since applied */}
                                                         {daysSinceApplied >= 0 && col.id !== 'draft' && (
                                                             <span className={cn(
-                                                                "inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md border",
+                                                                "inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-lg border shadow-sm",
                                                                 daysSinceApplied > 14
-                                                                    ? "text-amber-600 bg-amber-50 border-amber-100"
-                                                                    : "text-blue-600 bg-blue-50 border-blue-100"
+                                                                    ? "text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-900/30 dark:border-amber-800/50"
+                                                                    : "text-blue-700 bg-blue-50 border-blue-200 dark:text-blue-300 dark:bg-blue-900/30 dark:border-blue-800/50"
                                                             )}>
-                                                                <Send className="h-2.5 w-2.5" />
+                                                                <Send className="h-3 w-3" />
                                                                 {daysSinceApplied === 0 ? 'Today' : `${daysSinceApplied}d`}
                                                             </span>
                                                         )}
@@ -417,31 +412,31 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
                                                     </div>
 
                                                     {/* Footer */}
-                                                    <div className="mt-3 pt-3 border-t border-slate-50 flex items-center justify-between">
+                                                    <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between">
                                                         {isTailoring ? (
-                                                            <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full text-indigo-700 bg-indigo-50/50 ring-1 ring-indigo-100 animate-pulse">
-                                                                <Sparkles className="h-3 w-3 animate-spin" />
+                                                            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full text-indigo-700 bg-indigo-50 ring-1 ring-indigo-200 dark:text-indigo-300 dark:bg-indigo-900/30 dark:ring-indigo-800/50 animate-pulse shadow-sm">
+                                                                <Sparkles className="h-3.5 w-3.5 animate-spin" />
                                                                 {app.tailorStatus === 'tailoring' ? 'Tailoring...' :
                                                                     app.tailorStatus === 'verifying' ? 'Verifying...' :
                                                                         'Analyzing...'}
                                                             </span>
                                                         ) : (
                                                             <span className={cn(
-                                                                "inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full",
+                                                                "inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full shadow-sm",
                                                                 hasResume
-                                                                    ? "text-emerald-700 bg-emerald-50/50 ring-1 ring-emerald-100"
-                                                                    : "text-slate-400 bg-slate-50 ring-1 ring-slate-100"
+                                                                    ? "text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200 dark:text-emerald-300 dark:bg-emerald-900/30 dark:ring-emerald-800/50"
+                                                                    : "text-slate-500 bg-slate-100 ring-1 ring-slate-200 dark:text-slate-400 dark:bg-slate-800 dark:ring-slate-700"
                                                             )}>
-                                                                {hasResume ? <FileCheck className="h-3 w-3" /> : <FileX className="h-3 w-3" />}
+                                                                {hasResume ? <FileCheck className="h-3.5 w-3.5" /> : <FileX className="h-3.5 w-3.5" />}
                                                                 {hasResume ? 'Ready' : 'No Resume'}
                                                             </span>
                                                         )}
-                                                        <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all" />
+                                                        <ChevronRight className="h-5 w-5 text-slate-300 dark:text-slate-600 group-hover:text-indigo-500 dark:group-hover:text-indigo-400 group-hover:translate-x-1 transition-all duration-300" />
                                                     </div>
                                                 </Link>
 
                                                 {/* Mobile Actions: Move + Delete */}
-                                                <div className="lg:hidden flex items-center justify-between px-3 py-2 border-t border-slate-100 bg-slate-50/50 rounded-b-xl">
+                                                <div className="lg:hidden flex items-center justify-between px-4 py-3 border-t border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/50 rounded-b-2xl backdrop-blur-sm">
                                                     <div className="relative">
                                                         <button
                                                             onClick={(e) => {

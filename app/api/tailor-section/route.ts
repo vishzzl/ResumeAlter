@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
 You are an expert Resume Writer focusing on creating highly targeted, simple, and effective resumes.
 Your task is to rewrite ONLY the "${sectionName.toUpperCase()}" section of the resume.
 
-JOB DESCRIPTION & SELECTED SKILLS/REQUIREMENTS:
+JOB DESCRIPTION, SELECTED SKILLS, & SELECTED EXPERIENCE:
 ${jobDescription}
 
 ORIGINAL RESUME DATA (Your Source of Truth):
@@ -93,14 +93,15 @@ ${sections.other}
 CRITICAL INSTRUCTIONS:
 1. ONLY write the ${sectionName.toUpperCase()} section.
 2. DO NOT include section headers (like "## Experience") in your output.
-3. You MUST focus strictly on the points, skills, and requirements selected in the "JOB DESCRIPTION & SELECTED SKILLS" section above.
+3. You MUST focus strictly on the points, skills, requirements, and experiences selected in the "JOB DESCRIPTION, SELECTED SKILLS, & SELECTED EXPERIENCE" section above.
 4. If the user selected certain skills or requirements, ensure they are explicitly mentioned and highlighted in your rewrite. DO NOT SKIP THEM.
-5. Do not hallucinate or invent facts not present in the ORIGINAL RESUME DATA. 
-6. Keep the formatting simple and professional. For experience, use bullet points. For skills, group them logically.
-7. Output ONLY the raw content. No preamble, no markdown formatting blocks (\`\`\`).
+5. If the user selected certain experiences, ONLY include roles, projects, or bullets from the ORIGINAL RESUME DATA that are relevant to those selected experiences. Omit entirely any roles or bullets that are unrelated to the selected experiences.
+6. Do not hallucinate or invent facts not present in the ORIGINAL RESUME DATA. 
+7. Keep the formatting simple and professional. For experience, use bullet points. For skills, group them logically.
+8. Output ONLY the raw content. No preamble, no markdown formatting blocks (\`\`\`).
 `;
 
-                const systemInstruction = 'You are an elite Resume Writer who strictly follows instructions and never hallucinates.';
+                const systemInstruction = 'You are an elite Resume Writer who strictly follows instructions, applies ATS best practices, and never hallucinates.';
 
                 const generatedText = await generateText({
                     prompt,

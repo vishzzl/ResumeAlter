@@ -66,13 +66,16 @@ export async function POST(req: NextRequest) {
                 if (appId) await setTailorStatus(appId, 'tailoring', userId);
 
                 const prompt = `
-You are an expert Resume Writer focusing on creating highly targeted, simple, and effective resumes.
-Your task is to rewrite the resume based strictly on the job description and user-selected skills.
+<system_role>
+You are an elite, ATS-certified Executive Resume Writer with deep expertise in optimizing professional profiles for Applicant Tracking Systems (ATS) and strict factual fidelity. Your objective is to seamlessly tailor an applicant's existing resume to precisely target a specific job description, focusing intensely on the user's curated selection of skills and experiences.
+</system_role>
 
-JOB DESCRIPTION & SELECTED SKILLS/REQUIREMENTS:
+<input_data>
+<job_and_selections>
 ${jobDescription}
+</job_and_selections>
 
-ORIGINAL RESUME DATA (Your Source of Truth):
+<original_resume_source_of_truth>
 --- HEADER ---
 ${sections.header}
 --- SUMMARY ---
@@ -87,14 +90,19 @@ ${sections.education}
 ${sections.projects}
 --- CERTIFICATIONS & OTHER ---
 ${sections.other}
+</original_resume_source_of_truth>
+</input_data>
 
-CRITICAL INSTRUCTIONS:
-1. You MUST focus strictly on the points, skills, and requirements selected in the "JOB DESCRIPTION & SELECTED SKILLS" section above.
-2. If the user selected certain skills or requirements, ensure they are explicitly mentioned and highlighted in your rewrite (e.g. in Summary, Skills, or Experience). DO NOT SKIP THEM.
-3. Do not hallucinate or invent facts not present in the ORIGINAL RESUME DATA. 
-4. Output your response purely as JSON in the exact format shown below.
+<execution_directives>
+1. STRICT TARGETING: You must aggressively prioritize the points, skills, requirements, and experiences explicitly highlighted in the <job_and_selections> section.
+2. EXPLICIT SKILL INCLUSION: Any skill or requirement designated by the user MUST be organically and explicitly integrated into the Summary, Skills section, or Professional Experience bullets. DO NOT omit user-selected requirements.
+3. EXPERIENCE FILTERING: Scrutinize the <original_resume_source_of_truth>. Retain ONLY the professional roles, projects, and bullet points that demonstrate relevance to the user-selected experiences or the core job description. Ruthlessly prune unrelated or distractive experience points.
+4. ZERO HALLUCINATION POLICY: Your output must be strictly grounded in the provided <original_resume_source_of_truth>. Under no circumstances are you permitted to invent, embellish, or hallucinate metrics, roles, dates, or skills. If a required skill is entirely absent from the source data, do not invent an experience to cover it.
+5. FORMATTING EXCELLENCE: Output the resume adhering to industry-standard markdown styling within the specified JSON schema. Use strong action verbs and maintain a professional, confident tone.
+</execution_directives>
 
-OUTPUT FORMAT (JSON ONLY):
+<output_schema>
+Respond PURELY as a valid JSON object matching this exact schema. Do not include markdown fences (e.g., \`\`\`json).
 {
     "header": "# [Name]\\nemail | phone | location | [LinkedIn](url)",
     "summary": "...",
@@ -104,13 +112,14 @@ OUTPUT FORMAT (JSON ONLY):
     "projects": "**Project Name** | [Link](url)\\n* Description...",
     "other": "**Cert Name** | Issuer | Date"
 }
+</output_schema>
 `;
 
                 sendSSE(controller, encoder, { phase: 'tailoring' });
 
                 const text = await generateText({
                     prompt,
-                    systemInstruction: 'You are an elite Resume Writer who strictly follows instructions and never hallucinates. You always output valid JSON.',
+                    systemInstruction: 'You are an elite Resume Writer who strictly follows instructions, applies ATS best practices, and never hallucinates. You always output valid JSON.',
                     provider: provider!,
                     apiKey,
                     modelName,
@@ -136,10 +145,13 @@ OUTPUT FORMAT (JSON ONLY):
                     '',
                     '## Skills',
                     normalizeNewlines(data.skills) || sections.skills,
-                    data.education ? \`\\n## Education\\n\${normalizeNewlines(data.education)}\` : '',
-                    data.projects ? \`\\n## Projects\\n\${normalizeNewlines(data.projects)}\` : '',
-                    data.other ? \`\\n## Certifications\\n\${normalizeNewlines(data.other)}\` : ''
-                ].join('\\n').trim();
+                    '',
+                    data.education ? '## Education\n' + normalizeNewlines(data.education) : '',
+                    '',
+                    data.projects ? '## Projects\n' + normalizeNewlines(data.projects) : '',
+                    '',
+                    data.other ? '## Certifications\n' + normalizeNewlines(data.other) : ''
+                ].filter(Boolean).join('\n\n').trim();
 
                 sendSSE(controller, encoder, { phase: 'gap_check', data: { preFixCoverage: { required: {score:100, matched:[], missing:[], total:0}, preferred: {score:100, matched:[], missing:[], total:0} } } });
                 sendSSE(controller, encoder, { phase: 'gap_fix_result', data: { injected: [], skipped: [] } });
