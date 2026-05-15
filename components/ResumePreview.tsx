@@ -14,44 +14,44 @@ export function ResumePreview({ content, template = 'modern' }: ResumePreviewPro
 
     // Template-specific classes
     const styles = {
-        // MODERN POLISHED - Visual impact, clean sans-serif
+        // MODERN POLISHED - Clean sans-serif, strong section hierarchy.
         modern: {
-            container: "font-sans text-slate-800 leading-relaxed [&>h1+p]:text-center [&>h1+p]:text-[12px] [&>h1+p]:sm:text-sm [&>h1+p]:text-slate-500 [&>h1+p]:mb-4 [&>h1+p]:tracking-wide",
-            h1: "text-2xl sm:text-4xl font-extrabold tracking-tight text-slate-900 mb-1 text-center border-b-4 border-blue-600 pb-3 sm:pb-4",
-            h2: "text-[15px] sm:text-lg font-bold uppercase tracking-wider text-blue-700 mt-6 sm:mt-8 mb-3 sm:mb-4 flex items-center after:content-[''] after:flex-1 after:h-px after:bg-blue-200 after:ml-3 sm:after:ml-4",
-            h3: "text-[14px] sm:text-base font-bold text-slate-900 mt-3 sm:mt-4 mb-1",
+            container: "font-sans text-slate-800 leading-relaxed break-words [&>h1+p]:text-center [&>h1+p]:text-[12px] [&>h1+p]:sm:text-sm [&>h1+p]:text-slate-500 [&>h1+p]:mb-5",
+            h1: "text-3xl sm:text-[34px] font-bold text-slate-950 mb-2 text-center border-b-2 border-slate-900 pb-3",
+            h2: "text-[13px] sm:text-sm font-bold uppercase text-slate-950 mt-6 sm:mt-7 mb-2 border-b border-slate-200 pb-1.5",
+            h3: "text-[14px] sm:text-base font-bold text-slate-950 mt-3 sm:mt-4 mb-1",
             p: "text-[13px] sm:text-sm text-slate-700 mb-2 leading-relaxed",
-            ul: "list-disc list-outside ml-3 sm:ml-4 space-y-1 text-[13px] sm:text-sm text-slate-700 mb-3 sm:mb-4 marker:text-blue-500",
-            li: "pl-0.5 sm:pl-1",
-            strong: "font-bold text-slate-900",
-            hr: "border-slate-200 my-3 sm:my-4",
-            a: "text-blue-600 hover:text-blue-800 underline decoration-blue-300 underline-offset-2"
+            ul: "list-disc list-outside ml-4 sm:ml-5 space-y-1 text-[13px] sm:text-sm text-slate-700 mb-3 marker:text-slate-500",
+            li: "pl-1",
+            strong: "font-bold text-slate-950",
+            hr: "border-slate-200 my-4",
+            a: "text-slate-900 underline decoration-slate-300 underline-offset-2"
         },
-        // CLASSIC (PROFESSIONAL ATS) - Traditional, serif headings, very safe parsing
+        // CLASSIC (PROFESSIONAL ATS) - Traditional and easy for parsers.
         classic: {
-            container: "font-serif text-gray-900 leading-normal [&>h1+p]:text-center [&>h1+p]:text-[12px] [&>h1+p]:sm:text-sm [&>h1+p]:text-gray-500 [&>h1+p]:mb-4 [&>h1+p]:tracking-wide",
-            h1: "text-2xl sm:text-3xl font-bold text-center text-gray-900 mb-1 uppercase tracking-wide border-b border-gray-900 pb-2",
-            h2: "text-[14px] sm:text-base font-bold text-gray-900 uppercase border-b border-gray-400 pb-1 mb-2 sm:mb-3 mt-5 sm:mt-6 tracking-widest",
-            h3: "text-[14px] sm:text-base font-bold text-gray-900 mt-3 sm:mt-4 mb-1",
-            p: "text-[13px] sm:text-sm text-gray-800 mb-2",
+            container: "font-serif text-gray-900 leading-normal break-words [&>h1+p]:text-center [&>h1+p]:text-[12px] [&>h1+p]:sm:text-sm [&>h1+p]:text-gray-600 [&>h1+p]:mb-4",
+            h1: "text-2xl sm:text-3xl font-bold text-center text-gray-950 mb-2 uppercase border-b border-gray-900 pb-2",
+            h2: "text-[13px] sm:text-sm font-bold text-gray-950 uppercase border-b border-gray-400 pb-1 mb-2 sm:mb-3 mt-5 sm:mt-6",
+            h3: "text-[14px] sm:text-base font-bold text-gray-950 mt-3 sm:mt-4 mb-1",
+            p: "text-[13px] sm:text-sm text-gray-800 mb-2 leading-relaxed",
             ul: "list-disc list-outside ml-4 sm:ml-5 space-y-1 text-[13px] sm:text-sm text-gray-800 mb-3",
             li: "pl-0",
             strong: "font-bold text-gray-950",
             hr: "border-gray-300 my-3 sm:my-4",
             a: "text-black underline decoration-gray-400 underline-offset-2"
         },
-        // MINIMAL (EXECUTIVE) - Clean, sophisticated, airy
+        // MINIMAL (EXECUTIVE) - Quiet, compact, and polished.
         minimal: {
-            container: "font-sans text-gray-600 antialiased [&>h1+p]:text-center [&>h1+p]:text-[12px] [&>h1+p]:sm:text-sm [&>h1+p]:text-gray-400 [&>h1+p]:mb-6 [&>h1+p]:tracking-wide",
-            h1: "text-2xl sm:text-4xl font-light text-gray-900 mb-1 text-center tracking-tight",
-            h2: "text-[11px] sm:text-xs font-bold text-gray-900 uppercase tracking-[0.2em] mb-3 sm:mb-4 mt-7 sm:mt-10 border-t border-gray-100 pt-3 sm:pt-4",
-            h3: "text-[14px] sm:text-base font-medium text-gray-800 mt-4 sm:mt-6 mb-2",
-            p: "text-[13px] sm:text-sm text-gray-600 mb-2 sm:mb-3 font-light leading-6 sm:leading-7",
-            ul: "list-none space-y-1.5 sm:space-y-2 text-[13px] sm:text-sm text-gray-600 mb-4 sm:mb-6",
-            li: "relative pl-4 before:content-[''] before:absolute before:left-0 before:top-2.5 before:w-1 before:h-1 before:bg-gray-300 before:rounded-full",
-            strong: "font-semibold text-gray-900",
-            hr: "border-gray-100 my-5 sm:my-8",
-            a: "text-gray-900 border-b border-gray-300 hover:border-gray-900 transition-colors"
+            container: "font-sans text-gray-700 antialiased leading-relaxed break-words [&>h1+p]:text-center [&>h1+p]:text-[12px] [&>h1+p]:sm:text-sm [&>h1+p]:text-gray-500 [&>h1+p]:mb-6",
+            h1: "text-3xl sm:text-[34px] font-semibold text-gray-950 mb-2 text-center",
+            h2: "text-[12px] sm:text-[13px] font-bold text-gray-950 uppercase mb-3 mt-7 border-t border-gray-200 pt-3",
+            h3: "text-[14px] sm:text-base font-semibold text-gray-900 mt-4 mb-1.5",
+            p: "text-[13px] sm:text-sm text-gray-700 mb-2 leading-relaxed",
+            ul: "list-disc list-outside ml-4 sm:ml-5 space-y-1.5 text-[13px] sm:text-sm text-gray-700 mb-4",
+            li: "pl-1",
+            strong: "font-semibold text-gray-950",
+            hr: "border-gray-200 my-5",
+            a: "text-gray-950 underline decoration-gray-300 underline-offset-2"
         }
     };
 
@@ -103,6 +103,9 @@ export function ResumePreview({ content, template = 'modern' }: ResumePreviewPro
                     a: ({ ...props }) => <a className={s.a} {...props} target="_blank" rel="noopener noreferrer" />,
                     hr: ({ ...props }) => <hr className={s.hr} {...props} />,
                     blockquote: ({ ...props }) => <blockquote className="border-l-4 border-gray-200 pl-4 py-1 my-4 italic text-gray-600" {...props} />,
+                    table: ({ ...props }) => <table className="my-4 w-full border-collapse text-[13px] sm:text-sm" {...props} />,
+                    th: ({ ...props }) => <th className="border border-slate-200 bg-slate-50 px-2 py-1.5 text-left font-semibold text-slate-900" {...props} />,
+                    td: ({ ...props }) => <td className="border border-slate-200 px-2 py-1.5 align-top text-slate-700" {...props} />,
                 }}
             >
                 {cleanContent}
