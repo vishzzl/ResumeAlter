@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Application } from '@/lib/db/schema';
 import { updateApplication, getProfile } from '@/lib/actions';
 import {
-    Loader2, Save, Wand2, Upload, FileText, ChevronLeft, ChevronRight, ChevronDown,
+    Loader2, Save, Wand2, Upload, FileText, ChevronLeft, ChevronRight,
     RefreshCw, Download, CheckSquare, Square, UserCheck, Briefcase,
-    Sparkles, X, Eye, GitCompare, LayoutGrid, Mail, Copy, Check,
-    PenLine, BookOpen, Zap, Crown, Target, Layers
+    Sparkles, X, Eye, GitCompare, Mail, Copy, Check,
+    PenLine, BookOpen, Zap, Crown, Target, Layers, CheckCircle2,
+    AlertCircle, PanelLeftClose, PanelLeftOpen, FileCheck2, ClipboardCheck,
+    FileDown, ListChecks, ArrowRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -30,6 +32,38 @@ interface AnalysisChange {
 
 interface ApplicationClientProps {
     initialApplication: Application;
+}
+
+interface SaveSnapshotInput {
+    jobDescription: string;
+    jobDetails: JobDetails | null;
+    resumeText: string;
+    tailoredResume: string;
+    coverLetter: string;
+    selectedCertifications: Record<string, unknown>[];
+}
+
+function createSaveSnapshot({
+    jobDescription,
+    jobDetails,
+    resumeText,
+    tailoredResume,
+    coverLetter,
+    selectedCertifications,
+}: SaveSnapshotInput) {
+    return JSON.stringify({
+        jobDescription,
+        jobDetails: jobDetails ? JSON.stringify(jobDetails) : '',
+        baseResume: resumeText,
+        tailoredResume,
+        coverLetter,
+        selectedCertifications: JSON.stringify(selectedCertifications),
+    });
+}
+
+function formatSaveTime(date: Date | null) {
+    if (!date) return 'All changes saved';
+    return `Saved ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
 }
 
 
@@ -76,7 +110,6 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     // Resume State
     const [resumeText, setResumeText] = useState(app.baseResume || '');
     const [isUploading, setIsUploading] = useState(false);
-    const resumeAutoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Job Description State
     const [jobDescription, setJobDescription] = useState(app.jobDescription || '');
@@ -153,7 +186,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const [isEditingCoverLetter, setIsEditingCoverLetter] = useState(false);
 
     // Global AI Config
-    const { selectedModel, selectedProvider, customModelConfig } = useAIConfig();
+    const { selectedModel, selectedProvider, customModelConfig, reportGeminiIssue } = useAIConfig();
 
     // UI State
     const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
@@ -205,6 +238,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
 
     const hasResume = !!resumeText;
     const hasResult = !!tailoredResume;
+    const estimatedModelInputTokens = Math.ceil((resumeText.length + jobDescription.length) / 4) + 900;
 
     // Input validation — prevent tailoring with obviously insufficient data
     const inputTooShort = resumeText.length < 200 || jobDescription.length < 100;
@@ -215,6 +249,63 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const [selectedCertifications] = useState<Record<string, unknown>[]>(
         app.selectedCertifications ? JSON.parse(app.selectedCertifications) : []
     );
+
+    const currentSaveSnapshot = useMemo(() => createSaveSnapshot({
+        jobDescription,
+        jobDetails,
+        resumeText,
+        tailoredResume,
+        coverLetter,
+        selectedCertifications,
+    }), [jobDescription, jobDetails, resumeText, tailoredResume, coverLetter, selectedCertifications]);
+    const savedSnapshotRef = useRef(currentSaveSnapshot);
+    const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+    const hasUnsavedChanges = currentSaveSnapshot !== savedSnapshotRef.current;
+    const saveStatusLabel = isSaving
+        ? 'Saving...'
+        : hasUnsavedChanges
+            ? 'Unsaved changes'
+            : formatSaveTime(lastSavedAt);
+    const jobReady = jobDescription.trim().length >= 100 || !!jobDetails;
+    const resumeReady = resumeText.trim().length >= 200;
+    const tailoredReady = !!tailoredResume;
+    const selectedSignalCount = selectedJobDetails.skills.length + selectedJobDetails.requirements.length + selectedJobDetails.experience.length;
+    const tailorButtonLabel = loading && tailorPhase === 'extracting' ? 'Extracting details'
+        : loading && tailorPhase === 'tailoring' ? 'Tailoring resume'
+            : loading && tailorPhase === 'verifying' ? 'Verifying output'
+                : loading && tailorPhase === 'gap_check' ? 'Optimizing gaps'
+                    : loading && tailorPhase === 'analyzing' ? 'Analyzing match'
+                        : 'Tailor resume';
+    const workflowSteps = [
+        {
+            label: 'Job',
+            helper: jobReady ? `${selectedSignalCount || 'Full'} signals ready` : 'Add or analyze JD',
+            complete: jobReady,
+            active: activeTab === 'job' && mobileTab !== 'result',
+            icon: Briefcase,
+        },
+        {
+            label: 'Resume',
+            helper: resumeReady ? `${resumeText.length.toLocaleString()} characters` : 'Paste or upload resume',
+            complete: resumeReady,
+            active: activeTab === 'resume' && mobileTab !== 'result',
+            icon: ClipboardCheck,
+        },
+        {
+            label: 'Tailor',
+            helper: tailoredReady ? 'Generated' : canTailor ? 'Ready to run' : 'Needs inputs',
+            complete: tailoredReady,
+            active: loading,
+            icon: Sparkles,
+        },
+        {
+            label: 'Review',
+            helper: tailoredReady ? 'Preview, edit, export' : 'Waiting for output',
+            complete: tailoredReady && !hasUnsavedChanges,
+            active: mobileTab === 'result' || outputTab === 'resume',
+            icon: FileCheck2,
+        },
+    ];
 
     // Sync Profile Sections State
     const [selectedSyncSections, setSelectedSyncSections] = useState({
@@ -327,10 +418,23 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                 coverLetter: coverLetter || undefined,
                 selectedCertifications: JSON.stringify(selectedCertifications),
             });
-            toast.success('Saved successfully!');
+            savedSnapshotRef.current = currentSaveSnapshot;
+            setLastSavedAt(new Date());
+            setApp((prev: Application) => ({
+                ...prev,
+                jobDescription,
+                jobDetails: jobDetails ? JSON.stringify(jobDetails) : null,
+                baseResume: resumeText,
+                tailoredResume,
+                coverLetter,
+                selectedCertifications: JSON.stringify(selectedCertifications),
+            }));
+            toast.success('Application saved.');
+            return true;
         } catch (err) {
             console.error('Save failed', err);
             toast.error('Save failed. Please try again.');
+            return false;
         } finally {
             setIsSaving(false);
         }
@@ -410,6 +514,9 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                 errorMessage = '⚠️ The AI is taking too long to respond. The model might be overloaded. Please try again or switch to a faster model.';
             } else if (errorMessage.toLowerCase().includes('timeout')) {
                 errorMessage = '⚠️ The AI timed out: ' + errorMessage;
+            }
+            if (selectedProvider === 'gemini') {
+                reportGeminiIssue(errorMessage, selectedModel);
             }
             setError(errorMessage);
         } finally {
@@ -745,6 +852,9 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                 errorMessage = '⚠️ ' + errorMessage;
             }
             
+            if (selectedProvider === 'gemini') {
+                reportGeminiIssue(errorMessage, selectedModel);
+            }
             setError(errorMessage);
             toast.error('❌ Tailoring failed. See error banner for details.', { id: 'tailor-status', duration: 8000 });
         } finally {
@@ -771,6 +881,10 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
 
         setPdfGenerating(true);
         try {
+            if (hasUnsavedChanges) {
+                const saved = await handleSave();
+                if (!saved) return;
+            }
             const { exportResumePDF } = await import('@/lib/pdf-export');
             const fileName = ['Resume', app.companyName, app.jobTitle].filter(Boolean).join(' - ');
             await exportResumePDF(tailoredResume, { fileName });
@@ -870,9 +984,13 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     error: err instanceof Error ? err.message : 'Generation failed',
                 },
             }));
+            if (selectedProvider === 'gemini') {
+                const errorMessage = err instanceof Error ? err.message : 'Section generation failed';
+                reportGeminiIssue(errorMessage, selectedModel);
+            }
             toast.error(`Failed to generate ${sectionName}. Please try again.`);
         }
-    }, [resumeText, jobDescription, selectedProvider, selectedModel, customModelConfig]);
+    }, [resumeText, jobDescription, selectedProvider, selectedModel, customModelConfig, reportGeminiIssue]);
 
     /** Generate all sections sequentially so the user sees each card populate */
     const handleGenerateAllSections = useCallback(async () => {
@@ -1011,8 +1129,109 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     return (
         <div className="h-[calc(100vh-2rem)] md:h-[calc(100vh-3rem)] lg:h-[calc(100vh-4rem)] flex flex-col gap-4 animate-in fade-in duration-500">
 
+            <header className="shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm print:hidden">
+                <div className="flex flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-5">
+                    <div className="flex min-w-0 items-start gap-3">
+                        <Link
+                            href="/"
+                            className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                            title="Back to dashboard"
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                        </Link>
+
+                        <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <h1 className="truncate text-lg font-semibold text-slate-950 sm:text-xl">
+                                    {app.jobTitle || 'New Application'}
+                                </h1>
+                                <span className={cn(
+                                    "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                                    hasResult ? "border-emerald-200 bg-emerald-50 text-emerald-700" :
+                                        hasResume ? "border-amber-200 bg-amber-50 text-amber-700" :
+                                            "border-slate-200 bg-slate-100 text-slate-600"
+                                )}>
+                                    {hasResult ? <CheckCircle2 className="h-3.5 w-3.5" /> : hasResume ? <FileText className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
+                                    {hasResult ? 'Tailored' : hasResume ? 'In progress' : 'Draft'}
+                                </span>
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                                <span>{app.companyName || 'Company not set'}</span>
+                                {app.jobUrl ? <span className="hidden max-w-[360px] truncate sm:inline">{app.jobUrl}</span> : null}
+                                <span className={cn("inline-flex items-center gap-1", hasUnsavedChanges ? "text-amber-700" : "text-emerald-700")}>
+                                    {hasUnsavedChanges ? <AlertCircle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                                    {saveStatusLabel}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                        <div className="hidden md:block">
+                            <ModelSelector estimatedInputTokens={estimatedModelInputTokens} />
+                        </div>
+                        <button
+                            onClick={handleSave}
+                            disabled={isSaving || loading || !hasUnsavedChanges}
+                            className={cn(
+                                "inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+                                hasUnsavedChanges
+                                    ? "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
+                                    : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            )}
+                        >
+                            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : hasUnsavedChanges ? <Save className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                            <span className="hidden sm:inline">{hasUnsavedChanges ? 'Save changes' : 'Saved'}</span>
+                        </button>
+                        <button
+                            onClick={handleTailor}
+                            disabled={!canTailor}
+                            title={inputTooShort ? 'Resume must be at least 200 characters and job description at least 100 characters' : undefined}
+                            className="inline-flex h-10 min-w-[150px] items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Target className="h-4 w-4" />}
+                            <span className="hidden sm:inline">{tailorButtonLabel}</span>
+                            <span className="sm:hidden">{loading ? 'Working' : 'Tailor'}</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-3 lg:px-5">
+                    <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+                        {workflowSteps.map((step, index) => {
+                            const Icon = step.icon;
+                            return (
+                                <div
+                                    key={step.label}
+                                    className={cn(
+                                        "flex items-center gap-3 rounded-lg border bg-white px-3 py-2",
+                                        step.active ? "border-slate-300 shadow-sm" : "border-slate-200",
+                                        step.complete ? "text-slate-900" : "text-slate-500"
+                                    )}
+                                >
+                                    <div className={cn(
+                                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                                        step.complete ? "bg-emerald-50 text-emerald-700" :
+                                            step.active ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500"
+                                    )}>
+                                        {step.complete ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1.5">
+                                            <p className="truncate text-sm font-semibold">{step.label}</p>
+                                            {index < workflowSteps.length - 1 ? <ArrowRight className="hidden h-3.5 w-3.5 text-slate-300 xl:block" /> : null}
+                                        </div>
+                                        <p className="truncate text-[11px] text-slate-500">{step.helper}</p>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </header>
+
             {/* ━━━ Premium Glass Header ━━━ */}
-            <div className="glass-card shrink-0 px-4 sm:px-6 py-3 flex items-center justify-between gap-4 z-20 border border-white/20 shadow-sm rounded-2xl print:hidden relative overflow-hidden">
+            <div className="hidden">
                 {/* Subtle gradient glow inside header */}
                 <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 via-purple-500/5 to-transparent pointer-events-none" />
 
@@ -1046,7 +1265,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
 
                 <div className="flex items-center gap-2 sm:gap-3 shrink-0 relative z-10">
                     <div className="hidden sm:block">
-                        <ModelSelector />
+                        <ModelSelector estimatedInputTokens={estimatedModelInputTokens} />
                     </div>
                     <button
                         onClick={handleSave}
@@ -1082,11 +1301,11 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             </div>
 
             {/* ━━━ Mobile Bottom Tab Bar ━━━ */}
-            <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-lg border-t border-slate-200 px-6 py-2 flex items-center justify-between shadow-lg ring-1 ring-slate-900/5 pb-safe print:hidden">
+            <div className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between border-t border-slate-200 bg-white/95 px-6 py-2 shadow-lg ring-1 ring-slate-900/5 backdrop-blur-lg print:hidden lg:hidden">
                 {([
                     { id: 'job', label: 'Job', icon: Briefcase },
                     { id: 'resume', label: 'Resume', icon: FileText },
-                    { id: 'result', label: 'Result', icon: Sparkles },
+                    { id: 'result', label: 'Review', icon: FileCheck2 },
                 ] as const).map(tab => (
                     <button
                         key={tab.id}
@@ -1097,13 +1316,13 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                         className={cn(
                             "flex flex-col items-center gap-1 transition-all",
                             mobileTab === tab.id
-                                ? "text-indigo-600 scale-105"
+                                ? "text-slate-950"
                                 : "text-slate-400 hover:text-slate-600"
                         )}
                     >
                         <div className={cn(
-                            "p-1.5 rounded-full transition-colors",
-                            mobileTab === tab.id ? "bg-indigo-50" : "bg-transparent"
+                            "rounded-lg p-1.5 transition-colors",
+                            mobileTab === tab.id ? "bg-slate-100" : "bg-transparent"
                         )}>
                             <tab.icon className="h-5 w-5" />
                         </div>
@@ -1116,10 +1335,10 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
 
             {/* ━━━ Error Banner ━━━ */}
             {error && (
-                <div className="animate-fade-in-up mb-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm print:hidden" role="alert">
-                    <X className="h-4 w-4 text-red-500 shrink-0" />
-                    <p className="flex-1 min-w-0 text-xs truncate"><span className="font-semibold">Error:</span> {error}</p>
-                    <button onClick={() => setError(null)} className="p-1 rounded hover:bg-red-100 transition-colors shrink-0">
+                <div className="animate-fade-in-up flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 print:hidden" role="alert">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
+                    <p className="min-w-0 flex-1 truncate text-xs"><span className="font-semibold">Action needed:</span> {error}</p>
+                    <button onClick={() => setError(null)} className="shrink-0 rounded p-1 transition-colors hover:bg-red-100">
                         <X className="h-3.5 w-3.5" />
                     </button>
                 </div>
@@ -1127,12 +1346,12 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
 
                         {/* ━━━ SSE Incomplete Warning ━━━ */}
             {sseIncomplete && (
-                <div className="animate-fade-in-up mb-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm print:hidden" role="alert">
-                    <span className="shrink-0">⚠️</span>
-                    <p className="flex-1 min-w-0 text-xs">
-                        <span className="font-semibold">Tailoring may be incomplete</span> — the process was interrupted. Try tailoring again if anything looks off.
+                <div className="animate-fade-in-up flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 print:hidden" role="alert">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
+                    <p className="min-w-0 flex-1 text-xs">
+                        <span className="font-semibold">Tailoring may be incomplete.</span> The process was interrupted. Try tailoring again if anything looks off.
                     </p>
-                    <button onClick={() => setSseIncomplete(false)} className="p-1 rounded hover:bg-amber-100 transition-colors shrink-0">
+                    <button onClick={() => setSseIncomplete(false)} className="shrink-0 rounded p-1 transition-colors hover:bg-amber-100">
                         <X className="h-3.5 w-3.5" />
                     </button>
                 </div>
@@ -1148,31 +1367,35 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                         // Mobile: Full width with explicit height, visible only if tab is job or resume
                         mobileTab === 'result' ? "hidden lg:flex" : "w-full min-h-[calc(100vh-14rem)] lg:min-h-0",
                         // Desktop: Controlled by isLeftPanelOpen
-                        isLeftPanelOpen ? "lg:w-[320px] xl:w-[380px] opacity-100" : "lg:w-0 lg:opacity-0 lg:p-0 lg:overflow-hidden"
+                        isLeftPanelOpen ? "lg:w-[360px] xl:w-[420px] opacity-100" : "lg:w-0 lg:opacity-0 lg:p-0 lg:overflow-hidden"
                     )}
                 >
                     {/* Segmented Control (Desktop Only) */}
-                    <div className="hidden lg:flex items-center gap-2 print:hidden glass-card p-1.5 rounded-xl border border-white/20 shadow-sm shrink-0">
-                        <div className="flex-1 grid grid-cols-2 gap-1 bg-slate-900/5 dark:bg-slate-800/50 rounded-lg p-1">
+                    <div className="hidden shrink-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm print:hidden lg:flex">
+                        <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-slate-950">Input workspace</p>
+                            <p className="text-xs text-slate-500">Review the job and resume before generating.</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
                             <button
                                 onClick={() => setActiveTab('job')}
                                 className={cn(
-                                    "flex items-center justify-center gap-2 py-1.5 rounded-md text-xs font-bold transition-all duration-200",
+                                    "flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-all duration-200",
                                     activeTab === 'job' 
-                                        ? "bg-white dark:bg-slate-700 text-indigo-600 shadow-sm ring-1 ring-slate-900/5" 
-                                        : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
+                                        ? "bg-white text-slate-950 shadow-sm" 
+                                        : "text-slate-500 hover:text-slate-700"
                                 )}
                             >
                                 <Briefcase className="h-3.5 w-3.5" />
-                                Job Details
+                                Job
                             </button>
                             <button
                                 onClick={() => setActiveTab('resume')}
                                 className={cn(
-                                    "flex items-center justify-center gap-2 py-1.5 rounded-md text-xs font-bold transition-all duration-200",
+                                    "flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-all duration-200",
                                     activeTab === 'resume' 
-                                        ? "bg-white dark:bg-slate-700 text-indigo-600 shadow-sm ring-1 ring-slate-900/5" 
-                                        : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
+                                        ? "bg-white text-slate-950 shadow-sm" 
+                                        : "text-slate-500 hover:text-slate-700"
                                 )}
                             >
                                 <FileText className="h-3.5 w-3.5" />
@@ -1181,15 +1404,15 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                         </div>
                         <button
                             onClick={() => setIsLeftPanelOpen(false)}
-                            className="p-2.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors bg-white/50"
+                            className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
                             title="Collapse panel"
                         >
-                            <ChevronLeft className="h-4 w-4" />
+                            <PanelLeftClose className="h-4 w-4" />
                         </button>
                     </div>
 
                     {/* Panel Content - Made it a glass card that fills remaining height */}
-                    <div className="flex-1 glass-card border border-white/20 shadow-sm overflow-hidden flex flex-col rounded-2xl relative">
+                    <div className="relative flex flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
 
                         {/* ─ Job Description Tab ─ */}
                         {activeTab === 'job' && (
@@ -1208,21 +1431,22 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                 )}
 
                                 {/* Header */}
-                                <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
+                                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
                                     <div>
-                                        <h3 className="font-semibold text-sm text-slate-900">
+                                        <p className="text-[11px] font-semibold text-slate-500">Step 1</p>
+                                        <h3 className="text-sm font-semibold text-slate-950">
                                             {viewMode === 'raw' ? 'Raw Text' : 'Job Analysis'}
                                         </h3>
-                                        <p className="text-[11px] text-slate-400 mt-0.5">
+                                        <p className="mt-0.5 text-[11px] text-slate-500">
                                             {jobDetails ? 'Select relevant features for tailoring' : 'Paste or scrape the job description'}
                                         </p>
                                     </div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex shrink-0 items-center gap-2">
                                         {!jobDetails && jobDescription && (
                                             <button
                                                 onClick={scrapeJob}
                                                 disabled={isScraping}
-                                                className="inline-flex items-center gap-1.5 text-xs font-medium bg-indigo-500 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
+                                                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-slate-800"
                                             >
                                                 {isScraping ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
                                                 Analyze
@@ -1231,20 +1455,20 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                         <button
                                             onClick={scrapeJob}
                                             disabled={isScraping}
-                                            className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors border border-transparent hover:border-indigo-100"
+                                            className="rounded-lg border border-slate-200 p-1.5 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
                                             title="Re-analyze"
                                         >
                                             <RefreshCw className={`h-3.5 w-3.5 ${isScraping ? 'animate-spin' : ''}`} />
                                         </button>
 
                                         {jobDetails && (
-                                            <div className="flex items-center gap-1 p-1 bg-slate-50 rounded-lg border border-slate-100">
+                                            <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1">
                                                 <button
                                                     onClick={() => setViewMode('analysis')}
                                                     className={cn(
-                                                        "text-[10px] font-bold px-2 py-1 rounded-md transition-all uppercase tracking-tight",
+                                                        "rounded-md px-2 py-1 text-[11px] font-semibold transition-all",
                                                         viewMode === 'analysis' 
-                                                            ? "bg-white text-indigo-600 shadow-sm border border-slate-100" 
+                                                            ? "bg-white text-slate-950 shadow-sm" 
                                                             : "text-slate-500 hover:text-slate-700"
                                                     )}
                                                 >
@@ -1253,9 +1477,9 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                                 <button
                                                     onClick={() => setViewMode('raw')}
                                                     className={cn(
-                                                        "text-[10px] font-bold px-2 py-1 rounded-md transition-all uppercase tracking-tight",
+                                                        "rounded-md px-2 py-1 text-[11px] font-semibold transition-all",
                                                         viewMode === 'raw' 
-                                                            ? "bg-white text-indigo-600 shadow-sm border border-slate-100" 
+                                                            ? "bg-white text-slate-950 shadow-sm" 
                                                             : "text-slate-500 hover:text-slate-700"
                                                     )}
                                                 >
@@ -1268,9 +1492,9 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                             <button
                                                 onClick={() => setSelectedJobDetails(prev => ({ ...prev, useFullDescription: !prev.useFullDescription }))}
                                                 className={cn(
-                                                    "inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border transition-all",
+                                                    "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition-all",
                                                     selectedJobDetails.useFullDescription
-                                                        ? "bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm"
+                                                        ? "border-slate-900 bg-slate-900 text-white shadow-sm"
                                                         : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50"
                                                 )}
                                             >
@@ -1282,9 +1506,9 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                 </div>
 
                                 {/* Content */}
-                                <div className="flex-1 flex flex-col overflow-hidden bg-slate-50/30">
+                                <div className="flex flex-1 flex-col overflow-hidden bg-slate-50">
                                     {jobDetails && viewMode === 'analysis' ? (
-                                        <div className="flex-1 overflow-auto custom-scrollbar p-4 space-y-5 stagger-children pb-20 lg:pb-0">
+                                        <div className="custom-scrollbar flex-1 space-y-5 overflow-auto p-4 pb-20 lg:pb-4">
                                             {/* Job Type Badge */}
                                             {jobDetails.jobType && (
                                                 <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100">
@@ -1405,7 +1629,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                                                     return (
                                                                         <button
                                                                             key={i}
-                                                                            className={`w - full flex items - start gap - 2.5 p - 2.5 rounded - lg text - left transition - all duration - 200 group ${isSelected
+                                                                            className={`group flex w-full items-start gap-2.5 rounded-lg p-2.5 text-left transition-all duration-200 ${isSelected
                                                                                 ? 'bg-indigo-50/70 border border-indigo-100'
                                                                                 : 'bg-white border border-transparent hover:bg-slate-50 hover:border-slate-100'
                                                                                 }`}
@@ -1418,10 +1642,10 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                                                                 }));
                                                                             }}
                                                                         >
-                                                                            <div className={`mt - 0.5 shrink - 0 ${isSelected ? 'text-indigo-500' : 'text-slate-300 group-hover:text-slate-400'}`}>
+                                                                            <div className={`mt-0.5 shrink-0 ${isSelected ? 'text-indigo-500' : 'text-slate-300 group-hover:text-slate-400'}`}>
                                                                                 {isSelected ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
                                                                             </div>
-                                                                            <span className={`text - [13px] leading - relaxed ${isSelected ? 'text-slate-700' : 'text-slate-400'}`}>
+                                                                            <span className={`text-[13px] leading-relaxed ${isSelected ? 'text-slate-700' : 'text-slate-400'}`}>
                                                                                 {req}
                                                                             </span>
                                                                         </button>
@@ -1495,13 +1719,17 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                         {activeTab === 'resume' && (
                             <div className="flex flex-col h-full">
                                 {/* Toolbar */}
-                                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-                                    <h3 className="text-sm font-semibold text-slate-900">Resume Content</h3>
+                                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
+                                    <div>
+                                        <p className="text-[11px] font-semibold text-slate-500">Step 2</p>
+                                        <h3 className="text-sm font-semibold text-slate-950">Resume source</h3>
+                                        <p className="mt-0.5 text-[11px] text-slate-500">Paste, upload, or sync your master profile.</p>
+                                    </div>
                                     <div className="flex items-center gap-1">
                                         <Popover open={isSyncPopoverOpen} onOpenChange={setIsSyncPopoverOpen}>
                                             <PopoverTrigger asChild>
                                                 <button
-                                                    className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+                                                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950"
                                                     title="Sync from Master Profile"
                                                 >
                                                     <UserCheck className="h-3.5 w-3.5" />
@@ -1526,7 +1754,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                                             <label key={key} className="flex items-center gap-2 cursor-pointer group">
                                                                 <button
                                                                     type="button"
-                                                                    className={`flex items - center justify - center h - 4 w - 4 rounded border ${selectedSyncSections[key as keyof typeof selectedSyncSections] ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300 group-hover:border-indigo-400'}`}
+                                                                    className={`flex h-4 w-4 items-center justify-center rounded border ${selectedSyncSections[key as keyof typeof selectedSyncSections] ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300 group-hover:border-indigo-400'}`}
                                                                     onClick={() => setSelectedSyncSections(prev => ({ ...prev, [key]: !prev[key as keyof typeof selectedSyncSections] }))}
                                                                 >
                                                                     {selectedSyncSections[key as keyof typeof selectedSyncSections] && <Check className="h-3 w-3" />}
@@ -1549,7 +1777,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                             </PopoverContent>
                                         </Popover>
                                         <div className="h-4 w-px bg-slate-200" />
-                                        <label className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors cursor-pointer">
+                                        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-950">
                                             {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
                                             Upload PDF
                                             <input type="file" accept=".pdf,.txt" className="hidden" onChange={handleFileUpload} />
@@ -1586,18 +1814,18 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
 
                 {/* ── Center Panel (Pane 2): Editor Workspace ── */}
                 <div className={cn(
-                    "flex-1 flex flex-col min-w-0 glass-card border border-white/20 shadow-sm rounded-2xl overflow-hidden relative transition-all duration-300 ease-in-out h-full",
+                    "relative flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 ease-in-out",
                     mobileTab !== 'result' ? "hidden lg:flex" : "flex min-h-[60vh] lg:min-h-0"
                 )}>
                     {/* ─ IDE Style Top Tabs ─ */}
-                    <div className="flex items-end gap-1 px-2 pt-2 border-b border-slate-200/50 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md shrink-0 overflow-x-auto custom-scrollbar">
+                    <div className="custom-scrollbar flex shrink-0 items-center gap-2 overflow-x-auto border-b border-slate-200 bg-white px-3 py-3">
                         <button
                             onClick={() => setOutputTab('resume')}
                             className={cn(
-                                "flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all shrink-0 border border-b-0",
+                                "flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-all",
                                 outputTab === 'resume'
-                                    ? "bg-white text-indigo-600 border-slate-200/50 shadow-sm relative z-10"
-                                    : "bg-transparent text-slate-500 hover:text-slate-700 hover:bg-white/30 border-transparent opacity-80"
+                                    ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950"
                             )}
                         >
                             <FileText className="h-4 w-4" /> Full Resume
@@ -1605,10 +1833,10 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                         <button
                             onClick={handleSwitchToSections}
                             className={cn(
-                                "flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all shrink-0 border border-b-0",
+                                "flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-all",
                                 outputTab === 'sections'
-                                    ? "bg-white text-indigo-600 border-slate-200/50 shadow-sm relative z-10"
-                                    : "bg-transparent text-slate-500 hover:text-slate-700 hover:bg-white/30 border-transparent opacity-80"
+                                    ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950"
                             )}
                         >
                             <Layers className="h-4 w-4" /> Section Builder
@@ -1616,58 +1844,59 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                         <button
                             onClick={() => setOutputTab('coverLetter')}
                             className={cn(
-                                "flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all shrink-0 border border-b-0",
+                                "flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-all",
                                 outputTab === 'coverLetter'
-                                    ? "bg-white text-violet-600 border-slate-200/50 shadow-sm relative z-10"
-                                    : "bg-transparent text-slate-500 hover:text-slate-700 hover:bg-white/30 border-transparent opacity-80"
+                                    ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950"
                             )}
                         >
                             <Mail className="h-4 w-4" /> Cover Letter
                         </button>
 
-                        <div className="ml-auto mb-1 flex items-center gap-2 shrink-0 px-2 pb-1">
+                        <div className="ml-auto flex shrink-0 items-center gap-2">
                             {/* Panel Toggle if closed */}
                             {!isLeftPanelOpen && (
                                 <button 
                                     onClick={() => setIsLeftPanelOpen(true)}
-                                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors border border-transparent hover:border-indigo-100"
+                                    className="rounded-lg border border-slate-200 p-2 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-950"
                                     title="Open Job Details"
                                 >
-                                    <LayoutGrid className="h-4 w-4" />
+                                    <PanelLeftOpen className="h-4 w-4" />
                                 </button>
                             )}
-                            <div className="h-4 w-px bg-slate-200 mx-1" />
+                            <div className="mx-1 h-5 w-px bg-slate-200" />
                             {/* Editor Sub-actions based on active tab */}
                             {outputTab === 'resume' && tailoredResume && (
-                                <div className="flex items-center gap-1.5 glass-card p-1 rounded-lg">
-                                    <div className="flex bg-white/50 rounded-md p-0.5 shadow-sm">
-                                        <button onClick={() => setResultViewMode('preview')} className={cn("px-2.5 py-1 text-[10px] font-bold rounded flex items-center gap-1", resultViewMode === 'preview' ? "bg-white text-slate-800 shadow" : "text-slate-500")}>
+                                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-1">
+                                    <div className="flex rounded-md bg-white p-0.5">
+                                        <button onClick={() => setResultViewMode('preview')} className={cn("flex items-center gap-1 rounded px-2.5 py-1 text-[11px] font-semibold", resultViewMode === 'preview' ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-950")}>
                                             <Eye className="h-3 w-3" /> Preview
                                         </button>
-                                        <button onClick={() => setResultViewMode('edit')} className={cn("px-2.5 py-1 text-[10px] font-bold rounded flex items-center gap-1", resultViewMode === 'edit' ? "bg-white text-slate-800 shadow" : "text-slate-500")}>
+                                        <button onClick={() => setResultViewMode('edit')} className={cn("flex items-center gap-1 rounded px-2.5 py-1 text-[11px] font-semibold", resultViewMode === 'edit' ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-950")}>
                                             <PenLine className="h-3 w-3" /> Edit
                                         </button>
-                                        <button onClick={() => setResultViewMode('diff')} className={cn("px-2.5 py-1 text-[10px] font-bold rounded flex items-center gap-1", resultViewMode === 'diff' ? "bg-white text-slate-800 shadow" : "text-slate-500")}>
+                                        <button onClick={() => setResultViewMode('diff')} className={cn("flex items-center gap-1 rounded px-2.5 py-1 text-[11px] font-semibold", resultViewMode === 'diff' ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-950")}>
                                             <GitCompare className="h-3 w-3" /> Diff
                                         </button>
                                     </div>
                                     {resultViewMode === 'preview' && (
-                                        <div className="flex bg-white/50 rounded-md p-0.5 shadow-sm ml-1">
+                                        <div className="ml-1 flex rounded-md bg-white p-0.5">
                                             {(['modern', 'classic', 'minimal'] as const).map((t) => (
-                                                <button key={t} onClick={() => setSelectedTemplate(t)} className={cn("px-2 py-1 text-[10px] font-bold rounded capitalize", selectedTemplate === t ? "bg-white text-slate-800 shadow" : "text-slate-500")}>
+                                                <button key={t} onClick={() => setSelectedTemplate(t)} className={cn("rounded px-2 py-1 text-[11px] font-semibold capitalize", selectedTemplate === t ? "bg-slate-100 text-slate-950" : "text-slate-500 hover:text-slate-950")}>
                                                     {t}
                                                 </button>
                                             ))}
                                         </div>
                                     )}
-                                    <button onClick={handleDownloadPDF} disabled={pdfGenerating} className="p-1.5 ml-1 text-slate-500 hover:text-indigo-600 hover:bg-white rounded-md transition-all border border-transparent hover:border-slate-200 hover:shadow-sm disabled:opacity-50" title="Download PDF">
-                                        {pdfGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                                    <button onClick={handleDownloadPDF} disabled={pdfGenerating} className="ml-1 inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50" title="Download PDF">
+                                        {pdfGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                                        PDF
                                     </button>
                                 </div>
                             )}
 
                             {outputTab === 'coverLetter' && coverLetter && (
-                                <div className="flex items-center gap-1.5 glass-card p-1 rounded-lg">
+                                <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-1">
                                     <button onClick={() => setIsEditingCoverLetter(!isEditingCoverLetter)} className={cn("px-2.5 py-1 text-[11px] font-bold rounded flex items-center gap-1.5 shadow-sm transition-all", isEditingCoverLetter ? "bg-indigo-100 text-indigo-700" : "bg-white text-slate-600 hover:bg-slate-50")}>
                                         <PenLine className="h-3.5 w-3.5" /> Edit
                                     </button>
@@ -1684,9 +1913,9 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                             {((changes.length > 0) || keywordCoverage) && tailoredResume && !activeAnalysisTab && (
                                 <button
                                     onClick={() => setActiveAnalysisTab('changes')}
-                                    className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500 text-white rounded-lg shadow-lg shadow-indigo-500/20 hover:bg-indigo-600 transition-all text-[11px] font-bold ml-1 animate-in fade-in slide-in-from-right-2"
+                                    className="ml-1 hidden items-center gap-1.5 rounded-lg bg-slate-950 px-3 py-2 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 lg:flex"
                                 >
-                                    <Sparkles className="h-3.5 w-3.5" />
+                                    <ListChecks className="h-3.5 w-3.5" />
                                     Show Analysis
                                 </button>
                             )}
@@ -1710,7 +1939,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     )}
 
                     {/* Editor Content Wrapper */}
-                    <div className="flex-1 flex min-h-0 overflow-hidden relative bg-slate-50/50 dark:bg-slate-900/20">
+                    <div className="relative flex min-h-0 flex-1 overflow-hidden bg-slate-100/70">
                         {/* ── Section Builder tab ── */}
                         {outputTab === 'sections' && (
                             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -1733,36 +1962,54 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
 
                         {/* ── Resume / Cover Letter tabs ── */}
                         {outputTab !== 'sections' && (
-                            <div id="print-container" className="flex-1 overflow-auto p-4 md:p-8 custom-scrollbar print:p-0 print:overflow-visible pb-20 lg:pb-8">
+                            <div id="print-container" className="custom-scrollbar flex-1 overflow-auto p-4 pb-20 print:overflow-visible print:p-0 md:p-6 lg:pb-6">
                                 {outputTab === 'resume' ? (
                                     tailoredResume ? (
                                         resultViewMode === 'diff' ? (
-                                            <div className="h-full overflow-y-auto bg-white rounded-xl shadow-sm border border-slate-100 p-2"><DiffViewer oldText={resumeText} newText={tailoredResume} /></div>
+                                            <div className="h-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 shadow-sm"><DiffViewer oldText={resumeText} newText={tailoredResume} /></div>
                                         ) : resultViewMode === 'edit' ? (
-                                            <div className="w-full h-full flex flex-col relative z-20 group/editor bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                                            <div className="group/editor relative z-20 mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                                                 <textarea
-                                                    className="flex-1 w-full p-6 resize-none outline-none font-mono text-[13px] sm:text-sm text-slate-800 placeholder:text-slate-300 custom-scrollbar"
+                                                    className="custom-scrollbar w-full flex-1 resize-none p-6 font-mono text-[13px] leading-6 text-slate-800 outline-none placeholder:text-slate-300 sm:text-sm"
                                                     placeholder="Edit your tailored resume here..."
                                                     value={tailoredResume}
                                                     onChange={(e) => setTailoredResume(e.target.value)}
                                                     spellCheck={false}
                                                 />
-                                                <button onClick={() => setResultViewMode('preview')} className="absolute bottom-6 right-6 bg-slate-900 text-white shadow-xl hover:bg-slate-800 px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all hover:-translate-y-1">
-                                                    <Check className="h-4 w-4 text-emerald-400" /> Done Editing
+                                                <button onClick={() => setResultViewMode('preview')} className="absolute bottom-6 right-6 flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800">
+                                                    <Check className="h-4 w-4 text-emerald-300" /> Done editing
                                                 </button>
                                             </div>
                                         ) : (
-                                            <div className="relative group/preview min-h-full">
-                                                <ResumePreview content={tailoredResume} title={null} company={null} template={selectedTemplate} />
+                                            <div className="mx-auto min-h-full w-full max-w-[900px]">
+                                                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 shadow-sm">
+                                                    <div className="flex items-center gap-2">
+                                                        <FileCheck2 className="h-4 w-4 text-emerald-600" />
+                                                        <span className="font-semibold text-slate-700">Resume preview</span>
+                                                        <span>{selectedTemplate.charAt(0).toUpperCase() + selectedTemplate.slice(1)} template</span>
+                                                    </div>
+                                                    <span>{hasUnsavedChanges ? 'Save before export for the latest copy.' : saveStatusLabel}</span>
+                                                </div>
+                                                <div className="min-h-[1050px] rounded-xl border border-slate-200 bg-white px-8 py-10 shadow-sm sm:px-12 lg:px-16 print:min-h-0 print:border-0 print:p-0 print:shadow-none">
+                                                    <ResumePreview content={tailoredResume} title={null} company={null} template={selectedTemplate} />
+                                                </div>
                                             </div>
                                         )
                                     ) : (
-                                        <div className="h-full flex flex-col items-center justify-center text-slate-400">
-                                            <div className="w-24 h-24 rounded-3xl bg-white shadow-sm border border-slate-100 flex items-center justify-center mb-6 animate-float">
-                                                <FileText className="h-10 w-10 text-slate-300" />
+                                        <div className="flex h-full flex-col items-center justify-center text-slate-500">
+                                            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm">
+                                                <FileText className="h-9 w-9 text-slate-400" />
                                             </div>
-                                            <p className="text-lg font-bold text-slate-700 mb-2">No Output Generated</p>
-                                            <p className="text-sm text-slate-500 max-w-sm text-center">Add your job description and resume in the left panel, then click <span className="font-bold text-indigo-500">Tailor Resume</span> to see results here.</p>
+                                            <p className="mb-2 text-lg font-semibold text-slate-800">No tailored resume yet</p>
+                                            <p className="max-w-sm text-center text-sm text-slate-500">Complete the job and resume inputs, then run tailoring. The finished resume, edit mode, diff view, and PDF export stay here.</p>
+                                            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                                                <button onClick={() => { setMobileTab('job'); setActiveTab('job'); }} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                                                    <Briefcase className="h-4 w-4" /> Job input
+                                                </button>
+                                                <button onClick={() => { setMobileTab('resume'); setActiveTab('resume'); }} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                                                    <FileText className="h-4 w-4" /> Resume input
+                                                </button>
+                                            </div>
                                         </div>
                                     )
                                 ) : (
@@ -1794,19 +2041,19 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                                 <h3 className="text-sm font-bold text-slate-700 mb-4">1. Choose a Tone & Style</h3>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
                                                     {([
-                                                        { id: 'professional' as const, label: 'Professional', desc: 'Balanced & standard', icon: BookOpen, color: 'indigo' },
-                                                        { id: 'concise' as const, label: 'Concise', desc: 'Short & direct', icon: Zap, color: 'amber' },
-                                                        { id: 'storytelling' as const, label: 'Storytelling', desc: 'Narrative-driven', icon: PenLine, color: 'violet' },
-                                                        { id: 'executive' as const, label: 'Executive', desc: 'Leadership focus', icon: Crown, color: 'emerald' },
+                                                        { id: 'professional' as const, label: 'Professional', desc: 'Balanced & standard', icon: BookOpen },
+                                                        { id: 'concise' as const, label: 'Concise', desc: 'Short & direct', icon: Zap },
+                                                        { id: 'storytelling' as const, label: 'Storytelling', desc: 'Narrative-driven', icon: PenLine },
+                                                        { id: 'executive' as const, label: 'Executive', desc: 'Leadership focus', icon: Crown },
                                                     ]).map(s => {
                                                         const Icon = s.icon;
                                                         const isActive = coverLetterStyle === s.id;
                                                         return (
-                                                            <button key={s.id} onClick={() => setCoverLetterStyle(s.id)} className={`flex items-start gap-3 p-3 rounded-xl border-2 text-left transition-all ${isActive ? `border-${s.color}-400 bg-${s.color}-50 shadow-sm` : 'border-slate-100 hover:border-slate-200 bg-slate-50/50'}`}>
-                                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isActive ? `bg-${s.color}-500 text-white` : 'bg-white text-slate-400 shadow-sm'}`}><Icon className="h-4 w-4" /></div>
+                                                            <button key={s.id} onClick={() => setCoverLetterStyle(s.id)} className={cn("flex items-start gap-3 rounded-xl border p-3 text-left transition-all", isActive ? "border-slate-900 bg-slate-900 text-white shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50")}>
+                                                                <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", isActive ? "bg-white/10 text-white" : "bg-slate-100 text-slate-500")}><Icon className="h-4 w-4" /></div>
                                                                 <div>
-                                                                    <p className={`text-sm font-bold ${isActive ? 'text-slate-800' : 'text-slate-600'}`}>{s.label}</p>
-                                                                    <p className="text-xs text-slate-500 mt-0.5">{s.desc}</p>
+                                                                    <p className={cn("text-sm font-semibold", isActive ? "text-white" : "text-slate-800")}>{s.label}</p>
+                                                                    <p className={cn("mt-0.5 text-xs", isActive ? "text-slate-300" : "text-slate-500")}>{s.desc}</p>
                                                                 </div>
                                                             </button>
                                                         );
@@ -1837,7 +2084,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                         <div className={cn(
                             "transition-all duration-300 ease-in-out shrink-0 flex flex-col gap-3 h-full z-50 lg:z-auto",
                             // Mobile: Fixed bottom sheet
-                            "fixed lg:static bottom-0 left-0 right-0 max-h-[85vh] rounded-t-3xl lg:rounded-2xl bg-white lg:bg-transparent shadow-2xl lg:shadow-none",
+                            "fixed lg:static bottom-0 left-0 right-0 max-h-[85vh] rounded-t-2xl lg:rounded-2xl bg-white lg:bg-transparent shadow-2xl lg:shadow-none",
                             // Desktop width handling
                             activeAnalysisTab ? "translate-y-0 lg:w-[320px] xl:w-[350px] opacity-100" : "translate-y-full lg:translate-y-0 lg:w-0 lg:opacity-0 lg:p-0 lg:overflow-hidden lg:hidden"
                         )}>
@@ -1846,32 +2093,32 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                 <div className="w-12 h-1.5 rounded-full bg-slate-200" />
                             </div>
 
-                            <div className="flex-1 glass-card border border-white/20 shadow-sm overflow-hidden flex flex-col lg:rounded-2xl relative">
+                            <div className="relative flex flex-1 flex-col overflow-hidden border border-slate-200 bg-white shadow-sm lg:rounded-2xl">
                                 {/* Insights Header */}
-                                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200/50 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md shrink-0">
+                                <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
                                     <div className="flex items-center gap-2">
-                                        <div className="p-1.5 bg-indigo-500 rounded-lg text-white shadow-sm shadow-indigo-500/20"><Sparkles className="h-4 w-4" /></div>
-                                        <span className="font-bold text-sm text-slate-800">AI Analysis</span>
+                                        <div className="rounded-lg bg-slate-900 p-1.5 text-white"><ListChecks className="h-4 w-4" /></div>
+                                        <span className="text-sm font-semibold text-slate-950">Analysis</span>
                                     </div>
-                                    <button onClick={() => setActiveAnalysisTab(null)} className="p-1.5 text-slate-400 hover:text-slate-600 bg-white rounded-lg shadow-sm border border-slate-100 hover:bg-slate-50">
+                                    <button onClick={() => setActiveAnalysisTab(null)} className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-950">
                                         <ChevronRight className="h-4 w-4 lg:rotate-0" />
                                     </button>
                                 </div>
 
                                 {/* Persistent Tabs */}
-                                <div className="flex px-3 pt-3 pb-2 gap-2 shrink-0">
-                                    <button onClick={() => setActiveAnalysisTab('changes')} className={cn("flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all border", (!activeAnalysisTab || activeAnalysisTab === 'changes') ? "bg-white text-indigo-700 shadow-sm border-slate-200/50" : "bg-transparent text-slate-500 border-transparent hover:bg-white/50")}>
+                                <div className="flex shrink-0 gap-2 px-3 pb-2 pt-3">
+                                    <button onClick={() => setActiveAnalysisTab('changes')} className={cn("flex-1 rounded-lg border py-1.5 text-[11px] font-semibold transition-all", (!activeAnalysisTab || activeAnalysisTab === 'changes') ? "border-slate-900 bg-slate-900 text-white shadow-sm" : "border-slate-200 bg-white text-slate-500 hover:text-slate-950")}>
                                         Edits ({changes.length})
                                     </button>
                                     {keywordCoverage && (
-                                        <button onClick={() => setActiveAnalysisTab('coverage')} className={cn("flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all border", activeAnalysisTab === 'coverage' ? "bg-white text-indigo-700 shadow-sm border-slate-200/50" : "bg-transparent text-slate-500 border-transparent hover:bg-white/50")}>
+                                        <button onClick={() => setActiveAnalysisTab('coverage')} className={cn("flex-1 rounded-lg border py-1.5 text-[11px] font-semibold transition-all", activeAnalysisTab === 'coverage' ? "border-slate-900 bg-slate-900 text-white shadow-sm" : "border-slate-200 bg-white text-slate-500 hover:text-slate-950")}>
                                             ATS Match
                                         </button>
                                     )}
                                 </div>
 
                                 {/* Scrollable Insights Content */}
-                                <div className="flex-1 overflow-y-auto custom-scrollbar p-4 bg-slate-50/30">
+                                <div className="custom-scrollbar flex-1 overflow-y-auto bg-slate-50 p-4">
                                     {(!activeAnalysisTab || activeAnalysisTab === 'changes') && (
                                         <div className="space-y-3 stagger-children">
                                             {changes.map((change, i) => (

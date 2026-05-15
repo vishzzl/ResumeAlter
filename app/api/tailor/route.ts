@@ -1,12 +1,31 @@
 import { NextRequest } from 'next/server';
-import { generateText, cleanJson, CustomConfig } from '@/lib/generate';
+import { generateText, CustomConfig } from '@/lib/generate';
 import { parseResumeSections } from '@/lib/resume-parser';
 import { db } from '@/lib/db';
 import { applications } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { auth } from '@/auth';
+import {
+    TAILORING_SYSTEM_INSTRUCTION,
+    buildGapFixPrompt,
+    buildTailoringPrompt,
+    buildVerificationPrompt,
+    enforceImmutableSections,
+    mergeJDAnalysis,
+    parseGapFixResponse,
+    parseTailoringResponse,
+    parseVerificationResponse,
+    reconstructResume,
+} from '@/lib/tailoring-prompts';
+import {
+    calculateAtsScore,
+    calculateCoverageSet,
+    computeSectionChanges,
+    evidencedMissingKeywords,
+    extractKeywordHints,
+} from '@/lib/ats-scoring';
 
-export const maxDuration = 120;
+export const maxDuration = 180;
 
 function sendSSE(controller: ReadableStreamDefaultController, encoder: TextEncoder, event: Record<string, unknown>) {
     controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
@@ -53,7 +72,7 @@ export async function POST(req: NextRequest) {
         else provider = 'local';
     }
 
-    console.log(`[tailor] Using simple gemini only: provider=${provider}, model=${modelName || 'default'}`);
+    console.log(`[tailor] Using guarded tailoring pipeline: provider=${provider}, model=${modelName || 'default'}`);
 
     const encoder = new TextEncoder();
 
@@ -61,110 +80,111 @@ export async function POST(req: NextRequest) {
         async start(controller) {
             try {
                 const sections = parseResumeSections(resume);
+                const keywordHints = extractKeywordHints(jobDescription);
 
                 sendSSE(controller, encoder, { phase: 'extracting' });
                 if (appId) await setTailorStatus(appId, 'tailoring', userId);
 
-                const prompt = `
-<system_role>
-You are an elite, ATS-certified Executive Resume Writer with deep expertise in optimizing professional profiles for Applicant Tracking Systems (ATS) and strict factual fidelity. Your objective is to seamlessly tailor an applicant's existing resume to precisely target a specific job description, focusing intensely on the user's curated selection of skills and experiences.
-</system_role>
-
-<input_data>
-<job_and_selections>
-${jobDescription}
-</job_and_selections>
-
-<original_resume_source_of_truth>
---- HEADER ---
-${sections.header}
---- SUMMARY ---
-${sections.summary}
---- SKILLS ---
-${sections.skills}
---- EXPERIENCE ---
-${sections.experience}
---- EDUCATION ---
-${sections.education}
---- PROJECTS ---
-${sections.projects}
---- CERTIFICATIONS & OTHER ---
-${sections.other}
-</original_resume_source_of_truth>
-</input_data>
-
-<execution_directives>
-1. STRICT TARGETING: You must aggressively prioritize the points, skills, requirements, and experiences explicitly highlighted in the <job_and_selections> section.
-2. EXPLICIT SKILL INCLUSION: Any skill or requirement designated by the user MUST be organically and explicitly integrated into the Summary, Skills section, or Professional Experience bullets. DO NOT omit user-selected requirements.
-3. EXPERIENCE FILTERING: Scrutinize the <original_resume_source_of_truth>. Retain ONLY the professional roles, projects, and bullet points that demonstrate relevance to the user-selected experiences or the core job description. Ruthlessly prune unrelated or distractive experience points.
-4. ZERO HALLUCINATION POLICY: Your output must be strictly grounded in the provided <original_resume_source_of_truth>. Under no circumstances are you permitted to invent, embellish, or hallucinate metrics, roles, dates, or skills. If a required skill is entirely absent from the source data, do not invent an experience to cover it.
-5. FORMATTING EXCELLENCE: Output the resume adhering to industry-standard markdown styling within the specified JSON schema. Use strong action verbs and maintain a professional, confident tone.
-</execution_directives>
-
-<output_schema>
-Respond PURELY as a valid JSON object matching this exact schema. Do not include markdown fences (e.g., \`\`\`json).
-{
-    "header": "# [Name]\\nemail | phone | location | [LinkedIn](url)",
-    "summary": "...",
-    "skills": "**Languages**: Python, JavaScript\\n...",
-    "experience": "**Company** | **Role** | **Dates**\\n* Bullet 1...",
-    "education": "**Degree** | **Institution** | **Dates**",
-    "projects": "**Project Name** | [Link](url)\\n* Description...",
-    "other": "**Cert Name** | Issuer | Date"
-}
-</output_schema>
-`;
-
                 sendSSE(controller, encoder, { phase: 'tailoring' });
 
-                const text = await generateText({
-                    prompt,
-                    systemInstruction: 'You are an elite Resume Writer who strictly follows instructions, applies ATS best practices, and never hallucinates. You always output valid JSON.',
+                const tailoringText = await generateText({
+                    prompt: buildTailoringPrompt(sections, jobDescription, keywordHints),
+                    systemInstruction: TAILORING_SYSTEM_INSTRUCTION,
                     provider: provider!,
                     apiKey,
                     modelName,
                     customConfig: customConfig as CustomConfig,
-                    temperature: 0.2, // Low temp for precision
+                    temperature: 0.2,
                     jsonMode: true,
                 });
 
+                const tailoringResult = parseTailoringResponse(tailoringText, sections);
+                const jdAnalysis = mergeJDAnalysis(keywordHints, tailoringResult.jdAnalysis);
+                const generatedSections = enforceImmutableSections(sections, tailoringResult.tailoredSections);
+
                 sendSSE(controller, encoder, { phase: 'verifying' });
 
-                const data = JSON.parse(cleanJson(text));
+                let verifiedSections = generatedSections;
+                let verificationWarnings = [...tailoringResult.warnings];
+                try {
+                    const verificationText = await generateText({
+                        prompt: buildVerificationPrompt(sections, generatedSections, jdAnalysis),
+                        systemInstruction: TAILORING_SYSTEM_INSTRUCTION,
+                        provider: provider!,
+                        apiKey,
+                        modelName,
+                        customConfig: customConfig as CustomConfig,
+                        temperature: 0.1,
+                        jsonMode: true,
+                    });
+                    const verification = parseVerificationResponse(verificationText, generatedSections);
+                    verifiedSections = enforceImmutableSections(sections, verification.correctedSections);
+                    verificationWarnings = [...verificationWarnings, ...verification.warnings, ...verification.corrections];
+                } catch (error) {
+                    console.warn('[tailor] Verification pass failed; using generated sections with deterministic invariants.', error);
+                    verificationWarnings.push('Verification pass failed; deterministic header and education safeguards were applied.');
+                }
 
-                const normalizeNewlines = (s: string | undefined) => s ? s.replace(/\\n/g, '\\n') : '';
-                
-                const tailoredResume = [
-                    normalizeNewlines(data.header) || sections.header,
-                    '',
-                    '## Summary',
-                    normalizeNewlines(data.summary) || sections.summary,
-                    '',
-                    '## Experience',
-                    normalizeNewlines(data.experience) || sections.experience,
-                    '',
-                    '## Skills',
-                    normalizeNewlines(data.skills) || sections.skills,
-                    '',
-                    data.education ? '## Education\n' + normalizeNewlines(data.education) : '',
-                    '',
-                    data.projects ? '## Projects\n' + normalizeNewlines(data.projects) : '',
-                    '',
-                    data.other ? '## Certifications\n' + normalizeNewlines(data.other) : ''
-                ].filter(Boolean).join('\n\n').trim();
+                const preFixResume = reconstructResume(verifiedSections);
+                const preFixCoverage = calculateCoverageSet(
+                    preFixResume,
+                    jdAnalysis.requiredSkills,
+                    jdAnalysis.preferredSkills
+                );
 
-                sendSSE(controller, encoder, { phase: 'gap_check', data: { preFixCoverage: { required: {score:100, matched:[], missing:[], total:0}, preferred: {score:100, matched:[], missing:[], total:0} } } });
-                sendSSE(controller, encoder, { phase: 'gap_fix_result', data: { injected: [], skipped: [] } });
+                sendSSE(controller, encoder, { phase: 'gap_check', data: { preFixCoverage } });
+
+                const missing = evidencedMissingKeywords(resume, preFixCoverage);
+                let finalSections = verifiedSections;
+                let injectedKeywords: string[] = [];
+                const skippedKeywords: string[] = missing.unsupported.map(keyword => `${keyword} - not evidenced in original resume`);
+
+                if (missing.evidenced.length > 0) {
+                    try {
+                        const gapFixText = await generateText({
+                            prompt: buildGapFixPrompt({
+                                originalSections: sections,
+                                currentSections: verifiedSections,
+                                jdAnalysis,
+                                evidencedMissingKeywords: missing.evidenced,
+                            }),
+                            systemInstruction: TAILORING_SYSTEM_INSTRUCTION,
+                            provider: provider!,
+                            apiKey,
+                            modelName,
+                            customConfig: customConfig as CustomConfig,
+                            temperature: 0.15,
+                            jsonMode: true,
+                        });
+                        const gapFix = parseGapFixResponse(gapFixText, verifiedSections);
+                        finalSections = enforceImmutableSections(sections, gapFix.tailoredSections);
+                        injectedKeywords = gapFix.injectedKeywords;
+                        skippedKeywords.push(...gapFix.skippedKeywords);
+                        verificationWarnings.push(...gapFix.warnings);
+                    } catch (error) {
+                        console.warn('[tailor] Gap fix pass failed; using verified resume.', error);
+                        skippedKeywords.push(...missing.evidenced.map(keyword => `${keyword} - gap fix failed`));
+                    }
+                }
+
+                const tailoredResume = reconstructResume(finalSections);
+                const finalCoverage = calculateCoverageSet(
+                    tailoredResume,
+                    jdAnalysis.requiredSkills,
+                    jdAnalysis.preferredSkills
+                );
+
+                sendSSE(controller, encoder, {
+                    phase: 'gap_fix_result',
+                    data: { injected: injectedKeywords, skipped: skippedKeywords },
+                });
 
                 sendSSE(controller, encoder, {
                     phase: 'tailored',
                     data: {
                         tailoredResume,
-                        keywordCoverage: {
-                            required: { score: 100, matched: [], missing: [], total: 0 },
-                            preferred: { score: 100, matched: [], missing: [], total: 0 },
-                        }
-                    }
+                        keywordCoverage: finalCoverage,
+                    },
                 });
 
                 if (appId && userId) {
@@ -176,31 +196,31 @@ Respond PURELY as a valid JSON object matching this exact schema. Do not include
 
                 sendSSE(controller, encoder, { phase: 'analyzing' });
 
-                const deterministicAtsScore = {
-                    before: 50,
-                    after: 95,
-                    breakdown: {
-                        keywordMatch: { before: 50, after: 100 },
-                        experienceRelevance: { before: 50, after: 90 },
-                        skillsAlignment: { before: 50, after: 100 },
-                        formatting: { before: 50, after: 90 },
-                    },
-                    analysis: "The resume was strictly tailored to perfectly align with the selected job requirements and skills.",
-                };
+                const { atsScore } = calculateAtsScore({
+                    originalResume: resume,
+                    tailoredResume,
+                    requiredKeywords: jdAnalysis.requiredSkills,
+                    preferredKeywords: jdAnalysis.preferredSkills,
+                });
+                const changes = computeSectionChanges(resume, tailoredResume, tailoringResult.changeLog);
+
+                if (verificationWarnings.length > 0) {
+                    atsScore.analysis += ` Notes: ${verificationWarnings.slice(0, 3).join(' ')}`;
+                }
 
                 sendSSE(controller, encoder, {
                     phase: 'complete',
                     data: {
-                        atsScore: deterministicAtsScore,
-                        changes: []
-                    }
+                        atsScore,
+                        changes,
+                    },
                 });
 
                 if (appId && userId) {
                     await db.update(applications).set({
                         analysis: JSON.stringify({
-                            changes: [],
-                            atsScore: deterministicAtsScore,
+                            changes,
+                            atsScore,
                         }),
                         tailorStatus: 'complete',
                     }).where(and(eq(applications.id, appId), eq(applications.userId, userId)));
@@ -210,13 +230,13 @@ Respond PURELY as a valid JSON object matching this exact schema. Do not include
                 console.error('Streaming API Error:', error);
                 sendSSE(controller, encoder, {
                     phase: 'error',
-                    error: error instanceof Error ? error.message : 'Internal Server Error'
+                    error: error instanceof Error ? error.message : 'Internal Server Error',
                 });
                 if (appId) await setTailorStatus(appId, 'error', userId);
             } finally {
                 controller.close();
             }
-        }
+        },
     });
 
     return new Response(stream, {

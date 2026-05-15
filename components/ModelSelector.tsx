@@ -1,26 +1,104 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useAIConfig, AIProvider } from "@/app/context/AIConfigContext";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useAIConfig, AIProvider, Model } from "@/app/context/AIConfigContext";
+import {
+    AlertTriangle,
+    Check,
+    ChevronDown,
+    ChevronsUpDown,
+    Clock3,
+    Cpu,
+    KeyRound,
+    RefreshCw,
+    Server,
+    WifiOff,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from "@/components/ui/command";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { formatTokenCount } from "@/lib/gemini-quota";
 
-export function ModelSelector() {
+interface ModelSelectorProps {
+    estimatedInputTokens?: number;
+}
+
+function providerLabel(provider: AIProvider) {
+    if (provider === "gemini") return "Gemini";
+    if (provider === "local") return "Local";
+    return "Custom";
+}
+
+function familyTone(model?: Model) {
+    if (model?.family === "pro") return "bg-amber-50 text-amber-700 border-amber-200";
+    if (model?.family === "experimental") return "bg-rose-50 text-rose-700 border-rose-200";
+    return "bg-emerald-50 text-emerald-700 border-emerald-200";
+}
+
+function statusTone(state?: string) {
+    switch (state) {
+        case "ok":
+            return "bg-emerald-50 text-emerald-700 border-emerald-200";
+        case "quota":
+            return "bg-amber-50 text-amber-700 border-amber-200";
+        case "timeout":
+        case "network":
+            return "bg-orange-50 text-orange-700 border-orange-200";
+        case "auth":
+        case "model":
+        case "error":
+            return "bg-rose-50 text-rose-700 border-rose-200";
+        case "checking":
+            return "bg-sky-50 text-sky-700 border-sky-200";
+        default:
+            return "bg-slate-100 text-slate-600 border-slate-200";
+    }
+}
+
+function statusDotClass(state?: string) {
+    switch (state) {
+        case "ok":
+            return "bg-emerald-500";
+        case "quota":
+            return "bg-amber-500";
+        case "timeout":
+        case "network":
+            return "bg-orange-500";
+        case "auth":
+        case "model":
+        case "error":
+            return "bg-rose-500";
+        case "checking":
+            return "bg-sky-500";
+        default:
+            return "bg-slate-400";
+    }
+}
+
+function statusLabel(state?: string) {
+    switch (state) {
+        case "ok":
+            return "Ready";
+        case "quota":
+            return "Quota";
+        case "timeout":
+            return "Timeout";
+        case "network":
+            return "Network";
+        case "auth":
+            return "Key";
+        case "model":
+            return "Unavailable";
+        case "checking":
+            return "Checking";
+        case "error":
+            return "Issue";
+        default:
+            return "Unknown";
+    }
+}
+
+export function ModelSelector({ estimatedInputTokens }: ModelSelectorProps) {
     const {
         availableModels,
         selectedModel,
@@ -29,149 +107,319 @@ export function ModelSelector() {
         selectedProvider,
         setSelectedProvider,
         customModelConfig,
-        updateCustomConfig
+        updateCustomConfig,
+        geminiStatuses,
+        refreshGeminiStatus,
     } = useAIConfig();
+
     const [open, setOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<AIProvider>(selectedProvider);
+    const [query, setQuery] = useState("");
+    const [showDetails, setShowDetails] = useState(false);
+    const [now, setNow] = useState(0);
 
-    // Sync tab with selected provider when opening
     useEffect(() => {
-        // eslint-disable-next-line
-        if (open) setActiveTab(selectedProvider);
-    }, [open, selectedProvider]);
+        if (!open) return;
+        const id = window.setInterval(() => setNow(Date.now()), 1000);
+        return () => window.clearInterval(id);
+    }, [open]);
+
+    const currentModel = availableModels.find(model => model.name === selectedModel) || {
+        name: selectedModel,
+        displayName: selectedModel,
+        description: "Previously selected model",
+        family: selectedModel.includes("pro") ? "pro" : "flash",
+        stability: "stable",
+    };
+    const currentStatus = geminiStatuses[selectedModel];
+    const cooldown = currentStatus?.retryAfterSeconds
+        ? Math.max(0, currentStatus.retryAfterSeconds - Math.floor((now - currentStatus.checkedAt) / 1000))
+        : null;
+
+    const geminiModels = availableModels.filter(model => {
+        const haystack = `${model.displayName} ${model.name} ${model.description || ""}`.toLowerCase();
+        return haystack.includes(query.toLowerCase());
+    });
+
+    const requestSize = estimatedInputTokens ? `~${formatTokenCount(estimatedInputTokens)}` : "Unknown";
 
     const currentModelDisplay = () => {
-        if (selectedProvider === 'gemini') {
-            const m = availableModels.find(m => m.name === selectedModel);
-            return m ? m.displayName : selectedModel;
-        }
-        if (selectedProvider === 'local') return `Local (${customModelConfig.localModel})`;
-        if (selectedProvider === 'custom') return "Custom Config";
+        if (selectedProvider === "gemini") return currentModel.displayName || selectedModel;
+        if (selectedProvider === "local") return `Local (${customModelConfig.localModel})`;
+        if (selectedProvider === "custom") return customModelConfig.customUrl ? "Custom Endpoint" : "Custom Config";
         return "Select AI Model";
     };
 
     return (
-        <Popover open={open} onOpenChange={setOpen}>
+        <Popover
+            open={open}
+            onOpenChange={(nextOpen) => {
+                setOpen(nextOpen);
+                if (nextOpen) {
+                    setActiveTab(selectedProvider);
+                    setShowDetails(false);
+                    setNow(Date.now());
+                }
+            }}
+        >
             <PopoverTrigger asChild>
                 <Button
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
-                    className="w-[260px] justify-between text-xs h-8 bg-white/50 backdrop-blur-sm border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 text-slate-700"
+                    className="h-9 w-[280px] justify-between rounded-xl border-slate-200 bg-white/75 text-xs text-slate-700 shadow-sm backdrop-blur-sm hover:bg-white hover:border-slate-300"
                 >
-                    <div className="flex items-center gap-2 truncate">
-                        {selectedProvider === 'gemini' && <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]" />}
-                        {selectedProvider === 'local' && <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
-                        {selectedProvider === 'custom' && <div className="h-1.5 w-1.5 rounded-full bg-violet-500" />}
+                    <div className="flex min-w-0 items-center gap-2">
+                        <span className={cn("h-2 w-2 shrink-0 rounded-full", selectedProvider === "gemini" ? statusDotClass(currentStatus?.state) : selectedProvider === "local" ? "bg-emerald-500" : "bg-violet-500")} />
                         <span className="truncate font-medium">{currentModelDisplay()}</span>
                     </div>
-                    <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-40" />
+                    <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-40" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[340px] p-0 overflow-hidden bg-white/95 backdrop-blur-xl border border-slate-200 shadow-xl rounded-xl" align="end">
-                <div className="flex border-b border-slate-100 bg-slate-50/50">
-                    {(['gemini', 'local', 'custom'] as const).map((provider) => (
-                        <button
-                            key={provider}
-                            onClick={() => setActiveTab(provider)}
-                            className={cn(
-                                "flex-1 px-3 py-2.5 text-[11px] uppercase tracking-wider font-semibold transition-colors border-b-2 outline-none",
-                                activeTab === provider
-                                    ? "border-indigo-500 text-indigo-600 bg-white"
-                                    : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-100/50"
-                            )}
-                        >
-                            {provider === 'gemini' && "Gemini Cloud"}
-                            {provider === 'local' && "Local LLM"}
-                            {provider === 'custom' && "Custom"}
-                        </button>
-                    ))}
-                </div>
 
-                <div className="p-0">
-                    {activeTab === 'gemini' && (
-                        <div className="flex flex-col h-full">
-                            <Command className="bg-transparent flex-1">
-                                <CommandInput placeholder="Search Gemini models..." className="border-none focus:ring-0 text-xs py-2" />
-                                <CommandList className="max-h-[200px] custom-scrollbar">
-                                    <CommandEmpty className="py-6 text-center text-xs text-slate-400">No model found.</CommandEmpty>
-                                    <CommandGroup heading="Available Models" className="text-slate-500">
-                                        {availableModels.map((model) => (
-                                            <CommandItem
-                                                key={model.name}
-                                                value={model.name}
-                                                keywords={[model.displayName, model.name]}
-                                                onSelect={(currentValue) => {
-                                                    // Find model case-insensitively
-                                                    const targetModel = availableModels.find(
-                                                        m => m.name.toLowerCase() === currentValue.toLowerCase() ||
-                                                            m.displayName.toLowerCase() === currentValue.toLowerCase()
-                                                    );
+            <PopoverContent
+                align="end"
+                className="flex max-h-[min(76vh,620px)] w-[min(92vw,380px)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white/95 p-0 shadow-2xl backdrop-blur-xl"
+            >
+                <div className="shrink-0 border-b border-slate-100 bg-slate-50/80 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Model</p>
+                            <h3 className="mt-0.5 truncate text-sm font-bold text-slate-900">{currentModelDisplay()}</h3>
+                        </div>
+                        {selectedProvider === "gemini" && (
+                            <span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase", familyTone(currentModel))}>
+                                {currentModel.family || "flash"}
+                            </span>
+                        )}
+                    </div>
 
-                                                    if (targetModel) {
-                                                        setSelectedProvider('gemini');
-                                                        setSelectedModel(targetModel.name);
-                                                        setOpen(false);
-                                                    }
-                                                }}
-                                                className="cursor-pointer data-[disabled]:pointer-events-auto data-[disabled]:opacity-100 aria-selected:bg-indigo-50 aria-selected:text-indigo-700 my-1 mx-1 rounded-md transition-colors"
-                                            >
-                                                <Check
-                                                    className={cn(
-                                                        "mr-2 h-3.5 w-3.5 text-indigo-500",
-                                                        selectedProvider === 'gemini' && selectedModel === model.name ? "opacity-100" : "opacity-0"
-                                                    )}
-                                                />
-                                                <div className="flex flex-col">
-                                                    <span className="font-medium text-slate-700">{model.displayName}</span>
-                                                    {model.description && (
-                                                        <span className="text-[10px] text-slate-400 line-clamp-1">{model.description}</span>
-                                                    )}
-                                                </div>
-                                            </CommandItem>
-                                        ))}
-                                    </CommandGroup>
-                                </CommandList>
-                            </Command>
-
-                            {/* Status Check Section */}
-                            <div className="p-2 border-t border-slate-100 bg-slate-50/50">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="w-full justify-between text-[10px] h-7 px-2 text-slate-500 hover:text-indigo-600 hover:bg-white border border-transparent hover:border-indigo-100"
-                                    onClick={async () => {
-                                        const toastId = toast.loading("Checking API status...");
-                                        try {
-                                            const res = await fetch(`/api/quota?modelName=${selectedModel}`);
-                                            const data = await res.json();
-
-                                            if (data.status === 'ok') {
-                                                toast.success(`Service Operational`, {
-                                                    id: toastId,
-                                                    description: `Model: ${data.model}`
-                                                });
-                                            } else {
-                                                toast.error(`Issue Detected`, {
-                                                    id: toastId,
-                                                    description: data.message
-                                                });
-                                            }
-                                        } catch (e) {
-                                            toast.error("Failed to check status", {
-                                                id: toastId,
-                                                description: "Network or server error"
-                                            });
-                                        }
-                                    }}
-                                >
-                                    <span>Check API Status</span>
-                                    <div className="h-1.5 w-1.5 rounded-full bg-slate-300 group-hover:bg-indigo-400" />
-                                </Button>
+                    {selectedProvider === "gemini" && (
+                        <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
+                            <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+                                <p className="text-slate-400">Health</p>
+                                <p className={cn("mt-0.5 font-bold", currentStatus?.state === "quota" ? "text-amber-700" : currentStatus?.state === "ok" ? "text-emerald-700" : "text-slate-700")}>
+                                    {statusLabel(currentStatus?.state)}
+                                </p>
+                            </div>
+                            <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+                                <p className="text-slate-400">Input</p>
+                                <p className="mt-0.5 font-bold text-slate-700">{requestSize}</p>
+                            </div>
+                            <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+                                <p className="text-slate-400">Limit</p>
+                                <p className="mt-0.5 font-bold text-slate-700">{formatTokenCount(currentModel.inputTokenLimit ?? null)}</p>
                             </div>
                         </div>
                     )}
                 </div>
+
+                <div className="shrink-0 border-b border-slate-100 bg-white">
+                    <div className="grid grid-cols-3">
+                        {(["gemini", "local", "custom"] as const).map(provider => (
+                            <button
+                                key={provider}
+                                onClick={() => setActiveTab(provider)}
+                                className={cn(
+                                    "border-b-2 px-2 py-2 text-[11px] font-bold uppercase tracking-wide transition-colors",
+                                    activeTab === provider
+                                        ? "border-slate-900 text-slate-900"
+                                        : "border-transparent text-slate-400 hover:text-slate-700"
+                                )}
+                            >
+                                {providerLabel(provider)}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {activeTab === "gemini" && (
+                    <div className="flex min-h-0 flex-1 flex-col">
+                        <div className="shrink-0 space-y-2 border-b border-slate-100 p-3">
+                            <div className={cn("rounded-lg border px-3 py-2 text-[11px]", statusTone(currentStatus?.state))}>
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex min-w-0 items-center gap-2">
+                                        {currentStatus?.state === "quota" ? <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> : null}
+                                        <span className="truncate font-bold">{currentStatus?.message || "No recent health check"}</span>
+                                    </div>
+                                    {cooldown && cooldown > 0 ? (
+                                        <span className="inline-flex shrink-0 items-center gap-1 font-bold">
+                                            <Clock3 className="h-3 w-3" />
+                                            {cooldown}s
+                                        </span>
+                                    ) : null}
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <input
+                                    value={query}
+                                    onChange={(event) => setQuery(event.target.value)}
+                                    placeholder="Filter models..."
+                                    className="h-8 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-[11px] text-slate-700 outline-none focus:border-slate-400"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => refreshGeminiStatus()}
+                                    disabled={currentStatus?.state === "checking"}
+                                    className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white px-2.5 text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                                    title="Refresh Gemini health"
+                                >
+                                    <RefreshCw className={cn("h-3.5 w-3.5", currentStatus?.state === "checking" && "animate-spin")} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowDetails(value => !value)}
+                                    className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white px-2.5 text-slate-500 hover:bg-slate-50"
+                                    title="Show quota details"
+                                >
+                                    <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", showDetails && "rotate-180")} />
+                                </button>
+                            </div>
+
+                            {showDetails && (
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600">
+                                    <p>{currentStatus?.detail || "Gemini does not expose exact remaining quota counts here. This panel shows last-known health and retry hints."}</p>
+                                    {currentStatus?.knownRemaining.requestsToday === 0 || currentStatus?.knownRemaining.inputTokensToday === 0 ? (
+                                        <p className="mt-2 font-bold text-amber-700">Known remaining today: 0</p>
+                                    ) : null}
+                                    {currentStatus?.exhaustedLabels?.length ? (
+                                        <p className="mt-2">Exhausted: {currentStatus.exhaustedLabels.join(", ")}</p>
+                                    ) : null}
+                                    <p className="mt-2">Output cap: {formatTokenCount(currentModel.outputTokenLimit ?? null)} tokens</p>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="min-h-0 flex-1 overflow-y-auto p-2 custom-scrollbar">
+                            {isLoadingModels ? (
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">Loading models...</div>
+                            ) : geminiModels.length === 0 ? (
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">No models match.</div>
+                            ) : geminiModels.map(model => {
+                                const modelStatus = geminiStatuses[model.name];
+                                const modelCooldown = modelStatus?.retryAfterSeconds
+                                    ? Math.max(0, modelStatus.retryAfterSeconds - Math.floor((now - modelStatus.checkedAt) / 1000))
+                                    : null;
+                                const isSelected = selectedProvider === "gemini" && selectedModel === model.name;
+
+                                return (
+                                    <button
+                                        key={model.name}
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedProvider("gemini");
+                                            setSelectedModel(model.name);
+                                            setOpen(false);
+                                        }}
+                                        className={cn(
+                                            "mb-1.5 flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all",
+                                            isSelected
+                                                ? "border-slate-900 bg-slate-900 text-white"
+                                                : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                                        )}
+                                    >
+                                        <Check className={cn("h-4 w-4 shrink-0", isSelected ? "opacity-100" : "opacity-0")} />
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex min-w-0 items-center gap-2">
+                                                <span className="truncate text-sm font-semibold">{model.displayName}</span>
+                                                <span className={cn("shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold uppercase", isSelected ? "border-white/20 bg-white/10 text-white" : familyTone(model))}>
+                                                    {model.family || "flash"}
+                                                </span>
+                                            </div>
+                                            <p className={cn("truncate text-[11px]", isSelected ? "text-slate-300" : "text-slate-500")}>
+                                                {model.bestFor || model.name}
+                                            </p>
+                                        </div>
+                                        {modelStatus?.state && modelStatus.state !== "idle" ? (
+                                            <span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase", isSelected ? "border-white/20 bg-white/10 text-white" : statusTone(modelStatus.state))}>
+                                                {modelCooldown && modelCooldown > 0 ? `${modelCooldown}s` : statusLabel(modelStatus.state)}
+                                            </span>
+                                        ) : null}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === "local" && (
+                    <div className="space-y-3 p-3">
+                        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-800">
+                            <Cpu className="h-4 w-4" />
+                            Local model
+                        </div>
+                        <label className="block">
+                            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Server URL</span>
+                            <input
+                                value={customModelConfig.localUrl}
+                                onChange={(event) => updateCustomConfig({ localUrl: event.target.value })}
+                                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-400"
+                            />
+                        </label>
+                        <label className="block">
+                            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Model Name</span>
+                            <input
+                                value={customModelConfig.localModel}
+                                onChange={(event) => updateCustomConfig({ localModel: event.target.value })}
+                                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-400"
+                            />
+                        </label>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSelectedProvider("local");
+                                setOpen(false);
+                            }}
+                            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                        >
+                            <Server className="h-4 w-4" />
+                            Use local
+                        </button>
+                    </div>
+                )}
+
+                {activeTab === "custom" && (
+                    <div className="space-y-3 p-3">
+                        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-800">
+                            <WifiOff className="h-4 w-4" />
+                            Custom endpoint
+                        </div>
+                        <label className="block">
+                            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Endpoint URL</span>
+                            <input
+                                value={customModelConfig.customUrl}
+                                onChange={(event) => updateCustomConfig({ customUrl: event.target.value })}
+                                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-400"
+                                placeholder="https://..."
+                            />
+                        </label>
+                        <label className="block">
+                            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">API Key</span>
+                            <div className="relative">
+                                <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="password"
+                                    value={customModelConfig.customKey}
+                                    onChange={(event) => updateCustomConfig({ customKey: event.target.value })}
+                                    className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-3 text-sm text-slate-700 outline-none focus:border-slate-400"
+                                    placeholder="Optional"
+                                />
+                            </div>
+                        </label>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSelectedProvider("custom");
+                                setOpen(false);
+                            }}
+                            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                        >
+                            <WifiOff className="h-4 w-4" />
+                            Use custom
+                        </button>
+                    </div>
+                )}
             </PopoverContent>
         </Popover>
     );
