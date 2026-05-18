@@ -23,11 +23,7 @@ interface ModelSelectorProps {
     estimatedInputTokens?: number;
 }
 
-function providerLabel(provider: AIProvider) {
-    if (provider === "gemini") return "Gemini";
-    if (provider === "local") return "Local";
-    return "Custom";
-}
+
 
 function familyTone(model?: Model) {
     if (model?.family === "pro") return "bg-amber-50 text-amber-700 border-amber-200";
@@ -113,7 +109,6 @@ export function ModelSelector({ estimatedInputTokens }: ModelSelectorProps) {
     } = useAIConfig();
 
     const [open, setOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<AIProvider>(selectedProvider);
     const [query, setQuery] = useState("");
     const [showDetails, setShowDetails] = useState(false);
     const [now, setNow] = useState(0);
@@ -144,10 +139,7 @@ export function ModelSelector({ estimatedInputTokens }: ModelSelectorProps) {
     const requestSize = estimatedInputTokens ? `~${formatTokenCount(estimatedInputTokens)}` : "Unknown";
 
     const currentModelDisplay = () => {
-        if (selectedProvider === "gemini") return currentModel.displayName || selectedModel;
-        if (selectedProvider === "local") return `Local (${customModelConfig.localModel})`;
-        if (selectedProvider === "custom") return customModelConfig.customUrl ? "Custom Endpoint" : "Custom Config";
-        return "Select AI Model";
+        return currentModel.displayName || selectedModel;
     };
 
     return (
@@ -156,7 +148,6 @@ export function ModelSelector({ estimatedInputTokens }: ModelSelectorProps) {
             onOpenChange={(nextOpen) => {
                 setOpen(nextOpen);
                 if (nextOpen) {
-                    setActiveTab(selectedProvider);
                     setShowDetails(false);
                     setNow(Date.now());
                 }
@@ -214,26 +205,6 @@ export function ModelSelector({ estimatedInputTokens }: ModelSelectorProps) {
                     )}
                 </div>
 
-                <div className="shrink-0 border-b border-slate-100 bg-white">
-                    <div className="grid grid-cols-3">
-                        {(["gemini", "local", "custom"] as const).map(provider => (
-                            <button
-                                key={provider}
-                                onClick={() => setActiveTab(provider)}
-                                className={cn(
-                                    "border-b-2 px-2 py-2 text-[11px] font-bold uppercase tracking-wide transition-colors",
-                                    activeTab === provider
-                                        ? "border-slate-900 text-slate-900"
-                                        : "border-transparent text-slate-400 hover:text-slate-700"
-                                )}
-                            >
-                                {providerLabel(provider)}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {activeTab === "gemini" && (
                     <div className="flex min-h-0 flex-1 flex-col">
                         <div className="shrink-0 space-y-2 border-b border-slate-100 p-3">
                             <div className={cn("rounded-lg border px-3 py-2 text-[11px]", statusTone(currentStatus?.state))}>
@@ -341,85 +312,6 @@ export function ModelSelector({ estimatedInputTokens }: ModelSelectorProps) {
                             })}
                         </div>
                     </div>
-                )}
-
-                {activeTab === "local" && (
-                    <div className="space-y-3 p-3">
-                        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-800">
-                            <Cpu className="h-4 w-4" />
-                            Local model
-                        </div>
-                        <label className="block">
-                            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Server URL</span>
-                            <input
-                                value={customModelConfig.localUrl}
-                                onChange={(event) => updateCustomConfig({ localUrl: event.target.value })}
-                                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-400"
-                            />
-                        </label>
-                        <label className="block">
-                            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Model Name</span>
-                            <input
-                                value={customModelConfig.localModel}
-                                onChange={(event) => updateCustomConfig({ localModel: event.target.value })}
-                                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-400"
-                            />
-                        </label>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setSelectedProvider("local");
-                                setOpen(false);
-                            }}
-                            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-                        >
-                            <Server className="h-4 w-4" />
-                            Use local
-                        </button>
-                    </div>
-                )}
-
-                {activeTab === "custom" && (
-                    <div className="space-y-3 p-3">
-                        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-800">
-                            <WifiOff className="h-4 w-4" />
-                            Custom endpoint
-                        </div>
-                        <label className="block">
-                            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Endpoint URL</span>
-                            <input
-                                value={customModelConfig.customUrl}
-                                onChange={(event) => updateCustomConfig({ customUrl: event.target.value })}
-                                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-400"
-                                placeholder="https://..."
-                            />
-                        </label>
-                        <label className="block">
-                            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">API Key</span>
-                            <div className="relative">
-                                <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                <input
-                                    type="password"
-                                    value={customModelConfig.customKey}
-                                    onChange={(event) => updateCustomConfig({ customKey: event.target.value })}
-                                    className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-3 text-sm text-slate-700 outline-none focus:border-slate-400"
-                                    placeholder="Optional"
-                                />
-                            </div>
-                        </label>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setSelectedProvider("custom");
-                                setOpen(false);
-                            }}
-                            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-                        >
-                            <WifiOff className="h-4 w-4" />
-                            Use custom
-                        </button>
-                    </div>
-                )}
             </PopoverContent>
         </Popover>
     );
