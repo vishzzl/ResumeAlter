@@ -887,6 +887,8 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     resume: resumeText,       // FULL resume — anti-hallucination context
                     jobDescription,           // FULL job description
                     jdAnalysis,               // pre-analyzed JD intel (null if not yet ready)
+                    preferences: sectionStates[sectionName].preferences,
+                    customInstruction: sectionStates[sectionName].customInstruction,
                     apiKey,
                     modelProvider: selectedProvider,
                     modelName: selectedModel,
@@ -915,17 +917,21 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     if (!line.startsWith('data: ')) continue;
                     try {
                         const event = JSON.parse(line.slice(6));
-                        if (event.phase === 'complete' && event.data?.candidates?.length) {
-                            const candidates = event.data.candidates;
-                            // candidates are already sorted by score (highest first)
-                            const winner = candidates[0];
+                        if (event.phase === 'complete') {
+                            const tailoredText =
+                                typeof event.data?.tailoredSection === 'string'
+                                    ? event.data.tailoredSection
+                                    : event.data?.candidates?.[0]?.text;
+                            const candidates = Array.isArray(event.data?.candidates) ? event.data.candidates : [{ score: 100 }];
+                            const winner = candidates[0] ?? { score: 100 };
+                            if (!tailoredText) {
+                                throw new Error('Section generation returned no tailored content.');
+                            }
                             setSectionStates(prev => ({
                                 ...prev,
                                 [sectionName]: {
                                     ...prev[sectionName],
-                                    variants: candidates,
-                                    selectedVariantIndex: 0,
-                                    tailored: winner.text,
+                                    tailored: tailoredText,
                                     status: 'done',
                                     accepted: false,
                                 },
@@ -953,7 +959,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             }
             toast.error(`Failed to generate ${sectionName}. Please try again.`);
         }
-    }, [resumeText, jobDescription, selectedProvider, selectedModel, customModelConfig, reportGeminiIssue]);
+    }, [resumeText, jobDescription, jdAnalysis, selectedProvider, selectedModel, customModelConfig, reportGeminiIssue, sectionStates]);
 
     /** Generate all sections sequentially so the user sees each card populate */
     const handleGenerateAllSections = useCallback(async () => {
