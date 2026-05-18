@@ -3,6 +3,7 @@ import { ResumeSections } from './resume-parser';
 import { KeywordHints } from './ats-scoring';
 
 export type TailorableSectionName = 'summary' | 'skills' | 'experience' | 'education' | 'projects' | 'other';
+export type SectionPreference = 'quantify' | 'keywords' | 'concise' | 'detailed' | 'reword';
 
 export interface JDAnalysis {
     targetTitle: string;
@@ -46,17 +47,8 @@ export interface GapFixResponse {
     warnings: string[];
 }
 
-export interface SectionCandidate {
-    model: string;
-    focus: string;
+export interface SectionResponse {
     text: string;
-    // Self-assessed factual fidelity score (0–100). Higher = model is more
-    // confident every claim is supported by the original resume.
-    confidenceScore: number;
-}
-
-export interface SectionCandidateResponse {
-    candidates: SectionCandidate[];
     warnings: string[];
 }
 
@@ -514,21 +506,51 @@ export function buildSectionTailoringPrompt(params: {
     sections: ResumeSections;
     jobDescription: string;
     jdAnalysis: JDAnalysis;
+    preferences?: SectionPreference[];
+    customInstruction?: string;
 }): string {
     const label = params.sectionName.toUpperCase();
-    return `Create three grounded variants for only the ${label} section of this resume.
+    const prefs = params.preferences || ['quantify', 'keywords'];
 
-JOB DESCRIPTION AND USER SELECTIONS
+    // Map preference chips to concrete prompt instructions
+    const prefInstructions: string[] = [];
+    if (prefs.includes('quantify')) {
+        prefInstructions.push('QUANTIFY: Wherever the original resume contains implicit metrics (team sizes, timelines, user counts, scale, performance gains), make them explicit with numbers. If the original says "improved performance", and there is any numeric evidence anywhere in the resume, surface it. Do NOT invent numbers — only surface what exists.');
+    }
+    if (prefs.includes('keywords')) {
+        prefInstructions.push('KEYWORD-HEAVY: Maximize coverage of exact JD keywords and phrases. Weave them naturally into bullets and descriptions. Prioritize required skills over preferred skills. Use the exact phrasing from the job description where possible.');
+    }
+    if (prefs.includes('concise')) {
+        prefInstructions.push('CONCISE: Each bullet must be 60–100 characters (excluding leading dash). Remove filler words, adverbs, and padding. One concrete achievement per bullet. Favor brevity over detail.');
+    }
+    if (prefs.includes('detailed')) {
+        prefInstructions.push('DETAILED: Use full STAR format (Situation → Task → Action → Result) for each major bullet. Provide context about the project scope, your specific role, technologies used, and measurable outcomes.');
+    }
+    if (prefs.includes('reword')) {
+        prefInstructions.push('REWORD ONLY: Preserve the original structure, bullet count, and content exactly. Only rephrase for ATS optimization — replace passive voice with active, align terminology to JD phrasing. Do not add, remove, or reorder any bullets.');
+    }
+
+    const prefBlock = prefInstructions.length > 0
+        ? `\nUSER OPTIMIZATION PREFERENCES\n${prefInstructions.map((p, i) => `${i + 1}. ${p}`).join('\n')}\n`
+        : '';
+
+    const customBlock = params.customInstruction?.trim()
+        ? `\nCUSTOM USER INSTRUCTION\n${params.customInstruction.trim()}\n`
+        : '';
+
+    return `Create ONE optimized version of only the ${label} section of this resume, following the user's optimization preferences below.
+
+JOB DESCRIPTION
 ${params.jobDescription}
 
 JD ANALYSIS
 ${JSON.stringify(params.jdAnalysis, null, 2)}
-
+${prefBlock}${customBlock}
 ORIGINAL RESUME SOURCE OF TRUTH
 ${sectionSourceBlock(params.sections)}
 
 SECTION-SPECIFIC RULES
-- Output only ${label} content in each candidate. Do not include section headings.
+- Output only ${label} content. Do not include section headings.
 - Every claim must be supported by the original resume.
 - Use exact JD keywords only when supported by the original resume.
 - If the section is EDUCATION, preserve the original education content unless light formatting is needed.
@@ -536,35 +558,13 @@ SECTION-SPECIFIC RULES
 - If the section is EXPERIENCE or PROJECTS:
   - Use action-led bullets and only source-backed metrics.
   - Past tense for ended roles; present tense for the current role only.
-  - Target 80–120 characters per bullet (excluding the leading dash).
   - Preserve exact numbers, percentages, timeframes, and dollar amounts.
-  - Vary opening action verbs; do not repeat the same verb more than twice in a candidate.
-- Each candidate must differ meaningfully in structure or emphasis. Do not repeat the same bullet verbatim across candidates.
-- For each candidate, assign a confidenceScore (0–100) representing how confident you are that every claim is supported by the original resume (100 = fully grounded, 0 = fabricated).
+  - Vary opening action verbs; do not repeat the same verb more than twice.
 
 Return ONLY valid JSON with no markdown fences:
 {
-  "candidates": [
-    {
-      "model": "Balanced ATS",
-      "focus": "Best balance of ATS coverage, readability, and factual fidelity",
-      "text": "section content only",
-      "confidenceScore": 95
-    },
-    {
-      "model": "Keyword Coverage",
-      "focus": "More exact JD phrasing while staying grounded",
-      "text": "section content only",
-      "confidenceScore": 90
-    },
-    {
-      "model": "Concise Impact",
-      "focus": "Tighter human-readable version with strong impact language",
-      "text": "section content only",
-      "confidenceScore": 92
-    }
-  ],
-  "warnings": ["brief warning"]
+  "text": "the optimized section content only — no heading",
+  "warnings": ["brief warning if any"]
 }`;
 }
 
@@ -637,30 +637,16 @@ export function parseGapFixResponse(raw: string, fallback: TailoredSections): Ga
     };
 }
 
-export function parseSectionCandidateResponse(raw: string): SectionCandidateResponse {
+export function parseSectionResponse(raw: string): SectionResponse {
     const obj = parseObject(raw);
-    const candidates = Array.isArray(obj.candidates)
-        ? obj.candidates
-            .map((item, index) => {
-                if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
-                const candidate = item as Record<string, unknown>;
-                const scoreRaw = candidate.confidenceScore;
-                const confidenceScore =
-                    typeof scoreRaw === 'number' && scoreRaw >= 0 && scoreRaw <= 100
-                        ? Math.round(scoreRaw)
-                        : 0;
-                return {
-                    model: asString(candidate.model) || `Variant ${index + 1}`,
-                    focus: asString(candidate.focus) || 'Balanced ATS tailoring',
-                    text: asString(candidate.text),
-                    confidenceScore,
-                };
-            })
-            .filter((item): item is SectionCandidate => !!item?.text)
-        : [];
-
+    // Support both { text } and legacy { candidates: [{ text }] } shapes
+    let text = asString(obj.text);
+    if (!text && Array.isArray(obj.candidates) && obj.candidates.length > 0) {
+        const first = obj.candidates[0] as Record<string, unknown>;
+        text = asString(first?.text);
+    }
     return {
-        candidates,
+        text,
         warnings: asStringArray(obj.warnings),
     };
 }

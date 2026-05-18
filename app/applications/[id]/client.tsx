@@ -10,7 +10,7 @@ import {
     Sparkles, X, Eye, GitCompare, Mail, Copy, Check,
     PenLine, BookOpen, Zap, Crown, Target, Layers, CheckCircle2,
     AlertCircle, PanelLeftClose, PanelLeftOpen, FileCheck2, ClipboardCheck,
-    FileDown, ListChecks, ArrowRight
+    FileDown, ListChecks, ArrowRight, Menu, Home, PlusCircle, Settings
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -190,19 +190,13 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
 
     // UI State
     const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
+    const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
     const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'classic' | 'minimal'>('modern');
     const [activeAnalysisTab, setActiveAnalysisTab] = useState<'changes' | 'coverage' | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pdfGenerating, setPdfGenerating] = useState(false);
         // ─── Section-wise generation state ───────────────────────────────────────────
-    const makeSectionState = useCallback((original: string): SectionState => ({
-        original,
-        tailored: '',
-        variants: [],
-        selectedVariantIndex: 0,
-        status: 'idle',
-        accepted: false,
-    }), []);
+    const makeSectionState = useCallback((original: string): SectionState => ({ original, tailored: '', status: 'idle', accepted: false, preferences: ['quantify', 'keywords'], customInstruction: '' }), []);
 
     const buildInitialSections = useCallback((): SectionsState => {
         const parsed = parseResumeSections(resumeText);
@@ -217,10 +211,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     }, [resumeText, makeSectionState]);
 
     const [sectionStates, setSectionStates] = useState<SectionsState>(() => {
-        const empty = (s: string): SectionState => ({
-            original: s, tailored: '', variants: [], selectedVariantIndex: 0,
-            status: 'idle', accepted: false,
-        });
+        const empty = (s: string): SectionState => ({ original: s, tailored: '', status: 'idle', accepted: false, preferences: ['quantify', 'keywords'], customInstruction: '' });
         return {
             summary: empty(''), skills: empty(''), experience: empty(''),
             education: empty(''), projects: empty(''), other: empty(''),
@@ -276,6 +267,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                 : loading && tailorPhase === 'gap_check' ? 'Optimizing gaps'
                     : loading && tailorPhase === 'analyzing' ? 'Analyzing match'
                         : 'Tailor resume';
+    const hasInsights = ((changes.length > 0) || keywordCoverage) && tailoredResume;
 
 
     // Sync Profile Sections State
@@ -988,7 +980,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             ...prev,
             [name]: {
                 ...prev[name],
-                tailored: '', variants: [], selectedVariantIndex: 0,
+                tailored: '',
                 status: 'idle', accepted: false, error: undefined,
             },
         }));
@@ -998,21 +990,12 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
         setSectionStates(prev => ({ ...prev, [name]: { ...prev[name], tailored: value } }));
     }, []);
 
-    /** Switch the active variant for a section (updates tailored text to that variant) */
-    const handleSelectVariant = useCallback((name: SectionName, index: number) => {
-        setSectionStates(prev => {
-            const s = prev[name];
-            if (!s.variants[index]) return prev;
-            return {
-                ...prev,
-                [name]: {
-                    ...s,
-                    selectedVariantIndex: index,
-                    tailored: s.variants[index].text,
-                    accepted: false, // switching variant resets acceptance
-                },
-            };
-        });
+    const handleSetPreferences = useCallback((name: SectionName, prefs: any[]) => {
+        setSectionStates(prev => ({ ...prev, [name]: { ...prev[name], preferences: prefs } }));
+    }, []);
+
+    const handleSetCustomInstruction = useCallback((name: SectionName, text: string) => {
+        setSectionStates(prev => ({ ...prev, [name]: { ...prev[name], customInstruction: text } }));
     }, []);
 
     /**
@@ -1097,37 +1080,49 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
 
     // ─── RENDER ───
 
-    return (
-        <div className="h-[calc(100vh-2rem)] md:h-[calc(100vh-3rem)] lg:h-[calc(100vh-4rem)] flex flex-col gap-4 animate-in fade-in duration-500">
 
-            <header className="shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm print:hidden">
-                <div className="flex flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-5">
-                    <div className="flex min-w-0 items-start gap-3">
+    return (
+        <div className="flex h-[calc(100dvh-2rem)] flex-col gap-3 pb-[5.25rem] animate-in fade-in duration-500 lg:h-[calc(100vh-4rem)] lg:gap-4 lg:pb-0">
+
+            <header className={cn(
+                "shrink-0 overflow-visible rounded-xl border border-slate-200 bg-white shadow-sm print:hidden lg:rounded-2xl",
+                mobileTab === 'result' && "hidden lg:block"
+            )}>
+                <div className="flex flex-col gap-3 px-3 py-3 sm:px-4 lg:flex-row lg:items-center lg:justify-between lg:px-5 lg:py-4">
+                    <div className="flex min-w-0 items-center gap-2.5 sm:gap-3 lg:items-start">
+                        <button
+                            type="button"
+                            onClick={() => setIsMobileNavOpen(true)}
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-950 lg:hidden"
+                            aria-label="Open workspace menu"
+                        >
+                            <Menu className="h-4 w-4" />
+                        </button>
                         <Link
                             href="/"
-                            className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 lg:mt-1 lg:h-9 lg:w-9"
                             title="Back to dashboard"
                         >
                             <ChevronLeft className="h-4 w-4" />
                         </Link>
 
-                        <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <h1 className="truncate text-lg font-semibold text-slate-950 sm:text-xl">
+                        <div className="min-w-0 flex-1">
+                            <div className="flex min-w-0 items-center gap-2">
+                                <h1 className="min-w-0 truncate text-base font-semibold text-slate-950 sm:text-xl">
                                     {app.jobTitle || 'New Application'}
                                 </h1>
                                 <span className={cn(
-                                    "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                                    "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-semibold sm:px-2.5 sm:text-[11px]",
                                     hasResult ? "border-emerald-200 bg-emerald-50 text-emerald-700" :
                                         hasResume ? "border-amber-200 bg-amber-50 text-amber-700" :
                                             "border-slate-200 bg-slate-100 text-slate-600"
                                 )}>
                                     {hasResult ? <CheckCircle2 className="h-3.5 w-3.5" /> : hasResume ? <FileText className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
-                                    {hasResult ? 'Tailored' : hasResume ? 'In progress' : 'Draft'}
+                                    <span className="hidden sm:inline">{hasResult ? 'Tailored' : hasResume ? 'In progress' : 'Draft'}</span>
                                 </span>
                             </div>
                             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-                                <span>{app.companyName || 'Company not set'}</span>
+                                <span className="max-w-[55vw] truncate sm:max-w-none">{app.companyName || 'Company not set'}</span>
                                 {app.jobUrl ? <span className="hidden max-w-[360px] truncate sm:inline">{app.jobUrl}</span> : null}
                                 <span className={cn("inline-flex items-center gap-1", hasUnsavedChanges ? "text-amber-700" : "text-emerald-700")}>
                                     {hasUnsavedChanges ? <AlertCircle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
@@ -1137,7 +1132,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center lg:justify-end">
                         <div className="hidden md:block">
                             <ModelSelector estimatedInputTokens={estimatedModelInputTokens} />
                         </div>
@@ -1145,7 +1140,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                             onClick={handleSave}
                             disabled={isSaving || loading || !hasUnsavedChanges}
                             className={cn(
-                                "inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+                                "inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 sm:h-10",
                                 hasUnsavedChanges
                                     ? "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
                                     : "border-emerald-200 bg-emerald-50 text-emerald-700"
@@ -1158,7 +1153,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                             onClick={handleTailor}
                             disabled={!canTailor}
                             title={inputTooShort ? 'Resume must be at least 200 characters and job description at least 100 characters' : undefined}
-                            className="inline-flex h-10 min-w-[150px] items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:min-w-[150px]"
                         >
                             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Target className="h-4 w-4" />}
                             <span className="hidden sm:inline">{tailorButtonLabel}</span>
@@ -1241,34 +1236,40 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             </div>
 
             {/* ━━━ Mobile Bottom Tab Bar ━━━ */}
-            <div className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between border-t border-slate-200 bg-white/95 px-6 py-2 shadow-lg ring-1 ring-slate-900/5 backdrop-blur-lg print:hidden lg:hidden">
-                {([
-                    { id: 'job', label: 'Job', icon: Briefcase },
-                    { id: 'resume', label: 'Resume', icon: FileText },
-                    { id: 'result', label: 'Review', icon: FileCheck2 },
-                ] as const).map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => {
-                            setMobileTab(tab.id);
-                            if (tab.id !== 'result') setActiveTab(tab.id as 'job' | 'resume');
-                        }}
-                        className={cn(
-                            "flex flex-col items-center gap-1 transition-all",
-                            mobileTab === tab.id
-                                ? "text-slate-950"
-                                : "text-slate-400 hover:text-slate-600"
-                        )}
-                    >
-                        <div className={cn(
-                            "rounded-lg p-1.5 transition-colors",
-                            mobileTab === tab.id ? "bg-slate-100" : "bg-transparent"
-                        )}>
-                            <tab.icon className="h-5 w-5" />
-                        </div>
-                        <span className="text-[10px] font-medium">{tab.label}</span>
-                    </button>
-                ))}
+            <div className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 ring-1 ring-slate-900/5 backdrop-blur-lg print:hidden lg:hidden">
+                <div className="mx-auto grid max-w-md grid-cols-3 gap-2">
+                    {([
+                        { id: 'job', label: 'Job', icon: Briefcase, ready: jobReady },
+                        { id: 'resume', label: 'Resume', icon: FileText, ready: resumeReady },
+                        { id: 'result', label: 'Review', icon: FileCheck2, ready: tailoredReady },
+                    ] as const).map(tab => {
+                        const isActive = mobileTab === tab.id;
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => {
+                                    setMobileTab(tab.id);
+                                    if (tab.id !== 'result') setActiveTab(tab.id as 'job' | 'resume');
+                                }}
+                                className={cn(
+                                    "relative flex h-14 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-semibold transition-colors",
+                                    isActive
+                                        ? "bg-slate-950 text-white shadow-sm"
+                                        : "bg-slate-100 text-slate-500 active:bg-slate-200"
+                                )}
+                            >
+                                {tab.ready && (
+                                    <span className={cn(
+                                        "absolute right-3 top-2 h-1.5 w-1.5 rounded-full",
+                                        isActive ? "bg-emerald-300" : "bg-emerald-500"
+                                    )} />
+                                )}
+                                <tab.icon className="h-5 w-5" />
+                                <span>{tab.label}</span>
+                            </button>
+                        );
+                    })}
+                </div>
             </div>
 
 
@@ -1298,14 +1299,14 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             )}
 
             {/* ━━━ Main Workspace ━━━ */}
-            <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0 relative transition-all duration-300 ease-in-out">
+            <div className="relative flex min-h-0 flex-1 flex-col gap-3 transition-all duration-300 ease-in-out lg:flex-row lg:gap-4">
 
                 {/* ── Left Panel (Pane 1): Input (JD & Resume) ── */}
                 <div
                     className={cn(
-                        "transition-all duration-300 ease-in-out shrink-0 flex flex-col gap-3 h-full",
+                        "transition-all duration-300 ease-in-out shrink-0 flex flex-col gap-3 lg:h-full",
                         // Mobile: Full width with explicit height, visible only if tab is job or resume
-                        mobileTab === 'result' ? "hidden lg:flex" : "w-full min-h-[calc(100vh-14rem)] lg:min-h-0",
+                        mobileTab === 'result' ? "hidden lg:flex" : "flex h-full w-full min-h-0",
                         // Desktop: Controlled by isLeftPanelOpen
                         isLeftPanelOpen ? "lg:w-[360px] xl:w-[420px] opacity-100" : "lg:w-0 lg:opacity-0 lg:p-0 lg:overflow-hidden"
                     )}
@@ -1352,7 +1353,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     </div>
 
                     {/* Panel Content - Made it a glass card that fills remaining height */}
-                    <div className="relative flex flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:rounded-2xl">
 
                         {/* ─ Job Description Tab ─ */}
                         {activeTab === 'job' && (
@@ -1371,7 +1372,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                 )}
 
                                 {/* Header */}
-                                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
+                                <div className="flex shrink-0 flex-col gap-3 border-b border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
                                     <div>
                                         <p className="text-[11px] font-semibold text-slate-500">Step 1</p>
                                         <h3 className="text-sm font-semibold text-slate-950">
@@ -1381,12 +1382,12 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                             {jobDetails ? 'Select relevant features for tailoring' : 'Paste or scrape the job description'}
                                         </p>
                                     </div>
-                                    <div className="flex shrink-0 items-center gap-2">
+                                    <div className="scrollbar-hide flex w-full shrink-0 items-center gap-2 overflow-x-auto sm:w-auto">
                                         {!jobDetails && jobDescription && (
                                             <button
                                                 onClick={scrapeJob}
                                                 disabled={isScraping}
-                                                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-slate-800"
+                                                className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-slate-950 px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-slate-800"
                                             >
                                                 {isScraping ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
                                                 Analyze
@@ -1395,14 +1396,14 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                         <button
                                             onClick={scrapeJob}
                                             disabled={isScraping}
-                                            className="rounded-lg border border-slate-200 p-1.5 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
+                                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
                                             title="Re-analyze"
                                         >
                                             <RefreshCw className={`h-3.5 w-3.5 ${isScraping ? 'animate-spin' : ''}`} />
                                         </button>
 
                                         {jobDetails && (
-                                            <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1">
+                                            <div className="flex h-10 shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1">
                                                 <button
                                                     onClick={() => setViewMode('analysis')}
                                                     className={cn(
@@ -1432,7 +1433,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                             <button
                                                 onClick={() => setSelectedJobDetails(prev => ({ ...prev, useFullDescription: !prev.useFullDescription }))}
                                                 className={cn(
-                                                    "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition-all",
+                                                    "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-semibold transition-all",
                                                     selectedJobDetails.useFullDescription
                                                         ? "border-slate-900 bg-slate-900 text-white shadow-sm"
                                                         : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50"
@@ -1448,7 +1449,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                 {/* Content */}
                                 <div className="flex flex-1 flex-col overflow-hidden bg-slate-50">
                                     {jobDetails && viewMode === 'analysis' ? (
-                                        <div className="custom-scrollbar flex-1 space-y-5 overflow-auto p-4 pb-20 lg:pb-4">
+                                                <div className="custom-scrollbar flex-1 space-y-5 overflow-auto p-3 pb-6 sm:p-4 lg:pb-4">
                                             {/* Job Type Badge */}
                                             {jobDetails.jobType && (
                                                 <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100">
@@ -1585,9 +1586,9 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                                                             <div className={`mt-0.5 shrink-0 ${isSelected ? 'text-indigo-500' : 'text-slate-300 group-hover:text-slate-400'}`}>
                                                                                 {isSelected ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
                                                                             </div>
-                                                                            <span className={`text-[13px] leading-relaxed ${isSelected ? 'text-slate-700' : 'text-slate-400'}`}>
-                                                                                {req}
-                                                                            </span>
+                                                                    <span className={`min-w-0 break-words text-[13px] leading-relaxed ${isSelected ? 'text-slate-700' : 'text-slate-400'}`}>
+                                                                        {req}
+                                                                    </span>
                                                                         </button>
                                                                     );
                                                                 })}
@@ -1621,7 +1622,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                                                             <div className={`mt-0.5 shrink-0 ${isSelected ? 'text-indigo-500' : 'text-slate-300 group-hover:text-slate-400'}`}>
                                                                                 {isSelected ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
                                                                             </div>
-                                                                            <span className={`text-[13px] leading-relaxed ${isSelected ? 'text-slate-700' : 'text-slate-400'}`}>
+                                                                            <span className={`min-w-0 break-words text-[13px] leading-relaxed ${isSelected ? 'text-slate-700' : 'text-slate-400'}`}>
                                                                                 {exp}
                                                                             </span>
                                                                         </button>
@@ -1645,7 +1646,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                         </div>
                                     ) : (
                                         <textarea
-                                            className="w-full h-full p-4 resize-none outline-none font-mono text-[13px] text-slate-800 bg-white placeholder:text-slate-300 overflow-y-auto"
+                                            className="h-full w-full resize-none overflow-y-auto bg-white p-4 font-mono text-base text-slate-800 outline-none placeholder:text-slate-300 sm:text-[13px]"
                                             placeholder="Paste the job description here, or click Analyze to extract key details..."
                                             value={jobDescription}
                                             onChange={(e) => setJobDescription(e.target.value)}
@@ -1659,17 +1660,17 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                         {activeTab === 'resume' && (
                             <div className="flex flex-col h-full">
                                 {/* Toolbar */}
-                                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
+                                <div className="flex shrink-0 flex-col gap-3 border-b border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
                                     <div>
                                         <p className="text-[11px] font-semibold text-slate-500">Step 2</p>
                                         <h3 className="text-sm font-semibold text-slate-950">Resume source</h3>
                                         <p className="mt-0.5 text-[11px] text-slate-500">Paste, upload, or sync your master profile.</p>
                                     </div>
-                                    <div className="flex items-center gap-1">
+                                    <div className="scrollbar-hide flex w-full items-center gap-1 overflow-x-auto sm:w-auto">
                                         <Popover open={isSyncPopoverOpen} onOpenChange={setIsSyncPopoverOpen}>
                                             <PopoverTrigger asChild>
                                                 <button
-                                                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950"
+                                                    className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950"
                                                     title="Sync from Master Profile"
                                                 >
                                                     <UserCheck className="h-3.5 w-3.5" />
@@ -1717,7 +1718,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                             </PopoverContent>
                                         </Popover>
                                         <div className="h-4 w-px bg-slate-200" />
-                                        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-950">
+                                        <label className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-950">
                                             {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
                                             Upload PDF
                                             <input type="file" accept=".pdf,.txt" className="hidden" onChange={handleFileUpload} />
@@ -1727,8 +1728,8 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
 
                                 {/* Editor or Dropzone */}
                                 {!resumeText ? (
-                                    <div className="flex-1 flex items-center justify-center p-8">
-                                        <label className="w-full max-w-sm flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-dashed border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all cursor-pointer group">
+                                    <div className="flex flex-1 items-center justify-center p-4 sm:p-8">
+                                        <label className="group flex w-full max-w-sm cursor-pointer flex-col items-center gap-4 rounded-2xl border-2 border-dashed border-slate-200 p-6 transition-all hover:border-indigo-300 hover:bg-indigo-50/30 sm:p-8">
                                             <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
                                                 <Upload className="h-6 w-6 text-indigo-500" />
                                             </div>
@@ -1741,7 +1742,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                     </div>
                                 ) : (
                                     <textarea
-                                        className="flex-1 w-full min-h-[60vh] lg:min-h-0 p-4 resize-none outline-none font-mono text-[13px] sm:text-[13px] text-slate-800 bg-white placeholder:text-slate-300 custom-scrollbar overflow-y-auto"
+                                        className="custom-scrollbar w-full flex-1 resize-none overflow-y-auto bg-white p-4 font-mono text-base text-slate-800 outline-none placeholder:text-slate-300 sm:text-[13px] lg:min-h-0"
                                         placeholder="Paste your resume content here..."
                                         value={resumeText}
                                         onChange={(e) => setResumeText(e.target.value)}
@@ -1754,46 +1755,59 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
 
                 {/* ── Center Panel (Pane 2): Editor Workspace ── */}
                 <div className={cn(
-                    "relative flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 ease-in-out",
-                    mobileTab !== 'result' ? "hidden lg:flex" : "flex min-h-[60vh] lg:min-h-0"
+                    "relative h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-300 ease-in-out lg:rounded-2xl",
+                    mobileTab !== 'result' ? "hidden lg:flex" : "flex min-h-0"
                 )}>
                     {/* ─ IDE Style Top Tabs ─ */}
-                    <div className="custom-scrollbar flex shrink-0 items-center gap-2 overflow-x-auto border-b border-slate-200 bg-white px-3 py-3">
-                        <button
-                            onClick={() => setOutputTab('resume')}
-                            className={cn(
-                                "flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-all",
-                                outputTab === 'resume'
-                                    ? "border-slate-900 bg-slate-900 text-white shadow-sm"
-                                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950"
-                            )}
-                        >
-                            <FileText className="h-4 w-4" /> Full Resume
-                        </button>
-                        <button
-                            onClick={handleSwitchToSections}
-                            className={cn(
-                                "flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-all",
-                                outputTab === 'sections'
-                                    ? "border-slate-900 bg-slate-900 text-white shadow-sm"
-                                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950"
-                            )}
-                        >
-                            <Layers className="h-4 w-4" /> Section Builder
-                        </button>
-                        <button
-                            onClick={() => setOutputTab('coverLetter')}
-                            className={cn(
-                                "flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-all",
-                                outputTab === 'coverLetter'
-                                    ? "border-slate-900 bg-slate-900 text-white shadow-sm"
-                                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950"
-                            )}
-                        >
-                            <Mail className="h-4 w-4" /> Cover Letter
-                        </button>
+                    <div className="shrink-0 border-b border-slate-200 bg-white px-2 py-2 sm:px-3 sm:py-3">
+                        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsMobileNavOpen(true)}
+                                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-950 lg:hidden"
+                                    aria-label="Open workspace menu"
+                                >
+                                    <Menu className="h-4 w-4" />
+                                </button>
+                                <div className="scrollbar-hide flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+                                <button
+                                    onClick={() => setOutputTab('resume')}
+                                    className={cn(
+                                        "flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-all sm:h-10",
+                                        outputTab === 'resume'
+                                            ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                                            : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950"
+                                    )}
+                                >
+                                    <FileText className="h-4 w-4" /> Full Resume
+                                </button>
+                                <button
+                                    onClick={handleSwitchToSections}
+                                    className={cn(
+                                        "flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-all sm:h-10",
+                                        outputTab === 'sections'
+                                            ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                                            : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950"
+                                    )}
+                                >
+                                    <Layers className="h-4 w-4" /> Section Builder
+                                </button>
+                                <button
+                                    onClick={() => setOutputTab('coverLetter')}
+                                    className={cn(
+                                        "flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-all sm:h-10",
+                                        outputTab === 'coverLetter'
+                                            ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                                            : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950"
+                                    )}
+                                >
+                                    <Mail className="h-4 w-4" /> Cover Letter
+                                </button>
+                                </div>
+                            </div>
 
-                        <div className="ml-auto flex shrink-0 items-center gap-2">
+                            <div className="flex w-full flex-col gap-1.5 sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:overflow-x-auto">
                             {/* Panel Toggle if closed */}
                             {!isLeftPanelOpen && (
                                 <button 
@@ -1804,39 +1818,81 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                     <PanelLeftOpen className="h-4 w-4" />
                                 </button>
                             )}
-                            <div className="mx-1 h-5 w-px bg-slate-200" />
+                            <div className="hidden h-5 w-px bg-slate-200 sm:block" />
                             {/* Editor Sub-actions based on active tab */}
                             {outputTab === 'resume' && tailoredResume && (
-                                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-1">
-                                    <div className="flex rounded-md bg-white p-0.5">
-                                        <button onClick={() => setResultViewMode('preview')} className={cn("flex items-center gap-1 rounded px-2.5 py-1 text-[11px] font-semibold", resultViewMode === 'preview' ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-950")}>
-                                            <Eye className="h-3 w-3" /> Preview
+                                <div className="grid w-full shrink-0 gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 sm:flex sm:w-auto sm:items-center">
+                                    <div className="grid grid-cols-3 rounded-md bg-white p-0.5 sm:w-auto">
+                                        <button
+                                            onClick={() => setResultViewMode('preview')}
+                                            className={cn("flex h-8 items-center justify-center gap-1 rounded px-2 text-[11px] font-semibold sm:h-9", resultViewMode === 'preview' ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-950")}
+                                            title="Preview"
+                                        >
+                                            <Eye className="h-3.5 w-3.5" /> <span>Preview</span>
                                         </button>
-                                        <button onClick={() => setResultViewMode('edit')} className={cn("flex items-center gap-1 rounded px-2.5 py-1 text-[11px] font-semibold", resultViewMode === 'edit' ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-950")}>
-                                            <PenLine className="h-3 w-3" /> Edit
+                                        <button
+                                            onClick={() => setResultViewMode('edit')}
+                                            className={cn("flex h-8 items-center justify-center gap-1 rounded px-2 text-[11px] font-semibold sm:h-9", resultViewMode === 'edit' ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-950")}
+                                            title="Edit"
+                                        >
+                                            <PenLine className="h-3.5 w-3.5" /> <span>Edit</span>
                                         </button>
-                                        <button onClick={() => setResultViewMode('diff')} className={cn("flex items-center gap-1 rounded px-2.5 py-1 text-[11px] font-semibold", resultViewMode === 'diff' ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-950")}>
-                                            <GitCompare className="h-3 w-3" /> Diff
+                                        <button
+                                            onClick={() => setResultViewMode('diff')}
+                                            className={cn("flex h-8 items-center justify-center gap-1 rounded px-2 text-[11px] font-semibold sm:h-9", resultViewMode === 'diff' ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-950")}
+                                            title="Diff"
+                                        >
+                                            <GitCompare className="h-3.5 w-3.5" /> <span>Diff</span>
                                         </button>
                                     </div>
-                                    {resultViewMode === 'preview' && (
-                                        <div className="ml-1 flex rounded-md bg-white p-0.5">
-                                            {(['modern', 'classic', 'minimal'] as const).map((t) => (
-                                                <button key={t} onClick={() => setSelectedTemplate(t)} className={cn("rounded px-2 py-1 text-[11px] font-semibold capitalize", selectedTemplate === t ? "bg-slate-100 text-slate-950" : "text-slate-500 hover:text-slate-950")}>
-                                                    {t}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                    <button onClick={handleDownloadPDF} disabled={pdfGenerating} className="ml-1 inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50" title="Download PDF">
-                                        {pdfGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-                                        PDF
-                                    </button>
+                                    <div className={cn(
+                                        "grid gap-1 sm:flex sm:items-center",
+                                        resultViewMode === 'preview'
+                                            ? "grid-cols-[minmax(0,1fr)_auto_auto]"
+                                            : hasInsights && !activeAnalysisTab
+                                                ? "grid-cols-2"
+                                                : "grid-cols-1"
+                                    )}>
+                                        {resultViewMode === 'preview' && (
+                                            <>
+                                                <select
+                                                    value={selectedTemplate}
+                                                    onChange={(e) => setSelectedTemplate(e.target.value as typeof selectedTemplate)}
+                                                    className="h-8 min-w-0 rounded-md border border-slate-200 bg-white px-2 text-xs font-semibold capitalize text-slate-700 outline-none sm:hidden"
+                                                    aria-label="Resume template"
+                                                >
+                                                    {(['modern', 'classic', 'minimal'] as const).map((t) => (
+                                                        <option key={t} value={t}>{t}</option>
+                                                    ))}
+                                                </select>
+                                                <div className="hidden rounded-md bg-white p-0.5 sm:flex">
+                                                    {(['modern', 'classic', 'minimal'] as const).map((t) => (
+                                                        <button key={t} onClick={() => setSelectedTemplate(t)} className={cn("h-8 rounded px-2 text-[11px] font-semibold capitalize", selectedTemplate === t ? "bg-slate-100 text-slate-950" : "text-slate-500 hover:text-slate-950")}>
+                                                            {t}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </>
+                                        )}
+                                        <button onClick={handleDownloadPDF} disabled={pdfGenerating} className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50 sm:h-9 sm:px-3" title="Download PDF">
+                                            {pdfGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                                            PDF
+                                        </button>
+                                        {hasInsights && !activeAnalysisTab && (
+                                            <button
+                                                onClick={() => setActiveAnalysisTab('changes')}
+                                                className="inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-950 sm:h-9 sm:bg-slate-950 sm:px-3 sm:text-white sm:hover:bg-slate-800 sm:hover:text-white"
+                                            >
+                                                <ListChecks className="h-3.5 w-3.5 shrink-0" />
+                                                <span className="truncate">Analysis</span>
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             )}
 
                             {outputTab === 'coverLetter' && coverLetter && (
-                                <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-1">
+                                <div className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-1">
                                     <button onClick={() => setIsEditingCoverLetter(!isEditingCoverLetter)} className={cn("px-2.5 py-1 text-[11px] font-bold rounded flex items-center gap-1.5 shadow-sm transition-all", isEditingCoverLetter ? "bg-indigo-100 text-indigo-700" : "bg-white text-slate-600 hover:bg-slate-50")}>
                                         <PenLine className="h-3.5 w-3.5" /> Edit
                                     </button>
@@ -1849,24 +1905,15 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                 </div>
                             )}
 
-                            {/* Show right panel toggle if data exists but panel is closed */}
-                            {((changes.length > 0) || keywordCoverage) && tailoredResume && !activeAnalysisTab && (
-                                <button
-                                    onClick={() => setActiveAnalysisTab('changes')}
-                                    className="ml-1 hidden items-center gap-1.5 rounded-lg bg-slate-950 px-3 py-2 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 lg:flex"
-                                >
-                                    <ListChecks className="h-3.5 w-3.5" />
-                                    Show Analysis
-                                </button>
-                            )}
+                            </div>
                         </div>
                     </div>
 
                     {/* Loading Overlay */}
                     {(loading || coverLetterLoading) && (
                         <div className="absolute inset-0 z-30 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center rounded-b-2xl">
-                            <div className="flex flex-col items-center gap-4 animate-fade-in-up bg-white p-8 rounded-3xl shadow-2xl border border-slate-100">
-                                <div className={cn("w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg bg-gradient-to-br", coverLetterLoading ? 'from-violet-500 to-purple-600' : 'from-indigo-500 to-violet-500')}>
+                            <div className="mx-4 flex flex-col items-center gap-4 rounded-2xl border border-slate-100 bg-white p-6 shadow-xl animate-fade-in-up sm:p-8">
+                                <div className={cn("flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br shadow-lg sm:h-16 sm:w-16", coverLetterLoading ? 'from-violet-500 to-purple-600' : 'from-indigo-500 to-violet-500')}>
                                     {coverLetterLoading ? <Mail className="h-7 w-7 text-white animate-spin" style={{ animationDuration: '3s' }} /> : <Sparkles className="h-7 w-7 text-white animate-spin" style={{ animationDuration: '3s' }} />}
                                 </div>
                                 <div className="text-center">
@@ -1892,7 +1939,8 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                     onAccept={handleAcceptSection}
                                     onReset={handleResetSection}
                                     onTailoredChange={handleSectionTailoredChange}
-                                    onSelectVariant={handleSelectVariant}
+                                    onSetPreferences={handleSetPreferences}
+                                    onSetCustomInstruction={handleSetCustomInstruction}
                                     onAssemble={handleAssembleResume}
                                     isAnyGenerating={isAnySectionGenerating}
                                     canAssemble={canAssembleSections}
@@ -1902,7 +1950,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
 
                         {/* ── Resume / Cover Letter tabs ── */}
                         {outputTab !== 'sections' && (
-                            <div id="print-container" className="custom-scrollbar flex-1 overflow-auto p-4 pb-20 print:overflow-visible print:p-0 md:p-6 lg:pb-6">
+                            <div id="print-container" className="custom-scrollbar flex-1 overflow-auto p-1.5 pb-6 print:overflow-visible print:p-0 sm:p-4 md:p-6 lg:pb-6">
                                 {outputTab === 'resume' ? (
                                     tailoredResume ? (
                                         resultViewMode === 'diff' ? (
@@ -1910,33 +1958,33 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                         ) : resultViewMode === 'edit' ? (
                                             <div className="group/editor relative z-20 mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                                                 <textarea
-                                                    className="custom-scrollbar w-full flex-1 resize-none p-6 font-mono text-[13px] leading-6 text-slate-800 outline-none placeholder:text-slate-300 sm:text-sm"
+                                                    className="custom-scrollbar w-full flex-1 resize-none p-4 pb-20 font-mono text-base leading-6 text-slate-800 outline-none placeholder:text-slate-300 sm:p-6 sm:text-sm"
                                                     placeholder="Edit your tailored resume here..."
                                                     value={tailoredResume}
                                                     onChange={(e) => setTailoredResume(e.target.value)}
                                                     spellCheck={false}
                                                 />
-                                                <button onClick={() => setResultViewMode('preview')} className="absolute bottom-6 right-6 flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800">
+                                                <button onClick={() => setResultViewMode('preview')} className="absolute bottom-4 right-4 flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 sm:bottom-6 sm:right-6">
                                                     <Check className="h-4 w-4 text-emerald-300" /> Done editing
                                                 </button>
                                             </div>
                                         ) : (
                                             <div className="mx-auto min-h-full w-full max-w-[900px]">
-                                                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 shadow-sm">
-                                                    <div className="flex items-center gap-2">
+                                                <div className="mb-2 hidden flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 shadow-sm sm:flex sm:mb-3">
+                                                    <div className="flex min-w-0 items-center gap-2">
                                                         <FileCheck2 className="h-4 w-4 text-emerald-600" />
                                                         <span className="font-semibold text-slate-700">Resume preview</span>
-                                                        <span>{selectedTemplate.charAt(0).toUpperCase() + selectedTemplate.slice(1)} template</span>
+                                                        <span className="truncate">{selectedTemplate.charAt(0).toUpperCase() + selectedTemplate.slice(1)} template</span>
                                                     </div>
-                                                    <span>{hasUnsavedChanges ? 'Save before export for the latest copy.' : saveStatusLabel}</span>
+                                                    <span className="text-[11px]">{hasUnsavedChanges ? 'Save before export for the latest copy.' : saveStatusLabel}</span>
                                                 </div>
-                                                <div className="min-h-[1050px] rounded-xl border border-slate-200 bg-white px-8 py-10 shadow-sm sm:px-12 lg:px-16 print:min-h-0 print:border-0 print:p-0 print:shadow-none">
+                                                <div className="min-h-[78vh] rounded-xl border border-slate-200 bg-white px-5 py-7 shadow-sm sm:min-h-[900px] sm:px-10 sm:py-10 lg:min-h-[1050px] lg:px-16 print:min-h-0 print:border-0 print:p-0 print:shadow-none">
                                                     <ResumePreview content={tailoredResume} title={null} company={null} template={selectedTemplate} />
                                                 </div>
                                             </div>
                                         )
                                     ) : (
-                                        <div className="flex h-full flex-col items-center justify-center text-slate-500">
+                                        <div className="flex h-full flex-col items-center justify-center px-4 text-slate-500">
                                             <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm">
                                                 <FileText className="h-9 w-9 text-slate-400" />
                                             </div>
@@ -1965,19 +2013,19 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                                 />
                                             </div>
                                         ) : (
-                                            <div className="max-w-3xl mx-auto bg-white p-8 lg:p-12 rounded-xl shadow-sm border border-slate-100">
+                                            <div className="mx-auto max-w-3xl rounded-xl border border-slate-100 bg-white p-5 shadow-sm sm:p-8 lg:p-12">
                                                 <div className="font-serif text-[15px] text-slate-800 leading-relaxed whitespace-pre-wrap">{coverLetter}</div>
                                             </div>
                                         )
                                     ) : !coverLetterLoading ? (
-                                        <div className="h-full flex flex-col items-center justify-center px-4 sm:px-0 max-w-2xl mx-auto py-8">
+                                        <div className="mx-auto flex h-full max-w-2xl flex-col items-center justify-center px-2 py-6 sm:px-0 sm:py-8">
                                             <div className="w-16 h-16 rounded-2xl bg-violet-100 flex items-center justify-center mb-6">
                                                 <Mail className="h-8 w-8 text-violet-600" />
                                             </div>
                                             <h2 className="text-xl font-bold text-slate-800 mb-2">AI Cover Letter Generator</h2>
                                             <p className="text-slate-500 text-sm text-center mb-8">Craft a personalized, high-converting cover letter based on your tailored resume and the target job description.</p>
                                             
-                                            <div className="w-full bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                                            <div className="w-full rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
                                                 <h3 className="text-sm font-bold text-slate-700 mb-4">1. Choose a Tone & Style</h3>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
                                                     {([
@@ -2001,9 +2049,9 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                                 </div>
                                                 <div className="mb-6">
                                                     <label className="text-sm font-bold text-slate-700 mb-2 block">2. Custom Instructions <span className="text-slate-400 font-normal">(optional)</span></label>
-                                                    <textarea className="w-full h-24 p-3 resize-none rounded-xl border border-slate-200 text-sm text-slate-700 placeholder:text-slate-300 outline-none focus:border-violet-300 focus:ring-4 focus:ring-violet-100 transition-all custom-scrollbar" placeholder='e.g., "Emphasize my experience leading remote teams" or "Mention my passion for AI"' value={coverLetterInstructions} onChange={(e) => setCoverLetterInstructions(e.target.value)} />
+                                                    <textarea className="custom-scrollbar h-24 w-full resize-none rounded-xl border border-slate-200 p-3 text-base text-slate-700 outline-none transition-all placeholder:text-slate-300 focus:border-violet-300 focus:ring-4 focus:ring-violet-100 sm:text-sm" placeholder='e.g., "Emphasize my experience leading remote teams" or "Mention my passion for AI"' value={coverLetterInstructions} onChange={(e) => setCoverLetterInstructions(e.target.value)} />
                                                 </div>
-                                                <button onClick={handleGenerateCoverLetter} disabled={coverLetterLoading || !resumeText || !jobDescription} className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3.5 text-sm font-bold text-white shadow-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-xl hover:-translate-y-0.5">
+                                                <button onClick={handleGenerateCoverLetter} disabled={coverLetterLoading || !resumeText || !jobDescription} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50">
                                                     <Sparkles className="h-4 w-4 text-violet-400" /> Generate Cover Letter
                                                 </button>
                                             </div>
@@ -2019,12 +2067,12 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                 {((changes.length > 0) || keywordCoverage) && tailoredResume && (
                     <>
                         {/* Mobile: Bottom Sheet Overlay */}
-                        <div className={cn("lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity", activeAnalysisTab ? "opacity-100" : "opacity-0 pointer-events-none")} onClick={() => setActiveAnalysisTab(null)} />
+                        <div className={cn("fixed inset-0 z-40 bg-slate-950/35 transition-opacity lg:hidden", activeAnalysisTab ? "opacity-100" : "pointer-events-none opacity-0")} onClick={() => setActiveAnalysisTab(null)} />
                         
                         <div className={cn(
-                            "transition-all duration-300 ease-in-out shrink-0 flex flex-col gap-3 h-full z-50 lg:z-auto",
+                            "z-[60] flex h-full shrink-0 flex-col gap-3 transition-all duration-300 ease-in-out lg:z-auto",
                             // Mobile: Fixed bottom sheet
-"fixed lg:static bottom-0 left-0 right-0 max-h-[85vh] rounded-t-2xl lg:rounded-2xl bg-white lg:bg-transparent shadow-2xl lg:shadow-none",
+                            "fixed bottom-0 left-0 right-0 max-h-[calc(100dvh-4rem)] rounded-t-2xl bg-white pb-[env(safe-area-inset-bottom)] shadow-xl lg:static lg:max-h-none lg:rounded-2xl lg:bg-transparent lg:pb-0 lg:shadow-none",
                             // Desktop width handling
                             activeAnalysisTab ? "translate-y-0 lg:w-[320px] xl:w-[350px] opacity-100" : "translate-y-full lg:translate-y-0 lg:w-0 lg:opacity-0 lg:p-0 lg:overflow-hidden lg:hidden"
                         )}>
@@ -2214,13 +2262,47 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                 </button>
             )}
 
-            {/* Mobile FAB for Analysis */}
-            {((changes.length > 0) || keywordCoverage) && !activeAnalysisTab && tailoredResume && mobileTab === 'result' && (
-                <button onClick={() => setActiveAnalysisTab('changes')} className="lg:hidden fixed right-6 bottom-24 z-30 flex items-center gap-2 px-5 py-3.5 bg-slate-900 text-white rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all">
-                    <Sparkles className="h-4 w-4 text-indigo-400" />
-                    <span className="text-sm font-bold">Insights</span>
-                </button>
+            {/* Mobile Side Menu Overlay */}
+            {isMobileNavOpen && (
+                <div className="fixed inset-0 z-[100] lg:hidden flex justify-start">
+                    <div 
+                        className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm animate-in fade-in duration-300" 
+                        onClick={() => setIsMobileNavOpen(false)} 
+                    />
+                    <div className="relative w-[280px] h-full bg-white shadow-2xl flex flex-col animate-in slide-in-from-left duration-300">
+                        <div className="flex items-center justify-between p-4 border-b border-slate-100">
+                            <span className="font-bold text-slate-900">Workspace Menu</span>
+                            <button 
+                                onClick={() => setIsMobileNavOpen(false)}
+                                className="p-2 -mr-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                            {([
+                                { href: '/', label: 'Dashboard', Icon: Home },
+                                { href: '/profile', label: 'Master Profile', Icon: UserCheck },
+                                { href: '/new', label: 'New Application', Icon: PlusCircle },
+                                { href: '/settings', label: 'Settings', Icon: Settings },
+                            ] as const).map(({ href, label, Icon }) => (
+                                <Link
+                                    key={href}
+                                    href={href}
+                                    onClick={() => setIsMobileNavOpen(false)}
+                                    className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-600 group"
+                                >
+                                    <Icon className="h-5 w-5 text-slate-400 group-hover:text-indigo-500 transition-colors" />
+                                    {label}
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
 }
+
+
+

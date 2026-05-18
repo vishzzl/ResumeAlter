@@ -25,14 +25,15 @@ export function MainNav({ user }: MainNavProps) {
     }, [user, pathname, router]);
 
     const isAuthPage = pathname === '/login' || pathname === '/register';
-    if (isAuthPage && !user) {
+    const isApplicationWorkspace = /^\/applications\/[^/]+$/.test(pathname);
+    if ((isAuthPage && !user) || isApplicationWorkspace) {
         return null;
     }
 
     const isActive = (path: string) => pathname === path;
 
     return (
-        <header className="sticky top-0 z-40 w-full border-b border-slate-200/50 dark:border-slate-800/50 bg-white/70 dark:bg-slate-950/70 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 lg:hidden transition-colors duration-300">
+        <header className="sticky top-0 z-40 w-full border-b border-slate-200/50 dark:border-slate-800/50 bg-white/70 dark:bg-slate-950/70 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 lg:hidden transition-colors duration-300 overflow-visible">
             <div className="flex h-14 md:h-16 items-center px-4 justify-between">
                 {/* Mobile Logo */}
                 <Link href="/" className="flex items-center gap-2 font-bold text-lg text-slate-900 dark:text-slate-100 group">
@@ -61,7 +62,7 @@ export function MainNav({ user }: MainNavProps) {
 
             {/* Mobile Menu Overlay */}
             {isMenuOpen && (
-                <div className="lg:hidden border-t border-slate-200/50 dark:border-slate-800/50 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl absolute w-full left-0 animate-in slide-in-from-top-2 fade-in duration-200 shadow-2xl">
+                <div className="lg:hidden border-t border-slate-200/50 dark:border-slate-800/50 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl absolute w-full left-0 z-50 animate-in slide-in-from-top-2 fade-in duration-200 shadow-2xl">
                     <div className="px-4 py-4 flex flex-col gap-2">
                         {user && (
                             <div className="mb-4 pb-4 border-b border-slate-100 dark:border-slate-800/50 flex items-center justify-between px-2">

@@ -1,81 +1,69 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import {
     Loader2, Sparkles, RefreshCw, Check, RotateCcw,
     ChevronDown, ChevronUp, GitCompare, PenLine, Eye,
     CheckCircle2, AlertCircle, Clock, Layers, Wand2,
     FileText, GraduationCap, Briefcase, Code2, FolderOpen, Award,
-    Trophy, Zap, Target
+    Hash, KeyRound, Scissors, AlignLeft, TextSelect
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DiffViewer } from '@/components/DiffViewer';
+import { SectionPreference } from '@/lib/tailoring-prompts';
 
 export type SectionName = 'summary' | 'skills' | 'experience' | 'education' | 'projects' | 'other';
 export type SectionStatus = 'idle' | 'generating' | 'done' | 'error';
 
-export interface SectionVariant {
-    model: string;
-    focus: string;
-    text: string;
-    score: number;
-    scoreBreakdown: { keyword: number; format: number; groundedness: number };
-}
-
 export interface SectionState {
     original: string;
-    tailored: string;           // currently active/selected tailored text
-    variants: SectionVariant[]; // all 3 generated candidates
-    selectedVariantIndex: number;
+    tailored: string;
     status: SectionStatus;
     accepted: boolean;
     error?: string;
+    preferences: SectionPreference[];
+    customInstruction: string;
 }
 
 export type SectionsState = Record<SectionName, SectionState>;
 
 interface SectionWiseEditorProps {
     sections: SectionsState;
-    fullOriginalResume: string;          // full resume text for hallucination scanner
+    fullOriginalResume: string;
     onGenerate: (sectionName: SectionName) => void;
     onGenerateAll: () => void;
     onAccept: (sectionName: SectionName) => void;
     onReset: (sectionName: SectionName) => void;
     onTailoredChange: (sectionName: SectionName, value: string) => void;
-    onSelectVariant: (sectionName: SectionName, index: number) => void;
+    onSetPreferences: (sectionName: SectionName, prefs: SectionPreference[]) => void;
+    onSetCustomInstruction: (sectionName: SectionName, text: string) => void;
     onAssemble: () => void;
     isAnyGenerating: boolean;
     canAssemble: boolean;
-    jdAnalysisTitle?: string;            // optional: show analyzed role title in header
+    jdAnalysisTitle?: string;
 }
 
 // ─── Client-side hallucination scanner ───────────────────────────────────────────────
-// Pure text matching — zero latency, zero API calls.
-// Compares proper nouns and numbers in generated text against the FULL original resume.
 function detectHallucinations(generated: string, fullOriginal: string): string[] {
     if (!fullOriginal || !generated) return [];
     const origLower = fullOriginal.toLowerCase();
     const suspicious: string[] = [];
 
-    // Check percentages: any "42%" not in original is suspicious
     const pcts = generated.match(/\b\d+%/g) || [];
     for (const p of pcts) {
         if (!origLower.includes(p.toLowerCase())) suspicious.push(p);
     }
 
-    // Check numbers with units: "400ms", "6 engineers", "35k users"
     const nums = generated.match(/\b\d+\.?\d*\s*(?:ms|k|M|B|x|\busers\b|\bengineers\b|\bclients\b)/gi) || [];
     for (const n of nums) {
         if (!origLower.includes(n.toLowerCase().trim())) suspicious.push(n.trim());
     }
 
-    // Check standalone 2+ digit numbers
     const digits = generated.match(/\b\d{2,}\b/g) || [];
     for (const d of digits) {
         if (!origLower.includes(d)) suspicious.push(d);
     }
 
-    // Check proper nouns (CamelCase or TitleCase, 4+ chars)
     const skip = new Set(['This','With','From','Into','Over','Under','Through','Using',
         'Resume','Company','Client','Role','Team','Lead','Staff','Senior','Junior',
         'Product','Platform','Service','System','Project','Feature','Module']);
@@ -98,130 +86,54 @@ const SECTION_META: Record<SectionName, {
     Icon: React.ElementType;
     iconBg: string;
     iconColor: string;
-    ringColor: string;
-    badgeBg: string;
-    badgeText: string;
 }> = {
     summary: {
         label: 'Summary',
         description: '2–3 sentences targeting the role + years of experience',
         Icon: FileText,
         iconBg: 'bg-indigo-100', iconColor: 'text-indigo-600',
-        ringColor: 'ring-indigo-300', badgeBg: 'bg-indigo-50', badgeText: 'text-indigo-700',
     },
     skills: {
         label: 'Skills',
         description: 'Grouped categories matched to JD keywords',
         Icon: Code2,
         iconBg: 'bg-violet-100', iconColor: 'text-violet-600',
-        ringColor: 'ring-violet-300', badgeBg: 'bg-violet-50', badgeText: 'text-violet-700',
     },
     experience: {
         label: 'Experience',
         description: 'STAR-method bullets, client sub-sections preserved',
         Icon: Briefcase,
         iconBg: 'bg-blue-100', iconColor: 'text-blue-600',
-        ringColor: 'ring-blue-300', badgeBg: 'bg-blue-50', badgeText: 'text-blue-700',
     },
     education: {
         label: 'Education',
         description: 'Formatted exactly from your original',
         Icon: GraduationCap,
         iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600',
-        ringColor: 'ring-emerald-300', badgeBg: 'bg-emerald-50', badgeText: 'text-emerald-700',
     },
     projects: {
         label: 'Projects',
         description: 'Top 5 JD-relevant projects',
         Icon: FolderOpen,
         iconBg: 'bg-amber-100', iconColor: 'text-amber-600',
-        ringColor: 'ring-amber-300', badgeBg: 'bg-amber-50', badgeText: 'text-amber-700',
     },
     other: {
         label: 'Certifications',
         description: 'Awards & certs reordered by relevance',
         Icon: Award,
         iconBg: 'bg-rose-100', iconColor: 'text-rose-600',
-        ringColor: 'ring-rose-300', badgeBg: 'bg-rose-50', badgeText: 'text-rose-700',
     },
 };
 
 export const SECTION_ORDER: SectionName[] = ['summary', 'skills', 'experience', 'education', 'projects', 'other'];
 
-// ─── Score badge with breakdown tooltip ───────────────────────────────────────────────
-function ScoreBadge({ score, breakdown, isWinner }: {
-    score: number;
-    breakdown?: { keyword: number; format: number; groundedness: number };
-    isWinner?: boolean;
-}) {
-    const color = score >= 75 ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-        : score >= 50 ? 'text-amber-700 bg-amber-50 border-amber-200'
-            : 'text-red-700 bg-red-50 border-red-200';
-    const title = breakdown
-        ? `Score: ${score}%\nKeywords: ${breakdown.keyword}%\nFormat: ${breakdown.format}%\nGroundedness: ${breakdown.groundedness}%`
-        : `Score: ${score}%`;
-    return (
-        <span
-            title={title}
-            className={cn(
-                'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border cursor-help',
-                color,
-                isWinner && 'ring-1 ring-emerald-400'
-            )}
-        >
-            {isWinner && <Trophy className="h-2.5 w-2.5" />}
-            {score}%
-        </span>
-    );
-}
-
-// ─── Variant selector tabs ────────────────────────────────────────────────────
-function VariantTabs({
-    variants,
-    selectedIndex,
-    onSelect,
-}: {
-    variants: SectionVariant[];
-    selectedIndex: number;
-    onSelect: (i: number) => void;
-}) {
-    const labels = ['A', 'B', 'C'];
-    const modelIcons = [Sparkles, Zap, Target];
-
-    return (
-        <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">
-                {variants.length} Variants
-            </span>
-            {variants.map((v, i) => {
-                const Icon = modelIcons[i] || Sparkles;
-                const isSelected = i === selectedIndex;
-                const isWinner = i === 0; // sorted by score, so index 0 is always winner
-
-                return (
-                    <button
-                        key={i}
-                        onClick={() => onSelect(i)}
-                        title={`${v.model}\n${v.focus}\nScore: ${v.score}% (Keywords: ${v.scoreBreakdown?.keyword ?? '?'}% | Format: ${v.scoreBreakdown?.format ?? '?'}% | Grounded: ${v.scoreBreakdown?.groundedness ?? '?'}%)`}
-                        className={cn(
-                            'flex items-center gap-1.5 px-2.5 py-1 rounded-lg border-2 text-[11px] font-semibold transition-all duration-150',
-                            isSelected
-                                ? 'border-indigo-400 bg-indigo-50 text-indigo-700 shadow-sm'
-                                : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50'
-                        )}
-                    >
-                        <Icon className="h-3 w-3" />
-                        <span>{labels[i]}</span>
-                        <ScoreBadge score={v.score} breakdown={v.scoreBreakdown} isWinner={isWinner && isSelected} />
-                        {isWinner && (
-                            <span className="text-[9px] font-bold text-emerald-600">★</span>
-                        )}
-                    </button>
-                );
-            })}
-        </div>
-    );
-}
+const PREFERENCE_OPTIONS: { id: SectionPreference; label: string; icon: React.ElementType }[] = [
+    { id: 'quantify', label: 'Quantify', icon: Hash },
+    { id: 'keywords', label: 'Keyword-Heavy', icon: KeyRound },
+    { id: 'concise', label: 'Concise', icon: Scissors },
+    { id: 'detailed', label: 'Detailed', icon: AlignLeft },
+    { id: 'reword', label: 'Reword Only', icon: TextSelect },
+];
 
 // ─── Individual Section Card ──────────────────────────────────────────────────
 function SectionCard({
@@ -232,7 +144,8 @@ function SectionCard({
     onAccept,
     onReset,
     onTailoredChange,
-    onSelectVariant,
+    onSetPreferences,
+    onSetCustomInstruction,
     isAnyGenerating,
 }: {
     name: SectionName;
@@ -242,29 +155,35 @@ function SectionCard({
     onAccept: (n: SectionName) => void;
     onReset: (n: SectionName) => void;
     onTailoredChange: (n: SectionName, v: string) => void;
-    onSelectVariant: (n: SectionName, i: number) => void;
+    onSetPreferences: (n: SectionName, prefs: SectionPreference[]) => void;
+    onSetCustomInstruction: (n: SectionName, text: string) => void;
     isAnyGenerating: boolean;
 }) {
     const meta = SECTION_META[name];
     const [showOriginal, setShowOriginal] = useState(false);
     const [viewMode, setViewMode] = useState<'preview' | 'edit' | 'diff'>('preview');
+    const [showPreferences, setShowPreferences] = useState(false);
     const Icon = meta.Icon;
 
     const isGenerating = state.status === 'generating';
     const isDone = state.status === 'done';
     const isError = state.status === 'error';
-    const hasVariants = state.variants.length > 0;
     const hasContent = !!state.tailored;
-    const currentVariant = hasVariants ? state.variants[state.selectedVariantIndex] : null;
 
-    // Run hallucination scanner on the currently active tailored text
     const hallucinationWarnings = isDone && state.tailored
         ? detectHallucinations(state.tailored, fullOriginalResume)
         : [];
 
+    const togglePreference = (pref: SectionPreference) => {
+        const current = new Set(state.preferences);
+        if (current.has(pref)) current.delete(pref);
+        else current.add(pref);
+        onSetPreferences(name, Array.from(current));
+    };
+
     return (
         <div className={cn(
-            'rounded-2xl border-2 transition-all duration-300 overflow-hidden shadow-sm hover:shadow-md',
+            'overflow-hidden rounded-xl border-2 shadow-sm transition-all duration-300 sm:rounded-2xl sm:hover:shadow-md',
             state.accepted
                 ? 'border-emerald-300 bg-emerald-50/40 shadow-emerald-100'
                 : isDone
@@ -273,10 +192,8 @@ function SectionCard({
                         ? 'border-red-200 bg-red-50/30'
                         : 'border-slate-200 bg-white',
         )}>
-
             {/* ─ Card Header ─ */}
-            <div className="px-4 py-3 flex items-center gap-3">
-                {/* Icon */}
+            <div className="flex flex-wrap items-start gap-3 px-3 py-3 sm:flex-nowrap sm:items-center sm:px-4">
                 <div className={cn(
                     'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors',
                     state.accepted ? 'bg-emerald-100' : meta.iconBg,
@@ -291,7 +208,6 @@ function SectionCard({
                     }
                 </div>
 
-                {/* Label + status */}
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-sm font-bold text-slate-800">{meta.label}</h3>
@@ -303,7 +219,7 @@ function SectionCard({
                         )}
                         {isGenerating && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 animate-pulse">
-                                <Loader2 className="h-2.5 w-2.5 animate-spin" /> Generating 3 variants...
+                                <Loader2 className="h-2.5 w-2.5 animate-spin" /> Tailoring...
                             </span>
                         )}
                         {isError && (
@@ -316,60 +232,32 @@ function SectionCard({
                                 <Clock className="h-2.5 w-2.5" /> Review
                             </span>
                         )}
-
-                        {/* Current variant score with breakdown */}
-                        {currentVariant && !isGenerating && (
-                            <ScoreBadge
-                                score={currentVariant.score}
-                                breakdown={currentVariant.scoreBreakdown}
-                                isWinner={state.selectedVariantIndex === 0}
-                            />
-                        )}
                     </div>
                     <p className="text-[11px] text-slate-400 mt-0.5 truncate">{meta.description}</p>
                 </div>
 
-                {/* Action buttons */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                    {!hasContent && !isGenerating && (
-                        <button
-                            onClick={() => onGenerate(name)}
-                            disabled={isAnyGenerating}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
-                        >
-                            <Wand2 className="h-3 w-3" />
-                            Generate
-                        </button>
-                    )}
+                <div className="ml-auto flex shrink-0 items-center gap-1.5">
                     {hasContent && !isGenerating && (
                         <>
                             {!state.accepted ? (
                                 <button
                                     onClick={() => onAccept(name)}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 transition-all shadow-sm"
+                                    className="inline-flex h-9 items-center gap-1 rounded-lg bg-emerald-500 px-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-600"
                                 >
                                     <Check className="h-3 w-3" /> Accept
                                 </button>
                             ) : (
                                 <button
                                     onClick={() => onAccept(name)}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-white text-emerald-700 text-xs font-semibold hover:bg-emerald-50 transition-all"
+                                    className="inline-flex h-9 items-center gap-1 rounded-lg border border-emerald-300 bg-white px-2.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
                                 >
                                     <CheckCircle2 className="h-3 w-3" /> Accepted
                                 </button>
                             )}
                             <button
-                                onClick={() => onGenerate(name)}
-                                disabled={isAnyGenerating}
-                                title="Regenerate all 3 variants"
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-medium hover:bg-slate-50 disabled:opacity-40 transition-all"
-                            >
-                                <RefreshCw className="h-3 w-3" /> Redo
-                            </button>
-                            <button
                                 onClick={() => onReset(name)}
                                 title="Clear and reset"
-                                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-red-500 hover:border-red-200 transition-all"
+                                className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-colors hover:border-red-200 hover:text-red-500"
                             >
                                 <RotateCcw className="h-3 w-3" />
                             </button>
@@ -378,21 +266,72 @@ function SectionCard({
                 </div>
             </div>
 
+            {/* ─ Optimization Controls ─ */}
+            {(!hasContent || showPreferences) && !isGenerating && !isError && (
+                <div className="px-4 py-3 bg-slate-50 border-t border-slate-100 flex flex-col gap-3">
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Optimization Preferences</p>
+                        <div className="flex flex-wrap gap-2">
+                            {PREFERENCE_OPTIONS.map(opt => {
+                                const active = state.preferences.includes(opt.id);
+                                const OptIcon = opt.icon;
+                                return (
+                                    <button
+                                        key={opt.id}
+                                        onClick={() => togglePreference(opt.id)}
+                                        className={cn(
+                                            "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-all",
+                                            active
+                                                ? "border-indigo-400 bg-indigo-50 text-indigo-700 shadow-sm"
+                                                : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50"
+                                        )}
+                                    >
+                                        <OptIcon className="h-3 w-3" />
+                                        {opt.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                    <div>
+                        <input
+                            type="text"
+                            placeholder="Custom instructions (optional)... e.g., 'emphasize leadership' or 'keep it under 3 bullets'"
+                            value={state.customInstruction}
+                            onChange={(e) => onSetCustomInstruction(name, e.target.value)}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-base outline-none transition-all placeholder:text-slate-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 sm:text-[12px]"
+                        />
+                    </div>
+                    <div className="flex justify-end">
+                        <button
+                            onClick={() => {
+                                setShowPreferences(false);
+                                onGenerate(name);
+                            }}
+                            disabled={isAnyGenerating}
+                            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-slate-900 px-4 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            {hasContent ? <RefreshCw className="h-3 w-3" /> : <Wand2 className="h-3 w-3" />}
+                            {hasContent ? 'Regenerate' : 'Generate'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* ─ Content Area ─ */}
             {(hasContent || isGenerating || isError) && (
                 <div className="border-t border-slate-100">
+                    {/* Toolbar row */}
+                    {hasContent && !isGenerating && !showPreferences && (
+                        <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+                            <button
+                                onClick={() => setShowPreferences(true)}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-all"
+                            >
+                                <Settings2Icon className="h-3 w-3" /> Customize Output
+                            </button>
 
-                    {/* Variant selector row */}
-                    {hasVariants && !isGenerating && (
-                        <div className="px-4 py-2.5 bg-slate-50/80 border-b border-slate-100 flex items-center gap-3 flex-wrap">
-                            <VariantTabs
-                                variants={state.variants}
-                                selectedIndex={state.selectedVariantIndex}
-                                onSelect={(i) => onSelectVariant(name, i)}
-                            />
-
-                            {/* View mode + original toggle */}
-                            <div className="ml-auto flex items-center gap-1">
+                            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
                                 <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-lg p-0.5">
                                     {([
                                         { mode: 'preview' as const, Icon: Eye },
@@ -428,24 +367,15 @@ function SectionCard({
                         </div>
                     )}
 
-                    {/* Variant model info + hallucination warnings */}
-                    {currentVariant && !isGenerating && (
-                        <div className="px-4 py-1.5 bg-white border-b border-slate-50 flex items-center gap-2 flex-wrap">
-                            <span className="text-[10px] font-semibold text-slate-500">{currentVariant.model}</span>
-                            <span className="text-slate-300">·</span>
-                            <span className="text-[10px] text-slate-400 italic">{currentVariant.focus}</span>
-                        </div>
-                    )}
-
                     {/* Hallucination warning banner */}
                     {hallucinationWarnings.length > 0 && !isGenerating && (
-                        <div className="mx-4 mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 flex items-start gap-2">
+                        <div className="mx-3 mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 sm:mx-4">
                             <AlertCircle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
                             <div>
                                 <p className="text-[11px] font-semibold text-amber-700">
                                     {hallucinationWarnings.length} item{hallucinationWarnings.length > 1 ? 's' : ''} not found in original — verify before accepting
                                 </p>
-                                <p className="text-[10px] text-amber-600 mt-0.5">
+                                <p className="mt-0.5 break-words text-[10px] text-amber-600">
                                     {hallucinationWarnings.map(w => `"${w}"`).join(' · ')}
                                 </p>
                             </div>
@@ -470,14 +400,11 @@ function SectionCard({
                                     <Sparkles className="h-4 w-4 text-white animate-pulse" />
                                 </div>
                                 <div>
-                                    <p className="text-sm font-semibold text-slate-700">Generating 3 variants in parallel...</p>
-                                    <p className="text-[11px] text-slate-400 mt-0.5">
-                                        Gemini (balanced) · Ring (keyword-dense) · Laguna (impact) — all with full resume context
-                                    </p>
-                                    <div className="mt-2 flex gap-1.5">
-                                        {['Gemini', 'Ring', 'Laguna'].map((m) => (
-                                            <span key={m} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-500 animate-pulse">
-                                                <Loader2 className="h-2.5 w-2.5 animate-spin" /> {m}
+                                    <p className="text-sm font-semibold text-slate-700">Tailoring section with your preferences...</p>
+                                    <div className="mt-2 flex gap-1.5 flex-wrap">
+                                        {state.preferences.map((p) => (
+                                            <span key={p} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-500 animate-pulse">
+                                                <Loader2 className="h-2.5 w-2.5 animate-spin" /> {PREFERENCE_OPTIONS.find(o => o.id === p)?.label || p}
                                             </span>
                                         ))}
                                     </div>
@@ -489,12 +416,12 @@ function SectionCard({
                                 <p className="text-[11px] text-red-500 mt-0.5">{state.error || 'Unknown error'}</p>
                             </div>
                         ) : viewMode === 'diff' ? (
-                            <div className="overflow-auto max-h-80">
+                            <div className="max-h-[70dvh] overflow-auto sm:max-h-80">
                                 <DiffViewer oldText={state.original} newText={state.tailored} />
                             </div>
                         ) : viewMode === 'edit' ? (
                             <textarea
-                                className="w-full min-h-[120px] text-[13px] text-slate-800 bg-white border border-slate-200 rounded-lg p-3 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 resize-y font-mono leading-relaxed transition-all"
+                                className="min-h-[160px] w-full resize-y rounded-lg border border-slate-200 bg-white p-3 font-mono text-base leading-relaxed text-slate-800 outline-none transition-all focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 sm:min-h-[120px] sm:text-[13px]"
                                 value={state.tailored}
                                 onChange={e => onTailoredChange(name, e.target.value)}
                                 spellCheck={false}
@@ -509,6 +436,29 @@ function SectionCard({
             )}
         </div>
     );
+}
+
+// ─── Dummy icon for toolbar ───────────────────────────────────────────────────
+function Settings2Icon(props: React.SVGProps<SVGSVGElement>) {
+    return (
+        <svg
+            {...props}
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M20 7h-9" />
+            <path d="M14 17H5" />
+            <circle cx="17" cy="17" r="3" />
+            <circle cx="7" cy="7" r="3" />
+        </svg>
+    )
 }
 
 // ─── Progress bar ─────────────────────────────────────────────────────────────
@@ -541,7 +491,8 @@ export function SectionWiseEditor({
     onAccept,
     onReset,
     onTailoredChange,
-    onSelectVariant,
+    onSetPreferences,
+    onSetCustomInstruction,
     onAssemble,
     isAnyGenerating,
     canAssemble,
@@ -553,17 +504,17 @@ export function SectionWiseEditor({
     return (
         <div className="flex flex-col h-full">
             {/* ─ Header ─ */}
-            <div className="shrink-0 px-4 py-3 bg-white border-b border-slate-100 flex items-center gap-3 flex-wrap">
-                <div className="flex items-center gap-2 mr-auto">
+            <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-slate-100 bg-white px-3 py-3 sm:px-4">
+                <div className="mr-auto flex min-w-0 items-center gap-2">
                     <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-sm">
                         <Layers className="h-3.5 w-3.5 text-white" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                         <p className="text-xs font-bold text-slate-800">Section Builder</p>
-                        <p className="text-[10px] text-slate-400">
+                        <p className="truncate text-[10px] text-slate-400">
                             {jdAnalysisTitle
-                                ? <><span className="text-indigo-500 font-semibold">✓ {jdAnalysisTitle}</span> · 3 variants · scored</>
-                                : '3 variants per section · keyword-scored · ranked'
+                                ? <><span className="text-indigo-500 font-semibold">✓ {jdAnalysisTitle}</span> · Custom preferences</>
+                                : 'Tailor sections with custom preferences'
                             }
                         </p>
                     </div>
@@ -572,17 +523,17 @@ export function SectionWiseEditor({
                 <button
                     onClick={onGenerateAll}
                     disabled={isAnyGenerating}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
+                    className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
                 >
                     {isAnyGenerating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                    {isAnyGenerating ? 'Generating...' : 'Generate All (3×6)'}
+                    {isAnyGenerating ? 'Generating...' : 'Generate All'}
                 </button>
 
                 <button
                     onClick={onAssemble}
                     disabled={!canAssemble}
                     title={canAssemble ? 'Assemble accepted sections into final resume' : 'Accept at least one section first'}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
+                    className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
                 >
                     <FileText className="h-3 w-3" />
                     Assemble Resume
@@ -602,7 +553,7 @@ export function SectionWiseEditor({
             )}
 
             {/* ─ Section cards ─ */}
-            <div className="flex-1 overflow-auto p-4 space-y-3 pb-24 lg:pb-6">
+            <div className="flex-1 space-y-3 overflow-auto p-3 pb-6 sm:p-4 lg:pb-6">
                 {SECTION_ORDER.map(name => (
                     <SectionCard
                         key={name}
@@ -613,7 +564,8 @@ export function SectionWiseEditor({
                         onAccept={onAccept}
                         onReset={onReset}
                         onTailoredChange={onTailoredChange}
-                        onSelectVariant={onSelectVariant}
+                        onSetPreferences={onSetPreferences}
+                        onSetCustomInstruction={onSetCustomInstruction}
                         isAnyGenerating={isAnyGenerating}
                     />
                 ))}
