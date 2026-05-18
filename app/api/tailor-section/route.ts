@@ -6,14 +6,12 @@ import {
     JDAnalysis,
     SECTION_SYSTEM_INSTRUCTION,
     TailorableSectionName,
+    SectionPreference,
     buildSectionTailoringPrompt,
     mergeJDAnalysis,
-    parseSectionCandidateResponse,
+    parseSectionResponse,
 } from '@/lib/tailoring-prompts';
-import {
-    extractKeywordHints,
-    scoreSectionCandidate,
-} from '@/lib/ats-scoring';
+import { extractKeywordHints } from '@/lib/ats-scoring';
 
 export const maxDuration = 90;
 
@@ -36,6 +34,8 @@ export async function POST(req: NextRequest) {
         resume,
         jobDescription,
         jdAnalysis: incomingJdAnalysis,
+        preferences,
+        customInstruction,
         apiKey,
         modelProvider,
         modelName,
@@ -45,6 +45,8 @@ export async function POST(req: NextRequest) {
         resume: string;
         jobDescription: string;
         jdAnalysis?: Partial<JDAnalysis>;
+        preferences?: SectionPreference[];
+        customInstruction?: string;
         apiKey?: string;
         modelProvider?: string;
         modelName?: string;
@@ -74,7 +76,8 @@ export async function POST(req: NextRequest) {
         else provider = 'local';
     }
 
-    console.log(`[tailor-section] guarded variants: section=${sectionName}, provider=${provider}, model=${modelName || 'default'}`);
+    const prefLabels = (preferences || ['quantify', 'keywords']).join('+');
+    console.log(`[tailor-section] section=${sectionName}, provider=${provider}, prefs=${prefLabels}`);
 
     const sections = parseResumeSections(resume);
     const keywordHints = extractKeywordHints(jobDescription);
@@ -92,6 +95,8 @@ export async function POST(req: NextRequest) {
                         sections,
                         jobDescription,
                         jdAnalysis: mergedJdAnalysis,
+                        preferences,
+                        customInstruction,
                     }),
                     systemInstruction: SECTION_SYSTEM_INSTRUCTION,
                     provider: provider!,
@@ -104,55 +109,21 @@ export async function POST(req: NextRequest) {
 
                 let parsed;
                 try {
-                    parsed = parseSectionCandidateResponse(raw);
+                    parsed = parseSectionResponse(raw);
                 } catch {
                     parsed = {
-                        candidates: [{
-                            model: 'Balanced ATS',
-                            focus: 'Fallback single variant from model text',
-                            text: stripFences(raw),
-                        }],
-                        warnings: ['Model did not return JSON candidates.'],
+                        text: stripFences(raw),
+                        warnings: ['Model did not return expected JSON format.'],
                     };
                 }
 
-                const candidates = parsed.candidates
-                    .slice(0, 3)
-                    .map(candidate => {
-                        const scored = scoreSectionCandidate({
-                            sectionName,
-                            candidateText: candidate.text,
-                            originalResume: resume,
-                            requiredKeywords: mergedJdAnalysis.requiredSkills,
-                            preferredKeywords: mergedJdAnalysis.preferredSkills,
-                        });
-                        return {
-                            model: candidate.model,
-                            focus: candidate.focus,
-                            text: candidate.text,
-                            score: scored.score,
-                            scoreBreakdown: scored.scoreBreakdown,
-                        };
-                    })
-                    .sort((a, b) => b.score - a.score);
-
-                const finalCandidates = candidates.length > 0
-                    ? candidates
-                    : [{
-                        model: 'Original Section',
-                        focus: 'No generated candidate was usable; preserved source content',
-                        text: sections[sectionName],
-                        score: 0,
-                        scoreBreakdown: { keyword: 0, format: 0, groundedness: 100 },
-                    }];
+                const finalText = parsed.text || sections[sectionName] || '';
 
                 sendSSE(controller, encoder, {
                     phase: 'complete',
                     sectionName,
                     data: {
-                        candidates: finalCandidates,
-                        recommendedIndex: 0,
-                        tailoredSection: finalCandidates[0].text,
+                        tailoredSection: finalText,
                         warnings: parsed.warnings,
                     },
                 });
