@@ -321,7 +321,7 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
                                 </div>
 
                                 {/* Cards */}
-                                <div className="p-4 flex-1 overflow-y-auto space-y-4 custom-scrollbar relative">
+                                <div className="p-4 flex-1 overflow-y-auto overflow-x-hidden space-y-4 custom-scrollbar relative">
                                     {colApps.length === 0 && (
                                         <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none opacity-50">
                                             <div className="w-16 h-16 rounded-3xl bg-slate-200/50 dark:bg-slate-800/50 border border-slate-300/50 dark:border-slate-700/50 flex items-center justify-center mb-4 backdrop-blur-sm">
@@ -368,16 +368,16 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
 
                                                 <Link href={`/applications/${app.id}`} className="block p-5">
                                                     {/* Title */}
-                                                    <div className="flex justify-between items-start gap-3">
-                                                        <h4 className="font-extrabold text-base text-slate-800 dark:text-slate-100 truncate leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                                                    <div className="flex justify-between items-start gap-3 min-w-0">
+                                                        <h4 className="font-extrabold text-base text-slate-800 dark:text-slate-100 truncate min-w-0 flex-1 leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                                                             {app.jobTitle || 'Untitled Position'}
                                                         </h4>
                                                     </div>
 
                                                     {/* Company */}
-                                                    <div className="flex items-center gap-2 mt-1.5 opacity-80">
+                                                    <div className="flex items-center gap-2 mt-1.5 opacity-80 min-w-0">
                                                         <Briefcase className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
-                                                        <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 truncate">
+                                                        <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 truncate min-w-0 flex-1">
                                                             {app.companyName || 'Unknown Company'}
                                                         </p>
                                                     </div>

@@ -50,6 +50,9 @@ export interface SectionCandidate {
     model: string;
     focus: string;
     text: string;
+    // Self-assessed factual fidelity score (0–100). Higher = model is more
+    // confident every claim is supported by the original resume.
+    confidenceScore: number;
 }
 
 export interface SectionCandidateResponse {
@@ -57,28 +60,9 @@ export interface SectionCandidateResponse {
     warnings: string[];
 }
 
-const EMPTY_JD_ANALYSIS: JDAnalysis = {
-    targetTitle: '',
-    seniority: '',
-    requiredSkills: [],
-    preferredSkills: [],
-    requirements: [],
-    keyVerbs: [],
-    keyPhrases: [],
-    companyDomain: '',
-};
-
-export const TAILORING_SYSTEM_INSTRUCTION = [
-    'You are an expert resume writer, ATS optimization specialist, and strict fact checker.',
-    'Return only valid JSON when JSON is requested.',
-    'Never invent skills, metrics, dates, employers, titles, credentials, tools, projects, clients, or responsibilities.',
-].join(' ');
-
-export const SECTION_SYSTEM_INSTRUCTION = [
-    'You are an expert resume writer who creates grounded, ATS-aware section variants.',
-    'Return only valid JSON with no markdown fences.',
-    'Every claim must be supported by the original resume context.',
-].join(' ');
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
 
 function asString(value: unknown): string {
     return typeof value === 'string' ? normalizeNewlines(value).trim() : '';
@@ -107,6 +91,51 @@ function normalizeNewlines(value: string): string {
         .replace(/\s*```$/i, '')
         .trim();
 }
+
+function dedupe(values: string[]): string[] {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const value of values) {
+        const cleaned = value.replace(/\s+/g, ' ').trim();
+        if (!cleaned) continue;
+        const key = cleaned.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        result.push(cleaned);
+    }
+    return result;
+}
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const EMPTY_JD_ANALYSIS: JDAnalysis = {
+    targetTitle: '',
+    seniority: '',
+    requiredSkills: [],
+    preferredSkills: [],
+    requirements: [],
+    keyVerbs: [],
+    keyPhrases: [],
+    companyDomain: '',
+};
+
+export const TAILORING_SYSTEM_INSTRUCTION = [
+    'You are an expert resume writer, ATS optimization specialist, and strict fact checker.',
+    'Return only valid JSON when JSON is requested.',
+    'Never invent skills, metrics, dates, employers, titles, credentials, tools, projects, clients, or responsibilities.',
+].join(' ');
+
+export const SECTION_SYSTEM_INSTRUCTION = [
+    'You are an expert resume writer who creates grounded, ATS-aware section variants.',
+    'Return only valid JSON with no markdown fences.',
+    'Every claim must be supported by the original resume context.',
+].join(' ');
+
+// ---------------------------------------------------------------------------
+// Section-level transforms
+// ---------------------------------------------------------------------------
 
 export function toTailoredSections(sections: ResumeSections | Partial<TailoredSections>): TailoredSections {
     return {
@@ -144,6 +173,88 @@ export function enforceImmutableSections(original: ResumeSections, sections: Tai
     };
 }
 
+// ---------------------------------------------------------------------------
+// Post-parse quality utilities
+// ---------------------------------------------------------------------------
+
+/**
+ * Detects a suitable heading for the "other" section by inspecting its content,
+ * rather than always labelling it "Certifications".
+ */
+function inferOtherHeading(content: string): string {
+    const lower = content.toLowerCase();
+    if (lower.includes('certification') || lower.includes('certified') || lower.includes('licence')) {
+        return 'Certifications';
+    }
+    if (lower.includes('award') || lower.includes('honor') || lower.includes('honour')) {
+        return 'Awards';
+    }
+    if (lower.includes('publication') || lower.includes('paper') || lower.includes('journal')) {
+        return 'Publications';
+    }
+    if (lower.includes('volunteer') || lower.includes('community')) {
+        return 'Volunteer & Community';
+    }
+    return 'Additional';
+}
+
+/**
+ * Warns when the same opening action verb appears more than twice across
+ * experience bullets, which indicates monotonous language the model should vary.
+ */
+export function warnRepeatedVerbs(experience: string): string[] {
+    const bullets = experience.split('\n').filter(l => /^\s*[-•*]/.test(l));
+    const verbs = bullets.map(b =>
+        b.trim().replace(/^[-•*]\s*/, '').split(/\s+/)[0].toLowerCase()
+    );
+    const counts: Record<string, number> = {};
+    for (const verb of verbs) {
+        if (verb) counts[verb] = (counts[verb] ?? 0) + 1;
+    }
+    return Object.entries(counts)
+        .filter(([, count]) => count > 2)
+        .map(([verb, count]) => `Action verb "${verb}" used ${count} times — vary with synonyms for stronger impact`);
+}
+
+/**
+ * Checks whether any email address or phone number that appears in the
+ * generated body sections differs from what the original header contained.
+ * Returns warning strings for each mismatch found.
+ */
+export function auditContactLeakage(
+    original: ResumeSections,
+    sections: TailoredSections
+): string[] {
+    const warnings: string[] = [];
+
+    const emailRe = /[\w.+%-]+@[\w.-]+\.[a-z]{2,}/gi;
+    const phoneRe = /\+?[\d][\d\s\-().]{6,}[\d]/g;
+
+    const headerEmails = new Set((original.header.match(emailRe) ?? []).map(e => e.toLowerCase()));
+    const headerPhones = new Set((original.header.match(phoneRe) ?? []).map(p => p.replace(/\D/g, '')));
+
+    const bodyText = [sections.summary, sections.skills, sections.experience, sections.projects, sections.other]
+        .join('\n');
+
+    for (const email of bodyText.match(emailRe) ?? []) {
+        if (!headerEmails.has(email.toLowerCase())) {
+            warnings.push(`Possible fabricated email in body sections: "${email}"`);
+        }
+    }
+    for (const phone of bodyText.match(phoneRe) ?? []) {
+        const digits = phone.replace(/\D/g, '');
+        if (digits.length >= 7 && !headerPhones.has(digits)) {
+            warnings.push(`Possible fabricated phone number in body sections: "${phone}"`);
+        }
+    }
+
+    return warnings;
+}
+
+// ---------------------------------------------------------------------------
+// Resume reconstruction
+// ---------------------------------------------------------------------------
+
 export function reconstructResume(sections: TailoredSections): string {
     const parts: string[] = [];
     if (sections.header) parts.push(sections.header);
@@ -152,9 +263,13 @@ export function reconstructResume(sections: TailoredSections): string {
     if (sections.skills) parts.push(`## Skills\n${sections.skills}`);
     if (sections.education) parts.push(`## Education\n${sections.education}`);
     if (sections.projects) parts.push(`## Projects\n${sections.projects}`);
-    if (sections.other) parts.push(`## Certifications\n${sections.other}`);
+    if (sections.other) parts.push(`## ${inferOtherHeading(sections.other)}\n${sections.other}`);
     return parts.join('\n\n').trim();
 }
+
+// ---------------------------------------------------------------------------
+// JD analysis merge
+// ---------------------------------------------------------------------------
 
 export function mergeJDAnalysis(hints: KeywordHints, generated?: Partial<JDAnalysis>): JDAnalysis {
     return {
@@ -163,25 +278,16 @@ export function mergeJDAnalysis(hints: KeywordHints, generated?: Partial<JDAnaly
         requiredSkills: dedupe([...(hints.requiredSkills || []), ...(generated?.requiredSkills || [])]),
         preferredSkills: dedupe([...(hints.preferredSkills || []), ...(generated?.preferredSkills || [])]),
         requirements: dedupe([...(hints.requirements || []), ...(generated?.requirements || [])]),
-        keyVerbs: dedupe([...(hints.keyVerbs || []), ...(generated?.keyVerbs || [])]).slice(0, 12),
-        keyPhrases: dedupe([...(hints.keyPhrases || []), ...(generated?.keyPhrases || [])]).slice(0, 10),
+        // generated verbs take priority so they are not crowded out by pre-computed hints
+        keyVerbs: dedupe([...(generated?.keyVerbs || []), ...(hints.keyVerbs || [])]).slice(0, 12),
+        keyPhrases: dedupe([...(generated?.keyPhrases || []), ...(hints.keyPhrases || [])]).slice(0, 10),
         companyDomain: generated?.companyDomain || '',
     };
 }
 
-function dedupe(values: string[]): string[] {
-    const seen = new Set<string>();
-    const result: string[] = [];
-    for (const value of values) {
-        const cleaned = value.replace(/\s+/g, ' ').trim();
-        if (!cleaned) continue;
-        const key = cleaned.toLowerCase();
-        if (seen.has(key)) continue;
-        seen.add(key);
-        result.push(cleaned);
-    }
-    return result;
-}
+// ---------------------------------------------------------------------------
+// Prompt builders — shared source block
+// ---------------------------------------------------------------------------
 
 function sectionSourceBlock(sections: ResumeSections): string {
     return `--- HEADER ---
@@ -199,6 +305,10 @@ ${sections.projects}
 --- CERTIFICATIONS & OTHER ---
 ${sections.other}`;
 }
+
+// ---------------------------------------------------------------------------
+// Prompt: full resume tailoring
+// ---------------------------------------------------------------------------
 
 export function buildTailoringPrompt(sections: ResumeSections, jobDescription: string, hints: KeywordHints): string {
     return `You are tailoring a resume for a specific job. Use a balanced ATS style: exact JD terms where supported, concise professional language, and no keyword stuffing.
@@ -219,27 +329,52 @@ ORIGINAL RESUME SOURCE OF TRUTH
 ${sectionSourceBlock(sections)}
 
 TASK
-Stage 1 - Analyze the JD:
+
+Stage 1 — Analyze the JD:
 - Extract targetTitle, seniority, requiredSkills, preferredSkills, requirements, keyVerbs, keyPhrases, and companyDomain.
 - Treat "Required Skills (must target)" and "Selected Requirements" as high priority.
 
-Stage 2 - Map evidence:
+Stage 2 — Map evidence:
 - For every required or preferred skill, decide whether the original resume supports it.
 - If unsupported, do not add it. Put it in skippedRequirements with a short reason.
-- Equivalent spellings are allowed only when genuinely evident, for example AWS for Amazon Web Services or NodeJS for Node.js.
+- Equivalent spellings are allowed only when genuinely evident (e.g. AWS for Amazon Web Services, NodeJS for Node.js).
 
-Stage 3 - Rewrite:
-- Header: copy the original header exactly.
-- Summary: 2-3 sentences. Position the candidate for the target role without claiming the target title as a current job title unless it is already in the resume.
-- Skills: group skills with ATS-friendly labels such as **Languages**, **Frameworks**, **Cloud/DevOps**, **Databases**, **Tools**, and include only evidenced skills.
-- Experience: preserve real companies, roles, dates, clients, and metrics. Use 2-4 bullets per relevant role when possible. Each bullet must be one sentence, action-led, and result-oriented.
-- Education: copy the original education exactly.
-- Projects and certifications: keep only source-backed items that strengthen JD alignment.
+Stage 3 — Rewrite with these rules:
+
+HEADER
+- Copy the original header exactly, character for character.
+
+SUMMARY (2–3 sentences using this formula)
+- Sentence 1: [Role identity from the resume] with [X years / domain] experience in [core areas most relevant to JD].
+- Sentence 2: [Most relevant evidenced achievement or strength aligned to JD].
+- Sentence 3 (optional): Forward-looking fit statement using the JD target title only if the title or an equivalent already appears in the resume.
+- Do not claim the target title as a current job title unless it is already in the resume.
+
+SKILLS
+- Group skills with ATS-friendly bold labels: **Languages**, **Frameworks**, **Cloud / DevOps**, **Databases**, **Tools**.
+- Include only skills evidenced in the original resume.
+- Do not list a skill more than once across groups.
+
+EXPERIENCE
+- Preserve real companies, roles, dates, clients, and metrics exactly as written.
+- Use past tense for roles that have ended; use present tense for the current role only.
+- Write 2–4 bullets per relevant role. Each bullet must be one sentence, action-led, and result-oriented.
+- Target 80–120 characters per bullet (excluding the leading dash). Trim padding words to meet this.
+- Preserve exact numbers, percentages, timeframes, and dollar amounts. Never round or approximate.
+- Vary action verbs across bullets; do not repeat the same opening verb more than twice in the entire section.
+
+EDUCATION
+- Copy the original education section exactly, character for character.
+
+PROJECTS & CERTIFICATIONS
+- Keep only source-backed items that strengthen JD alignment.
 - Do not mention the hiring company as an employer unless it appears in the original resume.
 
-Stage 4 - Self-audit:
+Stage 4 — Self-audit before returning:
 - Remove unsupported skills, numbers, certifications, company names, job titles, and responsibilities.
 - Prefer omission over fabrication.
+- Verify header and education are copied exactly from the original.
+- Verify no contact details (email, phone, LinkedIn URL) appear in body sections unless already there in the original.
 
 Return ONLY valid JSON with this exact shape:
 {
@@ -270,6 +405,10 @@ Return ONLY valid JSON with this exact shape:
 }`;
 }
 
+// ---------------------------------------------------------------------------
+// Prompt: verification pass
+// ---------------------------------------------------------------------------
+
 export function buildVerificationPrompt(
     originalSections: ResumeSections,
     generatedSections: TailoredSections,
@@ -286,12 +425,14 @@ ${sectionSourceBlock(originalSections)}
 TAILORED SECTIONS TO VERIFY
 ${JSON.stringify(generatedSections, null, 2)}
 
-CHECKS
-- Header must be copied exactly from the original.
-- Education must be copied exactly from the original.
-- Remove any unsupported skills, tools, metrics, dates, employers, titles, certifications, clients, or achievements.
-- Keep JD phrasing only when the original resume clearly supports it.
-- Keep ATS-safe Markdown and no section headings inside values.
+CHECKS — apply every rule below:
+1. Header must be copied exactly from the original, character for character.
+2. Education must be copied exactly from the original, character for character.
+3. Remove any unsupported skills, tools, metrics, dates, employers, titles, certifications, clients, or achievements.
+4. Keep JD phrasing only when the original resume clearly supports it.
+5. Past tense for ended roles; present tense for the current role only.
+6. No contact detail (email, phone, LinkedIn URL) may appear in body sections unless already present in the original.
+7. Keep ATS-safe Markdown. No section headings inside JSON values.
 
 Return ONLY valid JSON:
 {
@@ -308,6 +449,10 @@ Return ONLY valid JSON:
   "warnings": ["remaining caution, if any"]
 }`;
 }
+
+// ---------------------------------------------------------------------------
+// Prompt: gap fix (keyword injection)
+// ---------------------------------------------------------------------------
 
 export function buildGapFixPrompt(params: {
     originalSections: ResumeSections;
@@ -329,12 +474,19 @@ ${sectionSourceBlock(params.originalSections)}
 CURRENT VERIFIED SECTIONS
 ${JSON.stringify(params.currentSections, null, 2)}
 
+INJECTION PRIORITY ORDER
+1. Skills section — add the keyword to the most relevant group first.
+2. Experience bullets — weave it in naturally into an existing bullet only if it cannot fit in skills.
+3. Summary — use only as a last resort, and only if the keyword strongly defines the candidate's identity.
+
 RULES
 - Make the smallest natural edit needed to include each evidenced keyword.
 - Use exact JD phrasing for the keyword.
 - Do not add any new responsibility, metric, credential, employer, or date.
-- If a keyword cannot be added without inventing context, skip it.
+- Do not repeat a keyword that already appears in the section.
+- If a keyword cannot be added without inventing context, skip it and record it in skippedKeywords.
 - Header and education must remain copied exactly from the original.
+- Past tense for ended roles; present tense for the current role only.
 
 Return ONLY valid JSON:
 {
@@ -352,6 +504,10 @@ Return ONLY valid JSON:
   "warnings": ["brief warning"]
 }`;
 }
+
+// ---------------------------------------------------------------------------
+// Prompt: per-section candidate generation
+// ---------------------------------------------------------------------------
 
 export function buildSectionTailoringPrompt(params: {
     sectionName: TailorableSectionName;
@@ -375,20 +531,46 @@ SECTION-SPECIFIC RULES
 - Output only ${label} content in each candidate. Do not include section headings.
 - Every claim must be supported by the original resume.
 - Use exact JD keywords only when supported by the original resume.
-- If the section is education, preserve the original education content unless light formatting is needed.
-- If the section is skills, group skills into concise ATS-friendly categories.
-- If the section is experience or projects, use action-led bullets and only source-backed metrics.
+- If the section is EDUCATION, preserve the original education content unless light formatting is needed.
+- If the section is SKILLS, group skills into concise ATS-friendly bold-label categories.
+- If the section is EXPERIENCE or PROJECTS:
+  - Use action-led bullets and only source-backed metrics.
+  - Past tense for ended roles; present tense for the current role only.
+  - Target 80–120 characters per bullet (excluding the leading dash).
+  - Preserve exact numbers, percentages, timeframes, and dollar amounts.
+  - Vary opening action verbs; do not repeat the same verb more than twice in a candidate.
+- Each candidate must differ meaningfully in structure or emphasis. Do not repeat the same bullet verbatim across candidates.
+- For each candidate, assign a confidenceScore (0–100) representing how confident you are that every claim is supported by the original resume (100 = fully grounded, 0 = fabricated).
 
-Return ONLY valid JSON:
+Return ONLY valid JSON with no markdown fences:
 {
   "candidates": [
-    { "model": "Balanced ATS", "focus": "Best balance of ATS coverage, readability, and factual fidelity", "text": "section content only" },
-    { "model": "Keyword Coverage", "focus": "More exact JD phrasing while staying grounded", "text": "section content only" },
-    { "model": "Concise Impact", "focus": "Tighter human-readable version with strong impact language", "text": "section content only" }
+    {
+      "model": "Balanced ATS",
+      "focus": "Best balance of ATS coverage, readability, and factual fidelity",
+      "text": "section content only",
+      "confidenceScore": 95
+    },
+    {
+      "model": "Keyword Coverage",
+      "focus": "More exact JD phrasing while staying grounded",
+      "text": "section content only",
+      "confidenceScore": 90
+    },
+    {
+      "model": "Concise Impact",
+      "focus": "Tighter human-readable version with strong impact language",
+      "text": "section content only",
+      "confidenceScore": 92
+    }
   ],
   "warnings": ["brief warning"]
 }`;
 }
+
+// ---------------------------------------------------------------------------
+// Response parsers
+// ---------------------------------------------------------------------------
 
 function parseObject(raw: string): Record<string, unknown> {
     const parsed = JSON.parse(cleanJson(raw));
@@ -462,10 +644,16 @@ export function parseSectionCandidateResponse(raw: string): SectionCandidateResp
             .map((item, index) => {
                 if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
                 const candidate = item as Record<string, unknown>;
+                const scoreRaw = candidate.confidenceScore;
+                const confidenceScore =
+                    typeof scoreRaw === 'number' && scoreRaw >= 0 && scoreRaw <= 100
+                        ? Math.round(scoreRaw)
+                        : 0;
                 return {
                     model: asString(candidate.model) || `Variant ${index + 1}`,
                     focus: asString(candidate.focus) || 'Balanced ATS tailoring',
                     text: asString(candidate.text),
+                    confidenceScore,
                 };
             })
             .filter((item): item is SectionCandidate => !!item?.text)

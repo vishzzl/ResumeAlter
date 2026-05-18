@@ -276,36 +276,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                 : loading && tailorPhase === 'gap_check' ? 'Optimizing gaps'
                     : loading && tailorPhase === 'analyzing' ? 'Analyzing match'
                         : 'Tailor resume';
-    const workflowSteps = [
-        {
-            label: 'Job',
-            helper: jobReady ? `${selectedSignalCount || 'Full'} signals ready` : 'Add or analyze JD',
-            complete: jobReady,
-            active: activeTab === 'job' && mobileTab !== 'result',
-            icon: Briefcase,
-        },
-        {
-            label: 'Resume',
-            helper: resumeReady ? `${resumeText.length.toLocaleString()} characters` : 'Paste or upload resume',
-            complete: resumeReady,
-            active: activeTab === 'resume' && mobileTab !== 'result',
-            icon: ClipboardCheck,
-        },
-        {
-            label: 'Tailor',
-            helper: tailoredReady ? 'Generated' : canTailor ? 'Ready to run' : 'Needs inputs',
-            complete: tailoredReady,
-            active: loading,
-            icon: Sparkles,
-        },
-        {
-            label: 'Review',
-            helper: tailoredReady ? 'Preview, edit, export' : 'Waiting for output',
-            complete: tailoredReady && !hasUnsavedChanges,
-            active: mobileTab === 'result' || outputTab === 'resume',
-            icon: FileCheck2,
-        },
-    ];
+
 
     // Sync Profile Sections State
     const [selectedSyncSections, setSelectedSyncSections] = useState({
@@ -1196,38 +1167,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     </div>
                 </div>
 
-                <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-3 lg:px-5">
-                    <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-                        {workflowSteps.map((step, index) => {
-                            const Icon = step.icon;
-                            return (
-                                <div
-                                    key={step.label}
-                                    className={cn(
-                                        "flex items-center gap-3 rounded-lg border bg-white px-3 py-2",
-                                        step.active ? "border-slate-300 shadow-sm" : "border-slate-200",
-                                        step.complete ? "text-slate-900" : "text-slate-500"
-                                    )}
-                                >
-                                    <div className={cn(
-                                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-                                        step.complete ? "bg-emerald-50 text-emerald-700" :
-                                            step.active ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500"
-                                    )}>
-                                        {step.complete ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-1.5">
-                                            <p className="truncate text-sm font-semibold">{step.label}</p>
-                                            {index < workflowSteps.length - 1 ? <ArrowRight className="hidden h-3.5 w-3.5 text-slate-300 xl:block" /> : null}
-                                        </div>
-                                        <p className="truncate text-[11px] text-slate-500">{step.helper}</p>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
+
             </header>
 
             {/* ━━━ Premium Glass Header ━━━ */}
@@ -2084,7 +2024,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                         <div className={cn(
                             "transition-all duration-300 ease-in-out shrink-0 flex flex-col gap-3 h-full z-50 lg:z-auto",
                             // Mobile: Fixed bottom sheet
-                            "fixed lg:static bottom-0 left-0 right-0 max-h-[85vh] rounded-t-2xl lg:rounded-2xl bg-white lg:bg-transparent shadow-2xl lg:shadow-none",
+"fixed lg:static bottom-0 left-0 right-0 max-h-[85vh] rounded-t-2xl lg:rounded-2xl bg-white lg:bg-transparent shadow-2xl lg:shadow-none",
                             // Desktop width handling
                             activeAnalysisTab ? "translate-y-0 lg:w-[320px] xl:w-[350px] opacity-100" : "translate-y-full lg:translate-y-0 lg:w-0 lg:opacity-0 lg:p-0 lg:overflow-hidden lg:hidden"
                         )}>
@@ -2094,11 +2034,17 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                             </div>
 
                             <div className="relative flex flex-1 flex-col overflow-hidden border border-slate-200 bg-white shadow-sm lg:rounded-2xl">
-                                {/* Insights Header */}
                                 <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
                                     <div className="flex items-center gap-2">
                                         <div className="rounded-lg bg-slate-900 p-1.5 text-white"><ListChecks className="h-4 w-4" /></div>
-                                        <span className="text-sm font-semibold text-slate-950">Analysis</span>
+                                        <div>
+                                            <span className="text-sm font-semibold text-slate-950">What Changed</span>
+                                            {changes.length > 0 && (
+                                                <p className="text-[10px] text-slate-400 mt-0.5">
+                                                    {[...new Set(changes.map(c => c.section).filter(Boolean))].length} sections · {changes.length} improvements
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
                                     <button onClick={() => setActiveAnalysisTab(null)} className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-950">
                                         <ChevronRight className="h-4 w-4 lg:rotate-0" />
@@ -2108,7 +2054,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                 {/* Persistent Tabs */}
                                 <div className="flex shrink-0 gap-2 px-3 pb-2 pt-3">
                                     <button onClick={() => setActiveAnalysisTab('changes')} className={cn("flex-1 rounded-lg border py-1.5 text-[11px] font-semibold transition-all", (!activeAnalysisTab || activeAnalysisTab === 'changes') ? "border-slate-900 bg-slate-900 text-white shadow-sm" : "border-slate-200 bg-white text-slate-500 hover:text-slate-950")}>
-                                        Edits ({changes.length})
+                                        Changes
                                     </button>
                                     {keywordCoverage && (
                                         <button onClick={() => setActiveAnalysisTab('coverage')} className={cn("flex-1 rounded-lg border py-1.5 text-[11px] font-semibold transition-all", activeAnalysisTab === 'coverage' ? "border-slate-900 bg-slate-900 text-white shadow-sm" : "border-slate-200 bg-white text-slate-500 hover:text-slate-950")}>
@@ -2118,51 +2064,90 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                 </div>
 
                                 {/* Scrollable Insights Content */}
-                                <div className="custom-scrollbar flex-1 overflow-y-auto bg-slate-50 p-4">
-                                    {(!activeAnalysisTab || activeAnalysisTab === 'changes') && (
-                                        <div className="space-y-3 stagger-children">
-                                            {changes.map((change, i) => (
-                                                <div key={i} className="group relative text-xs bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-200">
-                                                    <div className="flex items-start justify-between gap-3 mb-2">
-                                                        <div className="flex flex-col gap-1.5">
-                                                            {change.section && (
-                                                                <span className="w-fit px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[9px] font-black uppercase tracking-tighter">
-                                                                    {change.section}
-                                                                </span>
-                                                            )}
-                                                            <p className="font-bold text-slate-800 leading-tight pr-4">{change.reason}</p>
-                                                        </div>
-                                                        <div className="shrink-0 w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1" />
-                                                    </div>
+                                <div className="custom-scrollbar flex-1 overflow-y-auto bg-slate-50 p-3">
+                                    {(!activeAnalysisTab || activeAnalysisTab === 'changes') && (() => {
+                                        const sectionColors: Record<string, { bg: string; text: string; border: string; dot: string }> = {
+                                            summary:    { bg: 'bg-indigo-50',  text: 'text-indigo-700',  border: 'border-indigo-200', dot: 'bg-indigo-400' },
+                                            experience: { bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200',   dot: 'bg-blue-400' },
+                                            skills:     { bg: 'bg-violet-50',  text: 'text-violet-700',  border: 'border-violet-200', dot: 'bg-violet-400' },
+                                            education:  { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200',dot: 'bg-emerald-400' },
+                                            projects:   { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',  dot: 'bg-amber-400' },
+                                            other:      { bg: 'bg-rose-50',    text: 'text-rose-700',    border: 'border-rose-200',   dot: 'bg-rose-400' },
+                                        };
+                                        const defaultColor = { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200', dot: 'bg-slate-400' };
 
-                                                    <div className="space-y-1.5 mt-3 border-t border-slate-50 pt-3">
-                                                        {change.original && (
-                                                            <div className="relative pl-3 text-slate-400 line-through decoration-slate-300 italic text-[10px] leading-relaxed">
-                                                                <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-slate-200/50 rounded-full" />
-                                                                {String(change.original || '').substring(0, 100)}...
+                                        function getKeywordDelta(original: string | undefined, newText: string | undefined) {
+                                            if (!original || !newText) return { added: [], removed: [] };
+                                            const origWords = new Set(original.toLowerCase().match(/\b[a-z][a-z0-9+#.]{2,}\b/g) || []);
+                                            const newWords = new Set(newText.toLowerCase().match(/\b[a-z][a-z0-9+#.]{2,}\b/g) || []);
+                                            const stopWords = new Set(['the','and','for','with','this','that','from','into','over','have','been','will','your','our','their','which','when','were','are','was','its','has','had','not','but','can','may','also','each','both','more','such','than','then','them','they','some','very','just','about','after','before','would','could','should','through','within','across','using','based','other','these','those','where','while','there']);
+                                            const added = [...newWords].filter(w => !origWords.has(w) && !stopWords.has(w) && w.length >= 3).slice(0, 6);
+                                            const removed = [...origWords].filter(w => !newWords.has(w) && !stopWords.has(w) && w.length >= 3).slice(0, 4);
+                                            return { added, removed };
+                                        }
+
+                                        if (changes.length === 0) return (
+                                            <div className="text-center py-12 text-slate-400">
+                                                <div className="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center mx-auto mb-3"><Sparkles className="h-5 w-5 text-slate-300" /></div>
+                                                <p className="text-xs font-semibold">No changes recorded.</p>
+                                            </div>
+                                        );
+
+                                        const grouped: Record<string, AnalysisChange[]> = {};
+                                        changes.forEach(c => {
+                                            const key = (c.section || 'general').toLowerCase();
+                                            if (!grouped[key]) grouped[key] = [];
+                                            grouped[key].push(c);
+                                        });
+
+                                        return (
+                                            <div className="space-y-3">
+                                                {Object.entries(grouped).map(([section, sectionChanges]) => {
+                                                    const color = sectionColors[section] || defaultColor;
+                                                    return (
+                                                        <div key={section} className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+                                                            <div className={cn('flex items-center gap-2 px-3 py-2 border-b', color.bg, color.border)}>
+                                                                <div className={cn('w-2 h-2 rounded-full shrink-0', color.dot)} />
+                                                                <span className={cn('text-[10px] font-black uppercase tracking-widest', color.text)}>{section}</span>
+                                                                <span className={cn('ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full border', color.bg, color.text, color.border)}>
+                                                                    {sectionChanges.length} edit{sectionChanges.length > 1 ? 's' : ''}
+                                                                </span>
                                                             </div>
-                                                        )}
-                                                        {change.new && (
-                                                            <div className="relative pl-3 text-slate-700 text-[11px] font-medium leading-relaxed bg-emerald-50/20 py-1 rounded-r-lg">
-                                                                <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-emerald-400 rounded-full" />
-                                                                {String(change.new || '').substring(0, 120)}...
+                                                            <div className="divide-y divide-slate-50">
+                                                                {sectionChanges.map((change, ci) => {
+                                                                    const delta = getKeywordDelta(change.original, change.new);
+                                                                    return (
+                                                                        <div key={ci} className="px-3 py-2.5">
+                                                                            <p className="text-[12px] font-semibold text-slate-800 leading-snug">
+                                                                                {change.reason || 'Content updated for role alignment.'}
+                                                                            </p>
+                                                                            {(delta.added.length > 0 || delta.removed.length > 0) && (
+                                                                                <div className="mt-1.5 flex flex-wrap gap-1">
+                                                                                    {delta.added.map((kw, ki) => (
+                                                                                        <span key={`add-${ki}`} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                                                            <ArrowRight className="h-2 w-2" />{kw}
+                                                                                        </span>
+                                                                                    ))}
+                                                                                    {delta.removed.map((kw, ki) => (
+                                                                                        <span key={`rm-${ki}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-50 text-slate-400 border border-slate-200 line-through">
+                                                                                            {kw}
+                                                                                        </span>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })}
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {changes.length === 0 && (
-                                                <div className="text-center py-12 text-slate-400">
-                                                    <div className="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center mx-auto mb-3"><Sparkles className="h-5 w-5 text-slate-300" /></div>
-                                                    <p className="text-xs font-semibold">No specific changes recorded.</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        );
+                                    })()}
 
                                     {activeAnalysisTab === 'coverage' && keywordCoverage && (
-                                        <div className="space-y-6">
-                                            {/* ATS Score Ring */}
+                                        <div className="space-y-4">
                                             {atsScore && (
                                                 <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center gap-4">
                                                     <ScoreRing score={atsScore.after} size={64} strokeWidth={6} />
@@ -2173,8 +2158,6 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                                     </div>
                                                 </div>
                                             )}
-
-                                            {/* Required Keywords */}
                                             <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
                                                 <div className="flex items-center justify-between mb-3">
                                                     <span className="text-xs font-bold text-slate-800">Required Skills</span>
@@ -2185,7 +2168,6 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                                 <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-4">
                                                     <div className={cn("h-full rounded-full transition-all duration-1000", keywordCoverage.required.score >= 80 ? "bg-emerald-500" : keywordCoverage.required.score >= 60 ? "bg-amber-500" : "bg-red-500")} style={{ width: `${keywordCoverage.required.score}%` }} />
                                                 </div>
-                                                
                                                 <div className="space-y-3">
                                                     {keywordCoverage.required.matched.length > 0 && (
                                                         <div>
@@ -2205,8 +2187,6 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                                     )}
                                                 </div>
                                             </div>
-
-                                            {/* Gap-Fix Results */}
                                             {gapFixResults && gapFixResults.injected.length > 0 && (
                                                 <div className="bg-gradient-to-br from-indigo-50 to-violet-50 p-4 rounded-xl border border-indigo-100 shadow-sm relative overflow-hidden">
                                                     <div className="absolute top-0 right-0 p-4 opacity-10"><Zap className="h-16 w-16 text-indigo-500" /></div>
@@ -2228,7 +2208,6 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             </div>
 
             {/* Mobile/Hidden Desktop Toggle Buttons */}
-            {/* Show left panel button if hidden */}
             {!isLeftPanelOpen && (
                 <button onClick={() => setIsLeftPanelOpen(true)} className="hidden lg:flex absolute left-0 top-1/2 -translate-y-1/2 p-2 bg-white shadow-xl border border-slate-200 rounded-r-xl hover:pl-4 transition-all z-20 group" title="Expand Input Panel">
                     <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-indigo-600" />
