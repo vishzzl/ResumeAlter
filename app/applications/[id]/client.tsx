@@ -9,7 +9,7 @@ import {
     RefreshCw, Download, CheckSquare, Square, UserCheck, Briefcase,
     Sparkles, X, Eye, GitCompare, Mail, Copy, Check,
     PenLine, BookOpen, Zap, Crown, Target, Layers, CheckCircle2,
-    AlertCircle, PanelLeftClose, PanelLeftOpen, FileCheck2, ClipboardCheck,
+    AlertCircle, PanelLeftClose, PanelLeftOpen, FileCheck2,
     FileDown, ListChecks, ArrowRight, Menu, Home, PlusCircle, Settings, Award
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -208,19 +208,9 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const [error, setError] = useState<string | null>(null);
     const [pdfGenerating, setPdfGenerating] = useState(false);
         // ─── Section-wise generation state ───────────────────────────────────────────
-    const makeSectionState = useCallback((original: string): SectionState => ({ original, tailored: '', status: 'idle', accepted: false, preferences: ['quantify', 'keywords'], customInstruction: '' }), []);
 
-    const buildInitialSections = useCallback((): SectionsState => {
-        const parsed = parseResumeSections(resumeText);
-        return {
-            summary: makeSectionState(parsed.summary),
-            skills: makeSectionState(parsed.skills),
-            experience: makeSectionState(parsed.experience),
-            education: makeSectionState(parsed.education),
-            projects: makeSectionState(parsed.projects),
-            other: makeSectionState(parsed.other),
-        };
-    }, [resumeText, makeSectionState]);
+
+
 
     const [sectionStates, setSectionStates] = useState<SectionsState>(() => {
         const empty = (s: string): SectionState => ({ original: s, tailored: '', status: 'idle', accepted: false, preferences: ['quantify', 'keywords'], customInstruction: '' });
@@ -272,7 +262,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const jobReady = jobDescription.trim().length >= 100 || !!jobDetails;
     const resumeReady = resumeText.trim().length >= 200;
     const tailoredReady = !!tailoredResume;
-    const selectedSignalCount = selectedJobDetails.skills.length + selectedJobDetails.requirements.length + selectedJobDetails.experience.length;
+
     const tailorButtonLabel = loading && tailorPhase === 'extracting' ? 'Extracting details'
         : loading && tailorPhase === 'tailoring' ? 'Tailoring resume'
             : loading && tailorPhase === 'verifying' ? 'Verifying output'
@@ -295,7 +285,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
 
     useEffect(() => {
         // Load master profile certifications
-        getProfile().then(p => {
+        getProfile(app.profileId || undefined).then(p => {
             if (p && p.certifications) {
                 try {
                     const certs = JSON.parse(p.certifications);
@@ -551,7 +541,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
         setIsSyncPopoverOpen(false);
         setLoading(true);
         try {
-            const profile = await getProfile();
+            const profile = await getProfile(app.profileId || undefined);
             if (!profile) {
                 alert("No Master Profile found. Please configure it in the Profile section.");
                 setLoading(false);
@@ -843,7 +833,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             toast.error('❌ Tailoring failed. See error banner for details.', { id: 'tailor-status', duration: 8000 });
         } finally {
             clearTimeout(timeoutId);
-            setLoading(prevLoading => {
+            setLoading(() => {
                 // If we finished loading but never reached 'complete' phase, the stream was cut
                 setTailorPhase(prev => {
                     if (prev !== null && prev !== 'complete') {

@@ -17,47 +17,75 @@ async function main() {
     const tursoUrl = process.env.TURSO_DATABASE_URL;
     const tursoToken = process.env.TURSO_AUTH_TOKEN;
 
-    if (!tursoUrl || !tursoToken) {
-        console.log('Skipping Turso migration: Missing credentials in environment.');
-        return;
-    }
-
-    console.log(`📡 Connecting to Turso database: ${tursoUrl}`);
-    const client = createClient({
-        url: tursoUrl,
-        authToken: tursoToken,
-    });
-
     const migrationDir = path.join(__dirname, '../drizzle');
     const files = fs.readdirSync(migrationDir).filter(f => f.endsWith('.sql')).sort();
 
     console.log(`📦 Found ${files.length} migration files.`);
 
-    for (const file of files) {
-        console.log(`\n⏳ Applying migration: ${file}`);
-        const migrationContent = fs.readFileSync(path.join(migrationDir, file), 'utf-8');
+    if (tursoUrl && tursoToken) {
+        console.log(`📡 Connecting to Turso database: ${tursoUrl}`);
+        const client = createClient({
+            url: tursoUrl,
+            authToken: tursoToken,
+        });
 
-        // Split valid SQLite statements
-        const statements = migrationContent.split('--> statement-breakpoint').map(s => s.trim()).filter(Boolean);
+        for (const file of files) {
+            console.log(`\n⏳ Applying migration: ${file}`);
+            const migrationContent = fs.readFileSync(path.join(migrationDir, file), 'utf-8');
 
-        for (const statement of statements) {
-            try {
-                await client.execute(statement);
-                console.log(`   ✓ Executed statement`);
-            } catch (e) {
-                const isAlreadyExists =
-                    e.message.includes('already exists') ||
-                    e.message.includes('duplicate column name');
+            // Split valid SQLite statements
+            const statements = migrationContent.split('--> statement-breakpoint').map(s => s.trim()).filter(Boolean);
 
-                if (isAlreadyExists) {
-                    console.log(`   ⏭️ Skipped (Already applied)`);
-                } else {
-                    console.error(`   ❌ Error executing statement:`, e.message);
-                    console.error(`   Statement: ${statement}`);
-                    throw e; // Fail the build if it's a real error
+            for (const statement of statements) {
+                try {
+                    await client.execute(statement);
+                    console.log(`   ✓ Executed statement`);
+                } catch (e) {
+                    const isAlreadyExists =
+                        e.message.includes('already exists') ||
+                        e.message.includes('duplicate column name');
+
+                    if (isAlreadyExists) {
+                        console.log(`   ⏭️ Skipped (Already applied)`);
+                    } else {
+                        console.error(`   ❌ Error executing statement:`, e.message);
+                        console.error(`   Statement: ${statement}`);
+                        throw e; // Fail the build if it's a real error
+                    }
                 }
             }
         }
+    } else {
+        console.log(`📡 Connecting to local SQLite database (better-sqlite3): sqlite.db`);
+        const Database = require('better-sqlite3');
+        const dbClient = new Database('sqlite.db');
+
+        for (const file of files) {
+            console.log(`\n⏳ Applying migration: ${file}`);
+            const migrationContent = fs.readFileSync(path.join(migrationDir, file), 'utf-8');
+            const statements = migrationContent.split('--> statement-breakpoint').map(s => s.trim()).filter(Boolean);
+
+            for (const statement of statements) {
+                try {
+                    dbClient.prepare(statement).run();
+                    console.log(`   ✓ Executed statement`);
+                } catch (e) {
+                    const isAlreadyExists =
+                        e.message.includes('already exists') ||
+                        e.message.includes('duplicate column') ||
+                        e.message.includes('duplicate column name');
+
+                    if (isAlreadyExists) {
+                        console.log(`   ⏭️ Skipped (Already applied or table structure matches)`);
+                    } else {
+                        console.error(`   ❌ Error executing statement:`, e.message);
+                        console.error(`   Statement: ${statement}`);
+                        throw e;
+                    }
+                }
+            }
+        }
+        dbClient.close();
     }
 
     console.log('\n✅ All migrations processed successfully!');

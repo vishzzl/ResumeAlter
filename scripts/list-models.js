@@ -1,5 +1,3 @@
-
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 const fs = require('fs');
 const path = require('path');
 
@@ -27,7 +25,6 @@ if (!apiKey) {
     process.exit(1);
 }
 
-const genAI = new GoogleGenerativeAI(apiKey);
 
 async function formatModelSort(models) {
     // Sort by display name or name

@@ -135,7 +135,6 @@ body {
 }
 
 html {
-  overflow-x: hidden;
 }
 
 /* ─── Glass Conditionals ─── */
@@ -693,9 +692,8 @@ html {
   display: none;
 }
 
-/* Prevent horizontal scroll on mobile */
+/* Removed to fix position: sticky */
 body {
-  overflow-x: hidden;
 }
 
 /* Safe area insets for notched devices */

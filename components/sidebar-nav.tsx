@@ -11,12 +11,9 @@ import {
   Settings, 
   User as UserIcon,
   Users,
-  ChevronLeft,
-  ChevronRight,
   PanelLeftClose,
   PanelLeftOpen
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 
 interface SidebarNavProps {
   user?: any;

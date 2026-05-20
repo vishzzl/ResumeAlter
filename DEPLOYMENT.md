@@ -44,27 +44,29 @@ The following environment variables need to be configured in Vercel:
 
 ### Database Considerations
 
-⚠️ **Important**: This app uses SQLite which is **not persistent** on Vercel's serverless environment.
+⚠️ **Important**: This app uses local SQLite for development, which is **not persistent** on Vercel's serverless environment. 
 
-**For production, you have two options:**
+For production, the application is **pre-configured to natively support Turso (libSQL)** out-of-the-box. You do not need to rewrite any code to use a persistent database!
 
-#### Option 1: Migrate to a persistent database
-- **Vercel Postgres** - https://vercel.com/docs/storage/vercel-postgres
-- **Turso** (SQLite-compatible) - https://turso.tech/
-- **PlanetScale** - https://planetscale.com/
+#### Native Production Setup (Turso)
+To set up a persistent Turso database:
+1. Sign up/login to [Turso](https://turso.tech/).
+2. Create a database:
+   ```bash
+   turso db create resumealter
+   ```
+3. Get your database URL and token:
+   ```bash
+   turso db show resumealter --url
+   turso db tokens create resumealter
+   ```
+4. Set the following environment variables in Vercel:
+   - `TURSO_DATABASE_URL` - Set to your Turso DB URL (e.g., `libsql://your-db-org.turso.io`)
+   - `TURSO_AUTH_TOKEN` - Set to your Turso DB auth token
+5. The application code (`lib/db/index.ts`) will dynamically detect these credentials and connect to Turso automatically in production.
 
-#### Option 2: Keep SQLite (temporary/demo purposes)
-If you want to keep SQLite for now:
-- Data will reset on each deployment
-- Users will lose their data
-- Only suitable for demos or testing
-
-To migrate to Vercel Postgres:
-```bash
-npm install @vercel/postgres
-```
-
-Then update `lib/db/index.ts` to use Postgres instead of SQLite.
+#### Local/Demo DB (SQLite)
+If `TURSO_DATABASE_URL` is omitted, the app defaults to local SQLite (`sqlite.db`), which will reset on Vercel each time the serverless container restarts or redeploys. Use this option only for local development or quick, temporary demos.
 
 ### Build Configuration
 
@@ -98,8 +100,8 @@ After deployment:
 - Review function logs in Vercel dashboard
 
 #### Database errors
-- Remember SQLite doesn't persist on Vercel
-- Consider migrating to Vercel Postgres
+- Remember SQLite doesn't persist on Vercel.
+- Configure `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` in your Vercel Environment Variables to connect to a persistent Turso database.
 
 #### PDF parsing fails
 - Ensure `pdf-parse` is in `serverExternalPackages` in `next.config.ts`

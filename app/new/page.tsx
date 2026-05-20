@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createApplication, getProfile } from '@/lib/actions';
+import { createApplication, getProfiles } from '@/lib/actions';
 import { Loader2, Link as LinkIcon, AlertCircle } from 'lucide-react';
 
 export default function NewApplicationPage() {
@@ -14,7 +14,11 @@ export default function NewApplicationPage() {
     const [resumeSource, setResumeSource] = useState<'profile' | 'upload' | 'paste'>('profile');
     const [uploadedResumeText, setUploadedResumeText] = useState('');
     const [pastedResumeText, setPastedResumeText] = useState('');
-    const [profile, setProfile] = useState<any>(null);
+    
+    // Multiple Profiles states
+    const [profilesList, setProfilesList] = useState<any[]>([]);
+    const [selectedProfileId, setSelectedProfileId] = useState<number | null>(null);
+    
     const [isUploading, setIsUploading] = useState(false);
 
     const [loading, setLoading] = useState(false);
@@ -22,10 +26,11 @@ export default function NewApplicationPage() {
     const router = useRouter();
 
     useEffect(() => {
-        // Load profile on mount
-        getProfile().then(data => {
-            if (data) {
-                setProfile(data);
+        // Load profiles on mount
+        getProfiles().then(data => {
+            if (data && data.length > 0) {
+                setProfilesList(data);
+                setSelectedProfileId(data[0].id);
                 setResumeSource('profile');
             } else {
                 setResumeSource('paste'); // Default to paste if no profile
@@ -70,9 +75,12 @@ export default function NewApplicationPage() {
 
             // Determine base resume content
             let baseResumeToSend = undefined;
-            if (resumeSource === 'profile' && profile) {
-                const { formatProfileToText } = await import('@/lib/utils');
-                baseResumeToSend = formatProfileToText(profile);
+            if (resumeSource === 'profile' && selectedProfileId) {
+                const activeProfile = profilesList.find(p => p.id === selectedProfileId);
+                if (activeProfile) {
+                    const { formatProfileToText } = await import('@/lib/utils');
+                    baseResumeToSend = formatProfileToText(activeProfile);
+                }
             } else if (resumeSource === 'upload') {
                 baseResumeToSend = uploadedResumeText;
             } else if (resumeSource === 'paste') {
@@ -82,7 +90,7 @@ export default function NewApplicationPage() {
             // Pass the job description if the user opted to paste it
             const descriptionToSend = showPasteText ? jobDescription : undefined;
 
-            const id = await createApplication(url, descriptionToSend, baseResumeToSend);
+            const id = await createApplication(url, descriptionToSend, baseResumeToSend, selectedProfileId || undefined);
             router.push(`/applications/${id}`);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Something went wrong');
@@ -171,14 +179,14 @@ export default function NewApplicationPage() {
                             <button
                                 type="button"
                                 onClick={() => setResumeSource('profile')}
-                                disabled={!profile}
+                                disabled={profilesList.length === 0}
                                 className={`flex flex-col items-center justify-center p-4 rounded-lg border text-sm font-medium transition-all ${resumeSource === 'profile'
                                     ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500'
                                     : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
-                                    } ${!profile ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    } ${profilesList.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 <span className="mb-1">Master Profile</span>
-                                <span className="text-xs font-normal text-gray-500">{profile ? 'Recommended' : 'Not set up'}</span>
+                                <span className="text-xs font-normal text-gray-500">{profilesList.length > 0 ? 'Recommended' : 'Not set up'}</span>
                             </button>
 
                             <button
@@ -206,9 +214,27 @@ export default function NewApplicationPage() {
                             </button>
                         </div>
 
-                        {resumeSource === 'profile' && profile && (
-                            <div className="rounded-md bg-blue-50 p-4 text-sm text-blue-700">
-                                <p>Using data from your Master Profile. You can see this data in the profile section.</p>
+                        {resumeSource === 'profile' && profilesList.length > 0 && (
+                            <div className="space-y-3 rounded-lg bg-indigo-50/70 border border-indigo-100 p-4 text-sm text-indigo-800">
+                                <p className="font-semibold text-indigo-950">Select the Master Profile for this application:</p>
+                                <div className="relative max-w-md">
+                                    <select
+                                        value={selectedProfileId || ''}
+                                        onChange={(e) => setSelectedProfileId(parseInt(e.target.value))}
+                                        className="w-full bg-white border border-indigo-200 hover:border-indigo-300 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 outline-none cursor-pointer transition-all shadow-sm pr-10 appearance-none"
+                                    >
+                                        {profilesList.map(p => (
+                                            <option key={p.id} value={p.id}>
+                                                {p.profileName || 'Default Profile'}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-slate-400">
+                                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </div>
                             </div>
                         )}
 

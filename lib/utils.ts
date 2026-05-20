@@ -42,7 +42,7 @@ export function formatProfileToText(profile: any): string {
         });
         text += '\n';
       }
-    } catch (e) {
+    } catch {
       // If parsing fails, just append raw string if it's not JSON
       text += `SKILLS\n${profile.skills}\n\n`;
     }
@@ -88,7 +88,7 @@ export function formatProfileToText(profile: any): string {
           text += '\n';
         });
       }
-    } catch (e) {
+    } catch {
       text += `${profile.experience}\n\n`;
     }
   }
@@ -106,7 +106,7 @@ export function formatProfileToText(profile: any): string {
           text += '\n';
         });
       }
-    } catch (e) {
+    } catch {
       text += `${profile.education}\n\n`;
     }
   }
@@ -127,7 +127,7 @@ export function formatProfileToText(profile: any): string {
           text += '\n';
         });
       }
-    } catch (e) {
+    } catch {
       text += `${profile.projects}\n\n`;
     }
   }
@@ -145,7 +145,7 @@ export function formatProfileToText(profile: any): string {
           text += '\n';
         });
       }
-    } catch (e) {
+    } catch {
       text += `${profile.certifications}\n\n`;
     }
   }
