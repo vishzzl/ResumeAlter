@@ -246,26 +246,59 @@ function weightedKeywordScore(coverage: KeywordCoverageSet): number {
     return Math.round((coverage.required.score * 0.75) + (coverage.preferred.score * 0.25));
 }
 
-function countBullets(text: string): number {
-    return text.split(/\r?\n/).filter(line => /^\s*[-*]\s+/.test(line)).length;
+export interface FormattingResult {
+    score: number;
+    hasHeader: boolean;
+    hasSummary: boolean;
+    hasExperience: boolean;
+    hasSkills: boolean;
+    hasMinBullets: boolean;
+    hasTables: boolean;
+    hasDividers: boolean;
+    longLinesCount: number;
 }
 
-function formattingScore(text: string): number {
+export function analyzeFormatting(text: string): FormattingResult {
     const sections = parseResumeSections(text);
     let score = 55;
 
-    if (sections.header.trim()) score += 8;
-    if (sections.summary.trim()) score += 8;
-    if (sections.experience.trim()) score += 10;
-    if (sections.skills.trim()) score += 8;
-    if (countBullets(sections.experience) >= 3) score += 6;
-    if (!/[|\u2500-\u257f]/.test(text)) score += 3;
-    if (!/<table|<\/table>/i.test(text)) score += 2;
+    const hasHeader = !!sections.header.trim();
+    const hasSummary = !!sections.summary.trim();
+    const hasExperience = !!sections.experience.trim();
+    const hasSkills = !!sections.skills.trim();
+    const hasMinBullets = countBullets(sections.experience) >= 3;
+    const hasDividers = /[|\u2500-\u257f]/.test(text);
+    const hasTables = /<table|<\/table>/i.test(text);
+    const longLinesCount = text.split(/\r?\n/).filter(line => line.length > 180).length;
 
-    const longLines = text.split(/\r?\n/).filter(line => line.length > 180).length;
-    score -= Math.min(10, longLines * 2);
+    if (hasHeader) score += 8;
+    if (hasSummary) score += 8;
+    if (hasExperience) score += 10;
+    if (hasSkills) score += 8;
+    if (hasMinBullets) score += 6;
+    if (!hasDividers) score += 3;
+    if (!hasTables) score += 2;
+    score -= Math.min(10, longLinesCount * 2);
 
-    return Math.max(0, Math.min(100, score));
+    return {
+        score: Math.max(0, Math.min(100, score)),
+        hasHeader,
+        hasSummary,
+        hasExperience,
+        hasSkills,
+        hasMinBullets,
+        hasTables,
+        hasDividers,
+        longLinesCount,
+    };
+}
+
+function formattingScore(text: string): number {
+    return analyzeFormatting(text).score;
+}
+
+function countBullets(text: string): number {
+    return text.split(/\r?\n/).filter(line => /^\s*[-*]\s+/.test(line)).length;
 }
 
 function extractNumbers(text: string): string[] {
@@ -315,14 +348,20 @@ export function calculateAtsScore(params: {
     tailoredResume: string;
     requiredKeywords: string[];
     preferredKeywords: string[];
-}): { atsScore: AtsScore; beforeCoverage: KeywordCoverageSet; afterCoverage: KeywordCoverageSet; groundedness: GroundednessResult } {
+}): {
+    atsScore: AtsScore;
+    beforeCoverage: KeywordCoverageSet;
+    afterCoverage: KeywordCoverageSet;
+    groundedness: GroundednessResult;
+    formatting: FormattingResult;
+} {
     const { originalResume, tailoredResume, requiredKeywords, preferredKeywords } = params;
     const beforeCoverage = calculateCoverageSet(originalResume, requiredKeywords, preferredKeywords);
     const afterCoverage = calculateCoverageSet(tailoredResume, requiredKeywords, preferredKeywords);
     const beforeKeyword = weightedKeywordScore(beforeCoverage);
     const afterKeyword = weightedKeywordScore(afterCoverage);
     const beforeFormatting = formattingScore(originalResume);
-    const afterFormatting = formattingScore(tailoredResume);
+    const afterFormatting = analyzeFormatting(tailoredResume);
     const groundedness = calculateGroundedness(originalResume, tailoredResume, requiredKeywords, preferredKeywords);
 
     const beforeExperience = experienceRelevanceScore(originalResume, beforeCoverage);
@@ -342,7 +381,7 @@ export function calculateAtsScore(params: {
         afterKeyword * 0.40
         + afterExperience * 0.25
         + afterSkills * 0.20
-        + afterFormatting * 0.10
+        + afterFormatting.score * 0.10
         + groundedness.score * 0.05
     );
 
@@ -358,6 +397,7 @@ export function calculateAtsScore(params: {
         beforeCoverage,
         afterCoverage,
         groundedness,
+        formatting: afterFormatting,
         atsScore: {
             before: Math.max(0, Math.min(100, before)),
             after: Math.max(0, Math.min(100, after)),
@@ -365,7 +405,7 @@ export function calculateAtsScore(params: {
                 keywordMatch: { before: beforeKeyword, after: afterKeyword },
                 experienceRelevance: { before: beforeExperience, after: afterExperience },
                 skillsAlignment: { before: beforeSkills, after: afterSkills },
-                formatting: { before: beforeFormatting, after: afterFormatting },
+                formatting: { before: beforeFormatting, after: afterFormatting.score },
                 groundedness: { before: beforeGroundedness, after: groundedness.score },
             },
             analysis: `ATS score is based on real keyword coverage, experience relevance, skills alignment, ATS-safe formatting, and factual groundedness. ${afterCoverage.required.matched.length}/${afterCoverage.required.total} required keywords matched${missingRequired ? `; ${missingRequired} required keywords remain missing` : ''}.${groundedNote}`,

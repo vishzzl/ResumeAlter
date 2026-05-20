@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { updateApplication, deleteApplication } from '@/lib/actions';
 import {
-    Briefcase, Plus, Trash2,
+    Briefcase, Plus, Trash2, Archive,
     Sparkles, Clock, FileCheck, FileX, ArrowRight,
     ChevronRight, Zap, Trophy, XCircle, Send
 } from 'lucide-react';
@@ -20,6 +20,7 @@ type Application = {
     dateApplied?: string | null;
     analysis?: string | null;
     tailorStatus?: string | null;
+    isArchived?: boolean | null;
 };
 
 const STATUS_COLUMNS = [
@@ -128,11 +129,21 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
     const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set());
     const [mobileTab, setMobileTab] = useState('draft');
     const [movingAppId, setMovingAppId] = useState<number | null>(null);
+    const [showArchived, setShowArchived] = useState(false);
 
     // Auto-update mobile tab if last active application was in a different column? 
     // For now, keep it simple.
 
-    const getColumnApps = (colId: string) => applications.filter(a => (a.status || 'draft') === colId);
+    const isAppArchived = useCallback((app: Application) => {
+        if (app.isArchived) return true;
+        if (!app.createdAt) return false;
+        const days = getDaysSince(app.createdAt);
+        return days > 30 && (app.status === 'rejected' || app.status === 'draft' || !app.status);
+    }, []);
+
+    const visibleApplications = applications.filter(app => showArchived ? isAppArchived(app) : !isAppArchived(app));
+
+    const getColumnApps = (colId: string) => visibleApplications.filter(a => (a.status || 'draft') === colId);
 
     const handleDragStart = (e: React.DragEvent, id: number) => {
         setDraggedAppId(id);
@@ -222,10 +233,33 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
         }
     }, []);
 
-    const totalApps = applications.length;
-    const appliedCount = applications.filter(a => a.status === 'applied').length;
-    const interviewCount = applications.filter(a => a.status === 'interview').length;
-    const offerCount = applications.filter(a => a.status === 'offer').length;
+    const handleArchive = useCallback(async (id: number, e: React.MouseEvent, currentlyArchived: boolean) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const newArchivedState = !currentlyArchived;
+        
+        // Optimistic update
+        setApplications(prev => prev.map(app => 
+            app.id === id ? { ...app, isArchived: newArchivedState } : app
+        ));
+
+        try {
+            await updateApplication(id, { isArchived: newArchivedState });
+        } catch (error) {
+            console.error('Failed to update archive status:', error);
+            // Revert
+            setApplications(prev => prev.map(app => 
+                app.id === id ? { ...app, isArchived: currentlyArchived } : app
+            ));
+            alert('Failed to update archive status.');
+        }
+    }, []);
+
+    const totalApps = visibleApplications.length;
+    const appliedCount = visibleApplications.filter(a => a.status === 'applied').length;
+    const interviewCount = visibleApplications.filter(a => a.status === 'interview').length;
+    const offerCount = visibleApplications.filter(a => a.status === 'offer').length;
 
     return (
         <div className="flex flex-col h-[calc(100vh-5rem)] lg:h-[calc(100vh-4rem)] overflow-hidden animate-fade-in-up">
@@ -242,13 +276,28 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
                         {offerCount > 0 && <span className="inline-flex items-center gap-1.5 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide">Offers {offerCount}</span>}
                     </p>
                 </div>
-                <Link
-                    href="/new"
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-fuchsia-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:from-indigo-600 hover:to-fuchsia-700 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
-                >
-                    <Plus className="h-4 w-4" />
-                    New Application
-                </Link>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setShowArchived(!showArchived)}
+                        className={cn(
+                            "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-300 border",
+                            showArchived 
+                                ? "bg-slate-800 text-white border-slate-700 dark:bg-slate-200 dark:text-slate-900" 
+                                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-800 dark:hover:bg-slate-800"
+                        )}
+                    >
+                        <Clock className="h-4 w-4" />
+                        {showArchived ? 'Show Active' : 'Show Archived'}
+                    </button>
+                    <Link
+                        href="/new"
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-fuchsia-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:from-indigo-600 hover:to-fuchsia-700 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                        <Plus className="h-4 w-4" />
+                        <span className="hidden sm:inline">New Application</span>
+                        <span className="sm:hidden">New</span>
+                    </Link>
+                </div>
             </div>
 
             {/* ━━━ Mobile Tabs (Visible only on small screens) ━━━ */}
@@ -285,8 +334,8 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
             </div>
 
             {/* ━━━ Kanban Columns ━━━ */}
-            <div className="flex-1 overflow-auto custom-scrollbar lg:overflow-x-auto pb-4 px-2 lg:px-4">
-                <div className="lg:flex lg:gap-6 lg:min-w-[1400px] 3xl:min-w-[1800px] h-full">
+            <div className="flex-1 overflow-x-hidden overflow-y-auto custom-scrollbar lg:overflow-x-auto pb-4 px-2 lg:px-4">
+                <div className="lg:flex lg:gap-4 w-full h-full">
                     {STATUS_COLUMNS.map(col => {
                         // On mobile, only show valid column. On Desktop, show all.
                         const isVisibleMobile = mobileTab === col.id;
@@ -298,7 +347,7 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
                             <div
                                 key={col.id}
                                 className={cn(
-                                    "flex-1 min-w-[300px] 3xl:min-w-[340px] rounded-3xl border flex flex-col h-full transition-all duration-300 glass-card !shadow-none",
+                                    "flex-1 min-w-[240px] lg:min-w-0 xl:min-w-[200px] rounded-3xl border flex flex-col h-full transition-all duration-300 glass-card !shadow-none",
                                     col.bg, col.border,
                                     isDropTarget && "ring-2 ring-indigo-400/50 dark:ring-indigo-500/50 scale-[1.01] shadow-2xl bg-indigo-50/30 dark:bg-indigo-900/20",
                                     !isVisibleMobile && "hidden lg:flex" // Hide on mobile if not active tab
@@ -354,8 +403,16 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
                                                     draggedAppId === app.id && "opacity-50 scale-95 rotate-2 shadow-2xl"
                                                 )}
                                             >
-                                                {/* Drag Handle + Delete (Desktop) */}
-                                                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 lg:flex hidden">
+                                                {/* Drag Handle + Delete/Archive (Desktop) */}
+                                                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 lg:flex hidden gap-1">
+                                                    <button
+                                                        onClick={(e) => handleArchive(app.id, e, !!app.isArchived)}
+                                                        disabled={isDeleting}
+                                                        className="p-2 rounded-xl text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+                                                        title={app.isArchived ? "Unarchive" : "Archive"}
+                                                    >
+                                                        <Archive className="h-4 w-4" />
+                                                    </button>
                                                     <button
                                                         onClick={(e) => handleDelete(app.id, e)}
                                                         disabled={isDeleting}
@@ -492,14 +549,24 @@ export default function KanbanBoard({ initialApplications }: { initialApplicatio
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <button
-                                                        onClick={(e) => handleDelete(app.id, e)}
-                                                        disabled={isDeleting}
-                                                        className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                                                        title="Delete"
-                                                    >
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                    </button>
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            onClick={(e) => handleArchive(app.id, e, !!app.isArchived)}
+                                                            disabled={isDeleting}
+                                                            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
+                                                            title={app.isArchived ? "Unarchive" : "Archive"}
+                                                        >
+                                                            <Archive className="h-3.5 w-3.5" />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => handleDelete(app.id, e)}
+                                                            disabled={isDeleting}
+                                                            className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         );

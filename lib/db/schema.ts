@@ -25,6 +25,7 @@ export const applications = sqliteTable('applications', {
     selectedCertifications: text('selected_certifications'), // JSON array of selected certs
     createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
     dateApplied: text('date_applied'), // ISO 8601 string
+    isArchived: integer('is_archived', { mode: 'boolean' }).default(false), // Manual archive flag
     userId: integer('user_id').references(() => users.id),
 });
 
