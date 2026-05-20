@@ -10,7 +10,7 @@ import {
     Sparkles, X, Eye, GitCompare, Mail, Copy, Check,
     PenLine, BookOpen, Zap, Crown, Target, Layers, CheckCircle2,
     AlertCircle, PanelLeftClose, PanelLeftOpen, FileCheck2, ClipboardCheck,
-    FileDown, ListChecks, ArrowRight, Menu, Home, PlusCircle, Settings
+    FileDown, ListChecks, ArrowRight, Menu, Home, PlusCircle, Settings, Award
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -22,6 +22,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { SectionWiseEditor, SectionName, SectionState, SectionsState, SECTION_ORDER } from '@/components/SectionWiseEditor';
 import { parseResumeSections } from '@/lib/resume-parser';
 import { ModelSelector } from '@/components/ModelSelector';
+import { ATSScorePanel } from '@/components/ATSScorePanel';
 interface AnalysisChange {
     section?: string;
     reason?: string;
@@ -158,7 +159,18 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const [tailoredResume, setTailoredResume] = useState(app.tailoredResume || '');
     const initialAnalysis = app.analysis ? JSON.parse(app.analysis) : { changes: [], atsScore: null, executionTime: null };
     const [changes, setChanges] = useState<AnalysisChange[]>(initialAnalysis.changes || []);
-    const [atsScore, setAtsScore] = useState<{ before: number; after: number; analysis: string } | null>(initialAnalysis.atsScore || null);
+    const [atsScore, setAtsScore] = useState<{
+        before: number;
+        after: number;
+        analysis: string;
+        breakdown?: {
+            keywordMatch: { before: number; after: number };
+            experienceRelevance: { before: number; after: number };
+            skillsAlignment: { before: number; after: number };
+            formatting: { before: number; after: number };
+            groundedness: { before: number; after: number };
+        };
+    } | null>(initialAnalysis.atsScore || null);
     const [, setExecutionTime] = useState<number | null>(initialAnalysis.executionTime || null);
     const [resultViewMode, setResultViewMode] = useState<'preview' | 'diff' | 'edit'>('preview');
     const [tailorPhase, setTailorPhase] = useState<'extracting' | 'tailoring' | 'verifying' | 'gap_check' | 'analyzing' | 'complete' | null>(null);
@@ -181,7 +193,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const [coverLetterLoading, setCoverLetterLoading] = useState(false);
     const [coverLetterStyle, setCoverLetterStyle] = useState<'professional' | 'concise' | 'storytelling' | 'executive'>('professional');
     const [coverLetterInstructions, setCoverLetterInstructions] = useState('');
-    const [outputTab, setOutputTab] = useState<'resume' | 'coverLetter' | 'sections'>('resume');
+    const [outputTab, setOutputTab] = useState<'resume' | 'coverLetter' | 'sections' | 'ats'>('resume');
     const [copied, setCopied] = useState(false);
     const [isEditingCoverLetter, setIsEditingCoverLetter] = useState(false);
 
@@ -784,7 +796,16 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                 const duration = Math.round(endTime - startTime);
                                 setExecutionTime(duration);
 
-                                toast.success('🎉 Resume tailored successfully!', { id: 'tailor-status' });
+                                const scoreVal = event.data.atsScore?.after;
+                                toast.success(
+                                    scoreVal != null
+                                        ? `🎉 Resume tailored! ATS Score: ${scoreVal}/100`
+                                        : '🎉 Resume tailored successfully!',
+                                    { id: 'tailor-status' }
+                                );
+
+                                // Auto-switch to ATS Score tab so the user sees the results immediately
+                                setOutputTab('ats');
 
                                 await updateApplication(app.id, {
                                     analysis: JSON.stringify({
@@ -1317,20 +1338,17 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                         isLeftPanelOpen ? "lg:w-[360px] xl:w-[420px] opacity-100" : "lg:w-0 lg:opacity-0 lg:p-0 lg:overflow-hidden"
                     )}
                 >
-                    {/* Segmented Control (Desktop Only) */}
-                    <div className="hidden shrink-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm print:hidden lg:flex">
-                        <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-slate-950">Input workspace</p>
-                            <p className="text-xs text-slate-500">Review the job and resume before generating.</p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
+                    {/* Input panel header — compact command bar style */}
+                    <div className="hidden shrink-0 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 shadow-sm print:hidden lg:flex" style={{ height: '56px' }}>
+                        {/* Tab pills */}
+                        <nav className="flex flex-1 items-center gap-0.5 rounded-xl bg-slate-100 p-1">
                             <button
                                 onClick={() => setActiveTab('job')}
                                 className={cn(
-                                    "flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-all duration-200",
-                                    activeTab === 'job' 
-                                        ? "bg-white text-slate-950 shadow-sm" 
-                                        : "text-slate-500 hover:text-slate-700"
+                                    'flex flex-1 items-center justify-center gap-1.5 rounded-lg h-8 text-[12px] font-semibold transition-all duration-200',
+                                    activeTab === 'job'
+                                        ? 'bg-white text-slate-900 shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-800'
                                 )}
                             >
                                 <Briefcase className="h-3.5 w-3.5" />
@@ -1339,19 +1357,20 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                             <button
                                 onClick={() => setActiveTab('resume')}
                                 className={cn(
-                                    "flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-all duration-200",
-                                    activeTab === 'resume' 
-                                        ? "bg-white text-slate-950 shadow-sm" 
-                                        : "text-slate-500 hover:text-slate-700"
+                                    'flex flex-1 items-center justify-center gap-1.5 rounded-lg h-8 text-[12px] font-semibold transition-all duration-200',
+                                    activeTab === 'resume'
+                                        ? 'bg-white text-slate-900 shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-800'
                                 )}
                             >
                                 <FileText className="h-3.5 w-3.5" />
                                 Resume
                             </button>
-                        </div>
+                        </nav>
+                        {/* Collapse */}
                         <button
                             onClick={() => setIsLeftPanelOpen(false)}
-                            className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
                             title="Collapse panel"
                         >
                             <PanelLeftClose className="h-4 w-4" />
@@ -1764,153 +1783,183 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     "relative h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-300 ease-in-out lg:rounded-2xl",
                     mobileTab !== 'result' ? "hidden lg:flex" : "flex min-h-0"
                 )}>
-                    {/* ─ IDE Style Top Tabs ─ */}
-                    <div className="shrink-0 border-b border-slate-200 bg-white px-2 py-2 sm:px-3 sm:py-3">
-                        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsMobileNavOpen(true)}
-                                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-950 lg:hidden"
-                                    aria-label="Open workspace menu"
-                                >
-                                    <Menu className="h-4 w-4" />
-                                </button>
-                                <div className="scrollbar-hide flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
-                                <button
-                                    onClick={() => setOutputTab('resume')}
-                                    className={cn(
-                                        "flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-all sm:h-10",
-                                        outputTab === 'resume'
-                                            ? "border-slate-900 bg-slate-900 text-white shadow-sm"
-                                            : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950"
-                                    )}
-                                >
-                                    <FileText className="h-4 w-4" /> Full Resume
-                                </button>
-                                <button
-                                    onClick={handleSwitchToSections}
-                                    className={cn(
-                                        "flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-all sm:h-10",
-                                        outputTab === 'sections'
-                                            ? "border-slate-900 bg-slate-900 text-white shadow-sm"
-                                            : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950"
-                                    )}
-                                >
-                                    <Layers className="h-4 w-4" /> Section Builder
-                                </button>
-                                <button
-                                    onClick={() => setOutputTab('coverLetter')}
-                                    className={cn(
-                                        "flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-all sm:h-10",
-                                        outputTab === 'coverLetter'
-                                            ? "border-slate-900 bg-slate-900 text-white shadow-sm"
-                                            : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950"
-                                    )}
-                                >
-                                    <Mail className="h-4 w-4" /> Cover Letter
-                                </button>
-                                </div>
-                            </div>
+                    {/* ── Command Bar ── */}
+                    <div className="shrink-0 border-b border-slate-100 bg-white/95 backdrop-blur-sm px-3 py-0 sm:px-4">
+                        <div className="flex h-14 items-center gap-3">
 
-                            <div className="flex w-full flex-col gap-1.5 sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:overflow-x-auto">
-                            {/* Panel Toggle if closed */}
+                            {/* Mobile menu */}
+                            <button
+                                type="button"
+                                onClick={() => setIsMobileNavOpen(true)}
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 lg:hidden"
+                                aria-label="Open workspace menu"
+                            >
+                                <Menu className="h-4 w-4" />
+                            </button>
+
+                            {/* Left collapsed panel toggle */}
                             {!isLeftPanelOpen && (
-                                <button 
+                                <button
                                     onClick={() => setIsLeftPanelOpen(true)}
-                                    className="rounded-lg border border-slate-200 p-2 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-950"
+                                    className="hidden lg:flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
                                     title="Open Job Details"
                                 >
                                     <PanelLeftOpen className="h-4 w-4" />
                                 </button>
                             )}
-                            <div className="hidden h-5 w-px bg-slate-200 sm:block" />
-                            {/* Editor Sub-actions based on active tab */}
-                            {outputTab === 'resume' && tailoredResume && (
-                                <div className="grid w-full shrink-0 gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 sm:flex sm:w-auto sm:items-center">
-                                    <div className="grid grid-cols-3 rounded-md bg-white p-0.5 sm:w-auto">
-                                        <button
-                                            onClick={() => setResultViewMode('preview')}
-                                            className={cn("flex h-8 items-center justify-center gap-1 rounded px-2 text-[11px] font-semibold sm:h-9", resultViewMode === 'preview' ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-950")}
-                                            title="Preview"
-                                        >
-                                            <Eye className="h-3.5 w-3.5" /> <span>Preview</span>
-                                        </button>
-                                        <button
-                                            onClick={() => setResultViewMode('edit')}
-                                            className={cn("flex h-8 items-center justify-center gap-1 rounded px-2 text-[11px] font-semibold sm:h-9", resultViewMode === 'edit' ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-950")}
-                                            title="Edit"
-                                        >
-                                            <PenLine className="h-3.5 w-3.5" /> <span>Edit</span>
-                                        </button>
-                                        <button
-                                            onClick={() => setResultViewMode('diff')}
-                                            className={cn("flex h-8 items-center justify-center gap-1 rounded px-2 text-[11px] font-semibold sm:h-9", resultViewMode === 'diff' ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-950")}
-                                            title="Diff"
-                                        >
-                                            <GitCompare className="h-3.5 w-3.5" /> <span>Diff</span>
-                                        </button>
-                                    </div>
-                                    <div className={cn(
-                                        "grid gap-1 sm:flex sm:items-center",
-                                        resultViewMode === 'preview'
-                                            ? "grid-cols-[minmax(0,1fr)_auto_auto]"
-                                            : hasInsights && !activeAnalysisTab
-                                                ? "grid-cols-2"
-                                                : "grid-cols-1"
-                                    )}>
+
+                            {/* ── Primary Tab Pill ── */}
+                            <div className="scrollbar-hide flex min-w-0 flex-1 items-center overflow-x-auto">
+                                <nav className="flex items-center gap-0.5 rounded-xl bg-slate-100 p-1">
+                                    {([
+                                        { id: 'resume',      icon: FileText,  label: 'Resume'          },
+                                        { id: 'sections',    icon: Layers,    label: 'Sections'        },
+                                        { id: 'coverLetter', icon: Mail,      label: 'Cover Letter'    },
+                                        { id: 'ats',         icon: Award,     label: 'ATS Score'       },
+                                    ] as const).map(({ id, icon: Icon, label }) => {
+                                        const isActive = outputTab === id;
+                                        const isAts = id === 'ats';
+                                        return (
+                                            <button
+                                                key={id}
+                                                onClick={() => {
+                                                    if (id === 'sections') handleSwitchToSections();
+                                                    else setOutputTab(id);
+                                                }}
+                                                className={cn(
+                                                    'relative flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-semibold transition-all duration-200',
+                                                    isActive
+                                                        ? isAts
+                                                            ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm'
+                                                            : 'bg-white text-slate-900 shadow-sm'
+                                                        : 'text-slate-500 hover:text-slate-800'
+                                                )}
+                                            >
+                                                <Icon className="h-3.5 w-3.5 shrink-0" />
+                                                <span className="hidden sm:inline">{label}</span>
+                                                {/* ATS badge */}
+                                                {isAts && atsScore && (
+                                                    <span className={cn(
+                                                        'inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px] font-black leading-none',
+                                                        isActive
+                                                            ? 'bg-white/25 text-white'
+                                                            : atsScore.after >= 80
+                                                                ? 'bg-emerald-100 text-emerald-700'
+                                                                : atsScore.after >= 60
+                                                                    ? 'bg-amber-100 text-amber-700'
+                                                                    : 'bg-red-100 text-red-700'
+                                                    )}>
+                                                        {atsScore.after}
+                                                    </span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </nav>
+                            </div>
+
+                            {/* ── Right Action Zone ── */}
+                            <div className="flex shrink-0 items-center gap-2">
+
+                                {/* Resume tab actions */}
+                                {outputTab === 'resume' && tailoredResume && (
+                                    <>
+                                        {/* View mode switcher */}
+                                        <div className="flex items-center gap-0.5 rounded-lg bg-slate-100 p-0.5">
+                                            {([
+                                                { mode: 'preview', icon: Eye,        title: 'Preview' },
+                                                { mode: 'edit',    icon: PenLine,    title: 'Edit'    },
+                                                { mode: 'diff',    icon: GitCompare, title: 'Diff'    },
+                                            ] as const).map(({ mode, icon: Icon, title }) => (
+                                                <button
+                                                    key={mode}
+                                                    onClick={() => setResultViewMode(mode)}
+                                                    title={title}
+                                                    className={cn(
+                                                        'flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-semibold transition-all',
+                                                        resultViewMode === mode
+                                                            ? 'bg-white text-slate-900 shadow-sm'
+                                                            : 'text-slate-500 hover:text-slate-800'
+                                                    )}
+                                                >
+                                                    <Icon className="h-3.5 w-3.5" />
+                                                    <span className="hidden 2xl:inline">{title}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Template picker — only in preview mode */}
                                         {resultViewMode === 'preview' && (
                                             <>
+                                                <div className="hidden h-4 w-px bg-slate-200 md:block" />
                                                 <select
                                                     value={selectedTemplate}
-                                                    onChange={(e) => setSelectedTemplate(e.target.value as typeof selectedTemplate)}
-                                                    className="h-8 min-w-0 rounded-md border border-slate-200 bg-white px-2 text-xs font-semibold capitalize text-slate-700 outline-none sm:hidden"
-                                                    aria-label="Resume template"
+                                                    onChange={(e) => setSelectedTemplate(e.target.value as any)}
+                                                    className="hidden h-7 rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 outline-none hover:bg-slate-50 transition-colors cursor-pointer md:block"
                                                 >
-                                                    {(['modern', 'classic', 'minimal'] as const).map((t) => (
-                                                        <option key={t} value={t}>{t}</option>
-                                                    ))}
+                                                    <option value="modern">Modern</option>
+                                                    <option value="classic">Classic</option>
+                                                    <option value="minimal">Minimal</option>
                                                 </select>
-                                                <div className="hidden rounded-md bg-white p-0.5 sm:flex">
-                                                    {(['modern', 'classic', 'minimal'] as const).map((t) => (
-                                                        <button key={t} onClick={() => setSelectedTemplate(t)} className={cn("h-8 rounded px-2 text-[11px] font-semibold capitalize", selectedTemplate === t ? "bg-slate-100 text-slate-950" : "text-slate-500 hover:text-slate-950")}>
-                                                            {t}
-                                                        </button>
-                                                    ))}
-                                                </div>
                                             </>
                                         )}
-                                        <button onClick={handleDownloadPDF} disabled={pdfGenerating} className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50 sm:h-9 sm:px-3" title="Download PDF">
-                                            {pdfGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-                                            PDF
+
+                                        <div className="hidden h-4 w-px bg-slate-200 sm:block" />
+
+                                        {/* PDF download */}
+                                        <button
+                                            onClick={handleDownloadPDF}
+                                            disabled={pdfGenerating}
+                                            title="Download PDF"
+                                            className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
+                                        >
+                                            {pdfGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+                                            <span className="hidden 2xl:inline">PDF</span>
                                         </button>
+
+                                        {/* Analysis panel toggle */}
                                         {hasInsights && !activeAnalysisTab && (
                                             <button
                                                 onClick={() => setActiveAnalysisTab('changes')}
-                                                className="inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-950 sm:h-9 sm:bg-slate-950 sm:px-3 sm:text-white sm:hover:bg-slate-800 sm:hover:text-white"
+                                                className="flex h-8 items-center gap-1.5 rounded-lg bg-slate-900 px-3 text-[12px] font-semibold text-white shadow-sm transition-all hover:bg-slate-700"
                                             >
                                                 <ListChecks className="h-3.5 w-3.5 shrink-0" />
-                                                <span className="truncate">Analysis</span>
+                                                <span className="hidden 2xl:inline">Analysis</span>
                                             </button>
                                         )}
+                                    </>
+                                )}
+
+                                {/* Cover letter tab actions */}
+                                {outputTab === 'coverLetter' && coverLetter && (
+                                    <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-0.5">
+                                        <button
+                                            onClick={() => setIsEditingCoverLetter(!isEditingCoverLetter)}
+                                            className={cn(
+                                                'flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[11px] font-semibold transition-all',
+                                                isEditingCoverLetter
+                                                    ? 'bg-indigo-600 text-white shadow-sm'
+                                                    : 'bg-white text-slate-700 shadow-sm hover:bg-slate-50'
+                                            )}
+                                        >
+                                            <PenLine className="h-3.5 w-3.5" /> Edit
+                                        </button>
+                                        <button
+                                            onClick={handleCopyCoverLetter}
+                                            className="flex h-7 items-center gap-1.5 rounded-md bg-white px-2.5 text-[11px] font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50"
+                                        >
+                                            {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                                            {copied ? 'Copied' : 'Copy'}
+                                        </button>
+                                        <button
+                                            onClick={handleDownloadCoverLetterTxt}
+                                            className="flex h-7 items-center gap-1.5 rounded-md bg-white px-2.5 text-[11px] font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50"
+                                            title="Download TXT"
+                                        >
+                                            <Download className="h-3.5 w-3.5" /> TXT
+                                        </button>
                                     </div>
-                                </div>
-                            )}
-
-                            {outputTab === 'coverLetter' && coverLetter && (
-                                <div className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-1">
-                                    <button onClick={() => setIsEditingCoverLetter(!isEditingCoverLetter)} className={cn("px-2.5 py-1 text-[11px] font-bold rounded flex items-center gap-1.5 shadow-sm transition-all", isEditingCoverLetter ? "bg-indigo-100 text-indigo-700" : "bg-white text-slate-600 hover:bg-slate-50")}>
-                                        <PenLine className="h-3.5 w-3.5" /> Edit
-                                    </button>
-                                    <button onClick={handleCopyCoverLetter} className="px-2.5 py-1 text-[11px] font-bold rounded flex items-center gap-1.5 bg-white text-slate-600 hover:bg-slate-50 shadow-sm transition-all">
-                                        {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />} {copied ? 'Copied' : 'Copy'}
-                                    </button>
-                                    <button onClick={handleDownloadCoverLetterTxt} className="px-2.5 py-1 text-[11px] font-bold rounded flex items-center gap-1.5 bg-white text-slate-600 hover:bg-slate-50 shadow-sm transition-all" title="Download TXT">
-                                        <Download className="h-3.5 w-3.5" /> TXT
-                                    </button>
-                                </div>
-                            )}
-
+                                )}
                             </div>
                         </div>
                     </div>
@@ -1954,8 +2003,33 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                             </div>
                         )}
 
+                        {/* ── ATS Score tab ── */}
+                        {outputTab === 'ats' && (
+                            <div className="custom-scrollbar flex-1 overflow-auto p-4 sm:p-6">
+                                <ATSScorePanel
+                                    tailoredResume={tailoredResume}
+                                    originalResume={resumeText}
+                                    jobDescription={jobDescription}
+                                    initialScore={atsScore}
+                                    initialCoverage={keywordCoverage}
+                                    onScoreUpdate={async (score, coverage) => {
+                                        setAtsScore(score);
+                                        setKeywordCoverage(coverage);
+                                        // Save back to DB so it persists on next page load
+                                        await updateApplication(app.id, {
+                                            analysis: JSON.stringify({
+                                                changes,
+                                                atsScore: score,
+                                                executionTime: initialAnalysis.executionTime || null
+                                            })
+                                        });
+                                    }}
+                                />
+                            </div>
+                        )}
+
                         {/* ── Resume / Cover Letter tabs ── */}
-                        {outputTab !== 'sections' && (
+                        {outputTab !== 'sections' && outputTab !== 'ats' && (
                             <div id="print-container" className="custom-scrollbar flex-1 overflow-auto p-1.5 pb-6 print:overflow-visible print:p-0 sm:p-4 md:p-6 lg:pb-6">
                                 {outputTab === 'resume' ? (
                                     tailoredResume ? (

@@ -1,0 +1,1 @@
+ALTER TABLE `applications` ADD `is_archived` integer DEFAULT false;
