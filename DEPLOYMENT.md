@@ -100,8 +100,8 @@ After deployment:
 - Review function logs in Vercel dashboard
 
 #### Database errors
-- Remember SQLite doesn't persist on Vercel
-- Consider migrating to Vercel Postgres
+- Remember SQLite doesn't persist on Vercel.
+- Configure `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` in your Vercel Environment Variables to connect to a persistent Turso database.
 
 #### PDF parsing fails
 - Ensure `pdf-parse` is in `serverExternalPackages` in `next.config.ts`

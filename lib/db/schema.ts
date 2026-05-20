@@ -26,6 +26,7 @@ export const applications = sqliteTable('applications', {
     createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
     dateApplied: text('date_applied'), // ISO 8601 string
     isArchived: integer('is_archived', { mode: 'boolean' }).default(false), // Manual archive flag
+    profileId: integer('profile_id').references(() => profiles.id),
     userId: integer('user_id').references(() => users.id),
 });
 
@@ -34,6 +35,7 @@ export type NewApplication = typeof applications.$inferInsert;
 
 export const profiles = sqliteTable('profiles', {
     id: integer('id').primaryKey({ autoIncrement: true }),
+    profileName: text('profile_name').default('Default Profile').notNull(),
     name: text('name'),
     email: text('email'),
     phone: text('phone'),

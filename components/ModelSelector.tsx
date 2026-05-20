@@ -1,18 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAIConfig, AIProvider, Model } from "@/app/context/AIConfigContext";
+import { useAIConfig, Model } from "@/app/context/AIConfigContext";
 import {
     AlertTriangle,
     Check,
     ChevronDown,
     ChevronsUpDown,
     Clock3,
-    Cpu,
-    KeyRound,
     RefreshCw,
-    Server,
-    WifiOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -102,8 +98,6 @@ export function ModelSelector({ estimatedInputTokens }: ModelSelectorProps) {
         isLoadingModels,
         selectedProvider,
         setSelectedProvider,
-        customModelConfig,
-        updateCustomConfig,
         geminiStatuses,
         refreshGeminiStatus,
     } = useAIConfig();

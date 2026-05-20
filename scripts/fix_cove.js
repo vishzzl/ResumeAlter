@@ -32,8 +32,7 @@ if (summaryIdx < 0) {
 
 console.log('Found START marker at index:', summaryIdx);
 
-const beforeBlock = content.slice(0, summaryIdx);
-const afterBlock = content.slice(idx + END_MARKER.length - END_MARKER.indexOf('\r\n\r\n                try'));
+
 
 // The new block replaces from summaryIdx to idx+3 (the }`; part)
 const endOfBlock = idx + 3; // `}` + backtick + semicolon

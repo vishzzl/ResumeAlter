@@ -57,7 +57,7 @@ export default function AdminUsersPage() {
             } else {
                 setActionMessage({ type: 'error', text: result.message || 'Failed to delete' });
             }
-        } catch (error) {
+        } catch {
             setActionMessage({ type: 'error', text: 'An unexpected error occurred' });
         } finally {
             setIsActionPending(false);
@@ -78,7 +78,7 @@ export default function AdminUsersPage() {
             } else {
                 setActionMessage({ type: 'error', text: result.message || 'Failed to reset password' });
             }
-        } catch (error) {
+        } catch {
             setActionMessage({ type: 'error', text: 'An unexpected error occurred' });
         } finally {
             setIsActionPending(false);

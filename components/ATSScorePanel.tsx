@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
     Loader2, RefreshCw, CheckCircle, XCircle, AlertTriangle,
     TrendingUp, Target, Award, Zap, ShieldCheck, ChevronDown, ChevronUp,
-    Info, AlertCircle, HelpCircle, FileText, Sparkles, Check
+    Info, AlertCircle, Sparkles, Check
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { analyzeFormatting, calculateGroundedness } from '@/lib/ats-scoring';

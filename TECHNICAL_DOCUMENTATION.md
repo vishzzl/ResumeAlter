@@ -582,6 +582,8 @@ The database layer uses **Drizzle ORM** with a dual-driver strategy:
 
 This allows seamless deployment to Vercel's serverless platform while maintaining fast local development.
 
+Database migrations are generated using `drizzle-kit` and applied to the target database (either SQLite or Turso) using the unified migration script `scripts/migrate.js` (legacy root-level scripts `migration.js` and `migrate-turso.js` have been removed to prevent confusion).
+
 ### 3. The LLM Abstraction Layer
 
 A unified `generateText()` function abstracts over three LLM providers:
@@ -690,4 +692,4 @@ ResumeAlter demonstrates that a multi-phase LLM pipeline with programmatic guard
 
 ---
 
-*Generated on: March 1, 2026*
+*Updated on: May 20, 2026*

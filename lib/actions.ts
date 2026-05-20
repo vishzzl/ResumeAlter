@@ -12,23 +12,47 @@ async function getUserId() {
     return parseInt(session.user.id);
 }
 
-export async function getProfile() {
+export async function getProfiles() {
+    const userId = await getUserId();
+    if (!userId) return [];
+    return await db.select().from(profiles).where(eq(profiles.userId, userId));
+}
+
+export async function getProfile(profileId?: number) {
     const userId = await getUserId();
     if (!userId) return null;
+
+    if (profileId) {
+        const result = await db.select().from(profiles).where(and(eq(profiles.id, profileId), eq(profiles.userId, userId))).limit(1);
+        return result[0] || null;
+    }
+
     const result = await db.select().from(profiles).where(eq(profiles.userId, userId)).limit(1);
-    return result[0] || null;
+    if (result[0]) return result[0];
+
+    // Create a default profile if none exists
+    const defaultProfile = await db.insert(profiles).values({
+        userId,
+        profileName: 'Default Profile',
+        name: '',
+        email: '',
+        phone: '',
+        linkedin: '',
+        website: '',
+        summary: '',
+        skills: '[]',
+        experience: '[]',
+        education: '[]',
+        projects: '[]',
+        certifications: '[]',
+    }).returning();
+
+    return defaultProfile[0];
 }
 
 export async function createProfile(data: typeof profiles.$inferInsert) {
     const userId = await getUserId();
     if (!userId) throw new Error('Unauthorized');
-
-    // Check if profile already exists
-    const existing = await getProfile();
-    if (existing) {
-        // Update instead
-        return updateProfile(existing.id, data);
-    }
 
     const result = await db.insert(profiles).values({ ...data, userId }).returning();
     revalidatePath('/profile');
@@ -41,6 +65,14 @@ export async function updateProfile(id: number, data: Partial<typeof profiles.$i
 
     // Ensure user owns the profile
     await db.update(profiles).set(data).where(and(eq(profiles.id, id), eq(profiles.userId, userId)));
+    revalidatePath('/profile');
+}
+
+export async function deleteProfile(id: number) {
+    const userId = await getUserId();
+    if (!userId) throw new Error('Unauthorized');
+
+    await db.delete(profiles).where(and(eq(profiles.id, id), eq(profiles.userId, userId)));
     revalidatePath('/profile');
 }
 
@@ -58,7 +90,7 @@ export async function getApplication(id: number) {
     return result[0];
 }
 
-export async function createApplication(jobUrl: string, jobDescription?: string, baseResume?: string) {
+export async function createApplication(jobUrl: string, jobDescription?: string, baseResume?: string, profileId?: number) {
     const userId = await getUserId();
     if (!userId) throw new Error('Unauthorized');
 
@@ -66,6 +98,7 @@ export async function createApplication(jobUrl: string, jobDescription?: string,
         jobUrl,
         jobDescription: jobDescription || '', // Use provided description or default to empty (will be scraped)
         baseResume: baseResume, // Use provided base resume (e.g. from Master Profile)
+        profileId: profileId || null,
         userId
     }).returning({ insertedId: applications.id });
 
