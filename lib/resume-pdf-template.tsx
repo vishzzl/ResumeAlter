@@ -1,5 +1,3 @@
-'use client';
-
 import React from 'react';
 import { Page, View, Text, Link, StyleSheet } from '@react-pdf/renderer';
 
@@ -7,19 +5,18 @@ import { Page, View, Text, Link, StyleSheet } from '@react-pdf/renderer';
 const F = 'Helvetica';
 const FB = 'Helvetica-Bold';
 
-// ── Fixed compact stylesheet ──────────────────────────────────────────────────
-// Sized and spaced to fit a typical 1-page ATS resume on A4.
-// Tailored resumes are already concise — we don't need to dynamically scale.
-// If content somehow overflows, wrap={false} on sections prevents mid-section splits.
+// ── Improved ATS-friendly stylesheet ──────────────────────────────────────────
+// Professional typography with clear visual hierarchy and generous spacing.
+// Optimized for both readability and ATS parsing.
 const S = StyleSheet.create({
     page: {
         fontFamily: F,
-        fontSize: 8.5,
-        color: '#111',
-        paddingTop: 28,
+        fontSize: 9,
+        color: '#000',
+        paddingTop: 32,
         paddingBottom: 24,
-        paddingHorizontal: 38,
-        lineHeight: 1.35,
+        paddingHorizontal: 35,
+        lineHeight: 1.4,
         backgroundColor: '#ffffff',
     },
 
@@ -27,65 +24,67 @@ const S = StyleSheet.create({
     name: {
         fontFamily: FB,
         fontSize: 20,
-        color: '#111',
-        letterSpacing: 0.5,
-        marginBottom: 10,
-        textAlign: 'center',
+        color: '#000',
+        lineHeight: 1.15,
+        marginBottom: 6,
+        textAlign: 'left',
+        letterSpacing: 0.1,
     },
     contactRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 6,
-        fontSize: 8,
-        color: '#444',
+        marginTop: 2,
+        marginBottom: 8,
+        fontSize: 8.5,
+        color: '#333',
     },
-    contactText: { fontFamily: F, color: '#444', fontSize: 8 },
-    contactLink: { fontFamily: F, color: '#1a6ed8', fontSize: 8, textDecoration: 'none' },
-    contactSep: { fontFamily: F, color: '#999', fontSize: 8, marginHorizontal: 4 },
-    headerRule: { borderBottomWidth: 1.2, borderBottomColor: '#222', marginBottom: 10 },
+    contactText: { fontFamily: F, color: '#333', fontSize: 8.5 },
+    contactLink: { fontFamily: F, color: '#0066cc', fontSize: 8.5, textDecoration: 'none' },
+    contactSep: { fontFamily: F, color: '#666', fontSize: 8.5, marginHorizontal: 4 },
+    headerRule: { borderBottomWidth: 1.5, borderBottomColor: '#000', marginBottom: 10 },
 
     // ── Section ────────────────────────────────────────────────────────────
-    section: { marginBottom: 6 },
+    section: { marginBottom: 10 },
     sectionHead: {
         fontFamily: FB,
-        fontSize: 7.5,
-        color: '#111',
+        fontSize: 10,
+        color: '#000',
         textTransform: 'uppercase',
-        letterSpacing: 1,
-        borderBottomWidth: 0.5,
-        borderBottomColor: '#999',
-        paddingBottom: 1.5,
-        marginBottom: 3,
+        letterSpacing: 0.6,
+        borderBottomWidth: 1.2,
+        borderBottomColor: '#000',
+        paddingBottom: 3,
+        marginBottom: 6,
     },
 
     // ── Experience / Project entry ──────────────────────────────────────
-    entryBlock: { marginBottom: 4 },
+    entryBlock: { marginBottom: 6 },
     entryTopRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
+        marginBottom: 1.5,
     },
-    entryTitle: { fontFamily: FB, fontSize: 8.5, color: '#0f0f0f', flex: 1 },
-    entryDate: { fontFamily: F, fontSize: 7.5, color: '#555', textAlign: 'right', flexShrink: 0, marginLeft: 6 },
-    entryRole: { fontFamily: FB, fontSize: 7.5, color: '#444', marginBottom: 1.5 },
-    clientLabel: { fontFamily: FB, fontSize: 7.5, color: '#555', marginTop: 2, marginBottom: 1 },
+    entryTitle: { fontFamily: FB, fontSize: 9.5, color: '#000', flex: 1, marginRight: 8 },
+    entryDate: { fontFamily: F, fontSize: 8.5, color: '#555', textAlign: 'right', flexShrink: 0 },
+    entryRole: { fontFamily: FB, fontSize: 9, color: '#222', marginBottom: 3 },
+    clientLabel: { fontFamily: FB, fontSize: 8.5, color: '#333', marginTop: 1.5, marginBottom: 1.5 },
 
     // ── Bullets ────────────────────────────────────────────────────────────
-    bulletRow: { flexDirection: 'row', marginBottom: 1.5, paddingLeft: 6 },
-    bulletDot: { fontFamily: F, width: 9, fontSize: 8, color: '#555', flexShrink: 0, marginTop: 0.5 },
-    bulletText: { fontFamily: F, flex: 1, fontSize: 8, color: '#222', lineHeight: 1.35 },
+    bulletRow: { flexDirection: 'row', marginBottom: 2.5, paddingLeft: 6 },
+    bulletDot: { fontFamily: F, width: 8, fontSize: 9, color: '#000', flexShrink: 0, marginTop: 0, marginRight: 4 },
+    bulletText: { fontFamily: F, flex: 1, fontSize: 9, color: '#222', lineHeight: 1.4 },
 
     // ── Skills ─────────────────────────────────────────────────────────────
-    skillRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 1.5 },
-    skillCat: { fontFamily: FB, fontSize: 8.5, color: '#111', marginRight: 3 },
-    skillVal: { fontFamily: F, fontSize: 8.5, color: '#333', flex: 1 },
+    skillRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 3 },
+    skillCat: { fontFamily: FB, fontSize: 9, color: '#000', marginRight: 4, marginBottom: 1.5 },
+    skillVal: { fontFamily: F, fontSize: 9, color: '#333', flex: 1, marginBottom: 1.5 },
 
     // ── Paragraph / default ───────────────────────────────────────────────
-    para: { fontFamily: F, fontSize: 8.5, color: '#222', lineHeight: 1.4, marginBottom: 1.5 },
+    para: { fontFamily: F, fontSize: 9, color: '#222', lineHeight: 1.4, marginBottom: 3 },
     inlineBold: { fontFamily: FB },
-    subHead: { fontFamily: FB, fontSize: 8.5, color: '#111', marginBottom: 2 },
+    subHead: { fontFamily: FB, fontSize: 9.5, color: '#000', marginBottom: 3, marginTop: 3 },
 });
 
 // ── Inline parser: **bold**, *bold-fallback*, [link](url) ─────────────────────
@@ -103,6 +102,36 @@ function parseInline(raw: string): Span[] {
     }
     if (last < raw.length) out.push({ text: raw.slice(last) });
     return out;
+}
+
+// ── Skills delimiter parser: splits "--- Category ---, items" into structured chunks ─
+function parseCategorizedSkills(rawVal: string): { category: string; items: string }[] {
+    const rawItems = rawVal.split(',').map(item => item.trim());
+    const result: { category: string; items: string[] }[] = [];
+    let currentCat: { category: string; items: string[] } | null = null;
+    
+    for (const item of rawItems) {
+        if (!item) continue;
+        
+        // Check if item is a category marker, e.g. --- Category Name --- or ---- Category Name ----
+        const catMatch = item.match(/^-{3,}\s*(.+?)\s*-{3,}$/);
+        if (catMatch) {
+            const catName = catMatch[1].trim();
+            currentCat = { category: catName, items: [] };
+            result.push(currentCat);
+        } else {
+            if (!currentCat) {
+                currentCat = { category: 'Skills', items: [] };
+                result.push(currentCat);
+            }
+            currentCat.items.push(item);
+        }
+    }
+    
+    return result.map(c => ({
+        category: c.category,
+        items: c.items.join(', ')
+    }));
 }
 function RichText({ raw, style }: { raw: string; style?: any }) {
     return (
@@ -156,7 +185,7 @@ function ContactRow({ raw }: { raw: string }) {
                     return (
                         <React.Fragment key={i}>
                             <Link src={href} style={S.contactLink}>{mdLink[1]}</Link>
-                            {i < parts.length - 1 && <Text style={S.contactSep}> | </Text>}
+                            {i < parts.length - 1 ? <Text style={S.contactSep}> | </Text> : null}
                         </React.Fragment>
                     );
                 }
@@ -169,7 +198,7 @@ function ContactRow({ raw }: { raw: string }) {
                     return (
                         <React.Fragment key={i}>
                             <Link src={trimmed} style={S.contactLink}>{label}</Link>
-                            {i < parts.length - 1 && <Text style={S.contactSep}> | </Text>}
+                            {i < parts.length - 1 ? <Text style={S.contactSep}> | </Text> : null}
                         </React.Fragment>
                     );
                 }
@@ -183,7 +212,7 @@ function ContactRow({ raw }: { raw: string }) {
                     return (
                         <React.Fragment key={i}>
                             <Link src={href} style={S.contactLink}>{prettyLabel}</Link>
-                            {i < parts.length - 1 && <Text style={S.contactSep}> | </Text>}
+                            {i < parts.length - 1 ? <Text style={S.contactSep}> | </Text> : null}
                         </React.Fragment>
                     );
                 }
@@ -192,7 +221,7 @@ function ContactRow({ raw }: { raw: string }) {
                 return (
                     <React.Fragment key={i}>
                         <Text style={S.contactText}>{trimmed}</Text>
-                        {i < parts.length - 1 && <Text style={S.contactSep}> | </Text>}
+                        {i < parts.length - 1 ? <Text style={S.contactSep}> | </Text> : null}
                     </React.Fragment>
                 );
             })}
@@ -201,7 +230,7 @@ function ContactRow({ raw }: { raw: string }) {
 }
 
 // ── Section body renderer ─────────────────────────────────────────────────────
-function Body({ lines }: { lines: string[] }) {
+function Body({ lines, sectionName }: { lines: string[]; sectionName?: string }) {
     const els: React.ReactNode[] = [];
     let i = 0;
     while (i < lines.length) {
@@ -225,27 +254,89 @@ function Body({ lines }: { lines: string[] }) {
             const parts = line.split('|').map(p => p.trim());
             const stripped = parts.map(p => p.replace(/\*\*/g, '').trim());
             if (stripped.length >= 2) {
-                const tail = stripped[stripped.length - 1];
-                const isDate = /\d{4}|present|current|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i.test(tail);
-                if (isDate) {
-                    const company = stripped[0];
-                    const role = stripped.slice(1, -1).join(' | ');
+                const isProjectSec = sectionName && /project/i.test(sectionName);
+                const isCertSec = sectionName && /certifications/i.test(sectionName);
+
+                if (isCertSec) {
+                    const certName = stripped[0];
+                    const issuer = stripped[1];
+                    const date = stripped[2]; // could be undefined or empty
+
+                    els.push(
+                        <View key={i} style={S.bulletRow}>
+                            <Text style={S.bulletDot}>•</Text>
+                            <Text style={S.bulletText}>
+                                <Text style={S.inlineBold}>{certName}</Text>
+                                {issuer ? <Text style={{ color: '#444' }}>{` — ${issuer}`}</Text> : null}
+                                {date ? <Text style={{ color: '#666', fontSize: 8.5 }}>{` (${date})`}</Text> : null}
+                            </Text>
+                        </View>
+                    );
+                } else if (stripped.length >= 3) {
+                    const title = stripped[0];
+                    const subtitle = stripped[1];
+                    const rightDetail = stripped[2];
+
                     els.push(
                         <View key={i} style={S.entryBlock}>
                             <View style={S.entryTopRow}>
-                                <Text style={S.entryTitle}>{company}</Text>
-                                <Text style={S.entryDate}>{tail}</Text>
+                                <Text style={S.entryTitle}>{title}</Text>
+                                {rightDetail ? (
+                                    rightDetail.startsWith('http') || rightDetail.includes('.com') || rightDetail.includes('.org') || rightDetail.includes('.io') ? (
+                                        <Link src={rightDetail.startsWith('http') ? rightDetail : `https://${rightDetail}`} style={S.contactLink}>
+                                            {rightDetail}
+                                        </Link>
+                                    ) : (
+                                        <Text style={S.entryDate}>{rightDetail}</Text>
+                                    )
+                                ) : null}
                             </View>
-                            {role ? <Text style={S.entryRole}>{role}</Text> : null}
+                            {subtitle ? (
+                                isProjectSec ? (
+                                    <View style={S.skillRow}>
+                                        <Text style={S.skillCat}>Technologies:</Text>
+                                        <Text style={S.skillVal}>{subtitle}</Text>
+                                    </View>
+                                ) : (
+                                    <Text style={S.entryRole}>{subtitle}</Text>
+                                )
+                            ) : null}
                         </View>
                     );
                 } else {
-                    els.push(
-                        <View key={i} style={S.entryTopRow}>
-                            <Text style={S.entryTitle}>{stripped[0]}</Text>
-                            {stripped[1] && <Text style={S.entryDate}>{stripped[1]}</Text>}
-                        </View>
-                    );
+                    // stripped.length === 2
+                    const title = stripped[0];
+                    const detail = stripped[1];
+                    const isDate = /\d{4}|present|current|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i.test(detail);
+
+                    if (isDate) {
+                        els.push(
+                            <View key={i} style={S.entryBlock}>
+                                <View style={S.entryTopRow}>
+                                    <Text style={S.entryTitle}>{title}</Text>
+                                    <Text style={S.entryDate}>{detail}</Text>
+                                </View>
+                            </View>
+                        );
+                    } else {
+                        els.push(
+                            <View key={i} style={S.entryBlock}>
+                                <View style={S.entryTopRow}>
+                                    <Text style={S.entryTitle}>{title}</Text>
+                                </View>
+                                {detail ? (
+                                    isProjectSec ? (
+                                        <View style={S.skillRow}>
+                                            <Text style={S.skillCat}>Technologies:</Text>
+                                            <Text style={S.skillVal}>{detail}</Text>
+                                        </View>
+                                    ) : (
+                                        <Text style={S.entryRole}>{detail}</Text>
+                                    )
+                                ) : null}
+                            </View>
+                        );
+                    }
                 }
                 i++; continue;
             }
@@ -260,12 +351,27 @@ function Body({ lines }: { lines: string[] }) {
         // Skill row: **Category**: values
         const sm = line.match(/^\*\*([^*]+)\*\*\s*:\s*(.+)$/);
         if (sm) {
-            els.push(
-                <View key={i} style={S.skillRow}>
-                    <Text style={S.skillCat}>{sm[1]}:</Text>
-                    <Text style={S.skillVal}>{sm[2]}</Text>
-                </View>
-            );
+            const cat = sm[1];
+            const rawVal = sm[2];
+
+            if (rawVal.includes('---')) {
+                const cats = parseCategorizedSkills(rawVal);
+                cats.forEach((c, index) => {
+                    els.push(
+                        <View key={`${i}-${index}`} style={S.skillRow}>
+                            <Text style={S.skillCat}>{c.category}:</Text>
+                            <Text style={S.skillVal}>{c.items}</Text>
+                        </View>
+                    );
+                });
+            } else {
+                els.push(
+                    <View key={i} style={S.skillRow}>
+                        <Text style={S.skillCat}>{cat}:</Text>
+                        <Text style={S.skillVal}>{rawVal}</Text>
+                    </View>
+                );
+            }
             i++; continue;
         }
 
@@ -275,7 +381,7 @@ function Body({ lines }: { lines: string[] }) {
             i++; continue;
         }
 
-        // Default
+        // Default paragraph
         els.push(<RichText key={i} raw={line} style={S.para} />);
         i++;
     }
@@ -291,15 +397,15 @@ export function ResumePDFPage({ resumeMarkdown }: { resumeMarkdown: string }) {
         <Page size="A4" style={S.page}>
 
             {/* ── Header ── */}
-            {name && <Text style={S.name}>{name}</Text>}
+            {name ? <Text style={S.name}>{name}</Text> : null}
             {contactLines.map((l, i) => <ContactRow key={i} raw={l} />)}
             <View style={S.headerRule} />
 
             {/* ── Sections ── */}
             {secs.map((sec, i) => (
-                <View key={i} style={S.section} wrap={false}>
+                <View key={i} style={S.section} wrap={true}>
                     <Text style={S.sectionHead}>{sec.heading}</Text>
-                    <Body lines={sec.lines} />
+                    <Body lines={sec.lines} sectionName={sec.heading} />
                 </View>
             ))}
 

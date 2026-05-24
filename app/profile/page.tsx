@@ -36,7 +36,7 @@ import { toast } from 'sonner';
 
 import { useAIConfig } from '@/app/context/AIConfigContext';
 import { useParse } from '@/app/context/ParseContext';
-import { createProfile, deleteProfile, getProfile, getProfiles, updateProfile } from '@/lib/actions';
+import { createProfile, deleteProfile, getProfile, getProfiles, updateProfile, getResumeDownloadLink } from '@/lib/actions';
 import { cn } from '@/lib/utils';
 
 type TabId = 'basics' | 'experience' | 'skills' | 'education' | 'projects' | 'certifications';
@@ -236,6 +236,7 @@ export default function ProfilePage() {
     const [loading, setLoading] = useState(true);
     const [profile, setProfile] = useState<any>(null);
     const [resumeText, setResumeText] = useState('');
+    const [downloadLink, setDownloadLink] = useState('');
     const { isParsingGlobal, parsedData, parseResumeGlobal, clearParsedData } = useParse();
     const [isUploading, setIsUploading] = useState(false);
 
@@ -327,6 +328,15 @@ export default function ProfilePage() {
                     projects: [],
                     certifications: [],
                 });
+            }
+
+            // Fetch download link
+            const link = await getResumeDownloadLink();
+            if (link) {
+                const absoluteLink = typeof window !== 'undefined'
+                    ? `${window.location.origin}${link}`
+                    : link;
+                setDownloadLink(absoluteLink);
             }
         } catch (err) {
             console.error(err);
@@ -868,6 +878,50 @@ export default function ProfilePage() {
                                             placeholder="Brief overview of your background, strengths, and career focus."
                                         />
                                     </Field>
+
+                                    {downloadLink && (
+                                        <div className="mt-6 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/50 to-purple-50/30 p-5 dark:border-indigo-950/60 dark:from-indigo-950/20 dark:to-purple-950/10">
+                                            <div className="flex items-start gap-3">
+                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-900/60 dark:text-indigo-300">
+                                                    <BadgeCheck className="h-5 w-5" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Secure Portfolio PDF Resume Link</h3>
+                                                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                                        Use this secure link to link to or download your PDF resume directly from your static portfolio. Copy it below.
+                                                    </p>
+                                                    
+                                                    <div className="mt-3 flex items-center gap-2">
+                                                        <input
+                                                            type="text"
+                                                            readOnly
+                                                            value={downloadLink}
+                                                            className="h-10 flex-1 min-w-0 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-mono text-slate-700 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+                                                            onClick={(e) => (e.target as HTMLInputElement).select()}
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(downloadLink);
+                                                                toast.success('Resume link copied to clipboard!');
+                                                            }}
+                                                            className="inline-flex h-10 px-4 items-center justify-center rounded-xl bg-indigo-600 text-xs font-bold text-white transition hover:bg-indigo-700 active:scale-[0.98]"
+                                                        >
+                                                            Copy Link
+                                                        </button>
+                                                        <a
+                                                            href={downloadLink}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex h-10 px-4 items-center justify-center rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-900"
+                                                        >
+                                                            Test Download
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
