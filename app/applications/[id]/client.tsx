@@ -207,6 +207,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const [activeAnalysisTab, setActiveAnalysisTab] = useState<'changes' | 'coverage' | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pdfGenerating, setPdfGenerating] = useState(false);
+    const [docxGenerating, setDocxGenerating] = useState(false);
         // ─── Section-wise generation state ───────────────────────────────────────────
 
 
@@ -867,6 +868,29 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             setError('PDF export failed. Please try again.');
         } finally {
             setPdfGenerating(false);
+        }
+    };
+
+    const handleDownloadDOCX = async () => {
+        if (!tailoredResume) {
+            setError('No tailored resume to export. Please tailor the resume first.');
+            return;
+        }
+
+        setDocxGenerating(true);
+        try {
+            if (hasUnsavedChanges) {
+                const saved = await handleSave();
+                if (!saved) return;
+            }
+            const { exportResumeDOCX } = await import('@/lib/docx-export');
+            const fileName = ['Resume', app.companyName, app.jobTitle].filter(Boolean).join(' - ');
+            await exportResumeDOCX(tailoredResume, { fileName });
+        } catch (err) {
+            console.error('DOCX export failed:', err);
+            setError('DOCX export failed. Please try again.');
+        } finally {
+            setDocxGenerating(false);
         }
     };
 
@@ -1899,12 +1923,23 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                         {/* PDF download */}
                                         <button
                                             onClick={handleDownloadPDF}
-                                            disabled={pdfGenerating}
+                                            disabled={pdfGenerating || docxGenerating}
                                             title="Download PDF"
                                             className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
                                         >
                                             {pdfGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
                                             <span className="hidden 2xl:inline">PDF</span>
+                                        </button>
+
+                                        {/* Word download */}
+                                        <button
+                                            onClick={handleDownloadDOCX}
+                                            disabled={pdfGenerating || docxGenerating}
+                                            title="Download Word Document"
+                                            className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
+                                        >
+                                            {docxGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+                                            <span className="hidden 2xl:inline">Word</span>
                                         </button>
 
                                         {/* Analysis panel toggle */}

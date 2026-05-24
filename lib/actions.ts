@@ -5,12 +5,21 @@ import { applications, profiles } from '@/lib/db/schema';
 import { desc, eq, and } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/auth';
+import { generateUserToken } from '@/app/api/resume/route';
 
 async function getUserId() {
     const session = await auth();
     if (!session?.user?.id) return null;
     return parseInt(session.user.id);
 }
+
+export async function getResumeDownloadLink() {
+    const userId = await getUserId();
+    if (!userId) return null;
+    const token = generateUserToken(userId);
+    return `/api/resume?userId=${userId}&token=${token}`;
+}
+
 
 export async function getProfiles() {
     const userId = await getUserId();
