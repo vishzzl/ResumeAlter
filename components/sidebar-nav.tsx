@@ -86,7 +86,7 @@ export function SidebarNav({ user }: SidebarNavProps) {
 
         <Link
           href="/profile"
-          title="Master Profile"
+          title="My Resume"
           className={cn(
             "flex items-center gap-3 py-3 rounded-xl transition-all duration-200 group text-sm font-semibold",
             isCollapsed ? "justify-center px-0" : "px-4",
@@ -96,7 +96,7 @@ export function SidebarNav({ user }: SidebarNavProps) {
           )}
         >
           <UserIcon className={cn("h-5 w-5 shrink-0 transition-transform group-hover:scale-110", isActive('/profile') ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400 group-hover:text-indigo-500")} />
-          {!isCollapsed && <span>Master Profile</span>}
+          {!isCollapsed && <span>My Resume</span>}
         </Link>
 
         <div className="my-2">

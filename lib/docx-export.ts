@@ -17,8 +17,150 @@ import {
     ExternalHyperlink,
 } from 'docx';
 
-const BODY_FONT = 'Arial';
-const HEADING_FONT = 'Arial';
+// ── Design Tokens per Template Style ──────────────────────────────────────────
+interface TemplateTokens {
+    headingFont: string;
+    bodyFont: string;
+    primaryColor: string; // hex
+    secondaryColor: string; // hex
+    nameSize: number; // in half-points (40 = 20pt)
+    headingSize: number; // in half-points (20 = 10pt)
+    roleSize: number; // (18 = 9pt)
+    bodySize: number; // (18 = 9pt)
+    margin: { top: number; bottom: number; left: number; right: number }; // dxa (1440 = 1 in, 1080 = 0.75 in)
+    centerHeader: boolean;
+    headerSeparator: boolean;
+    borderAccent: 'none' | 'bottom' | 'left';
+}
+
+const TOKENS: Record<string, TemplateTokens> = {
+    modern: {
+        headingFont: 'Arial',
+        bodyFont: 'Arial',
+        primaryColor: '000000',
+        secondaryColor: '333333',
+        nameSize: 40,
+        headingSize: 20,
+        roleSize: 18,
+        bodySize: 18,
+        margin: { top: 1080, bottom: 1080, left: 1080, right: 1080 },
+        centerHeader: false,
+        headerSeparator: true,
+        borderAccent: 'bottom',
+    },
+    classic: {
+        headingFont: 'Times New Roman',
+        bodyFont: 'Times New Roman',
+        primaryColor: '000000',
+        secondaryColor: '444444',
+        nameSize: 42,
+        headingSize: 21,
+        roleSize: 18,
+        bodySize: 18,
+        margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 },
+        centerHeader: true,
+        headerSeparator: true,
+        borderAccent: 'bottom',
+    },
+    minimal: {
+        headingFont: 'Arial',
+        bodyFont: 'Arial',
+        primaryColor: '0f172a',
+        secondaryColor: '475569',
+        nameSize: 36,
+        headingSize: 18,
+        roleSize: 17,
+        bodySize: 17,
+        margin: { top: 1080, bottom: 1080, left: 1080, right: 1080 },
+        centerHeader: true,
+        headerSeparator: false,
+        borderAccent: 'none',
+    },
+    executive: {
+        headingFont: 'Georgia',
+        bodyFont: 'Georgia',
+        primaryColor: '1E3A8A', // Deep corporate navy
+        secondaryColor: '334155',
+        nameSize: 44,
+        headingSize: 21,
+        roleSize: 18,
+        bodySize: 18,
+        margin: { top: 1080, bottom: 1080, left: 1080, right: 1080 },
+        centerHeader: true,
+        headerSeparator: true,
+        borderAccent: 'bottom',
+    },
+    tech: {
+        headingFont: 'Consolas', // Monospace headings
+        bodyFont: 'Calibri', // Elegant sans body
+        primaryColor: '0F172A',
+        secondaryColor: '0284C7', // Sky blue details
+        nameSize: 40,
+        headingSize: 19,
+        roleSize: 18,
+        bodySize: 18,
+        margin: { top: 1080, bottom: 1080, left: 1080, right: 1080 },
+        centerHeader: false,
+        headerSeparator: true,
+        borderAccent: 'left', // Blue left highlight
+    },
+    creative: {
+        headingFont: 'Arial',
+        bodyFont: 'Arial',
+        primaryColor: '0D9488', // Teal
+        secondaryColor: '475569',
+        nameSize: 40,
+        headingSize: 19,
+        roleSize: 18,
+        bodySize: 18,
+        margin: { top: 1080, bottom: 1080, left: 1080, right: 1080 },
+        centerHeader: true,
+        headerSeparator: true,
+        borderAccent: 'left', // Teal left highlight
+    },
+    emerald: {
+        headingFont: 'Georgia',
+        bodyFont: 'Georgia',
+        primaryColor: '065F46', // Emerald
+        secondaryColor: '334155',
+        nameSize: 44,
+        headingSize: 21,
+        roleSize: 18,
+        bodySize: 18,
+        margin: { top: 1080, bottom: 1080, left: 1080, right: 1080 },
+        centerHeader: true,
+        headerSeparator: true,
+        borderAccent: 'bottom',
+    },
+    elegant: {
+        headingFont: 'Georgia',
+        bodyFont: 'Georgia',
+        primaryColor: '881337', // Burgundy
+        secondaryColor: '4C0519',
+        nameSize: 42,
+        headingSize: 21,
+        roleSize: 18,
+        bodySize: 18,
+        margin: { top: 1080, bottom: 1080, left: 1080, right: 1080 },
+        centerHeader: true,
+        headerSeparator: true,
+        borderAccent: 'bottom',
+    },
+    slate: {
+        headingFont: 'Arial',
+        bodyFont: 'Arial',
+        primaryColor: '1E293B', // Slate
+        secondaryColor: '475569',
+        nameSize: 40,
+        headingSize: 20,
+        roleSize: 18,
+        bodySize: 18,
+        margin: { top: 1080, bottom: 1080, left: 1080, right: 1080 },
+        centerHeader: false,
+        headerSeparator: true,
+        borderAccent: 'bottom',
+    },
+};
 
 // Helper to parse inline markdown bold (**text**) and plain text
 interface TextChunk {
@@ -48,13 +190,13 @@ function parseInlineMarkdown(raw: string): TextChunk[] {
 }
 
 // Helper to format a string with optional inline markdown bolding
-function createRichTextRuns(raw: string, baseOptions: { size: number; color?: string }): TextRun[] {
+function createRichTextRuns(raw: string, baseOptions: { size: number; color?: string; font: string }): TextRun[] {
     const chunks = parseInlineMarkdown(raw);
     return chunks.map(chunk => new TextRun({
         text: chunk.text,
         bold: chunk.bold ? true : undefined,
         size: baseOptions.size,
-        font: BODY_FONT,
+        font: baseOptions.font,
         color: baseOptions.color,
     }));
 }
@@ -131,7 +273,7 @@ function parseCategorizedSkills(rawVal: string): { category: string; items: stri
 }
 
 // ── Contact Row Builder ───────────────────────────────────────────────────────
-function createContactRow(raw: string): Paragraph {
+function createContactRow(raw: string, t: TemplateTokens): Paragraph {
     const parts = raw.split(/\s*\|\s*/);
     const children: any[] = [];
     
@@ -148,10 +290,10 @@ function createContactRow(raw: string): Paragraph {
                     children: [
                         new TextRun({
                             text: label,
-                            color: '0066cc',
+                            color: t.secondaryColor === '333333' ? '0066cc' : t.primaryColor,
                             underline: {},
-                            size: 17, // 8.5pt
-                            font: BODY_FONT,
+                            size: t.bodySize - 1, // slightly smaller than body
+                            font: t.headingFont === 'Consolas' ? 'Consolas' : t.bodyFont,
                         }),
                     ],
                     link: href,
@@ -166,10 +308,10 @@ function createContactRow(raw: string): Paragraph {
                     children: [
                         new TextRun({
                             text: prettyLabel,
-                            color: '0066cc',
+                            color: t.secondaryColor === '333333' ? '0066cc' : t.primaryColor,
                             underline: {},
-                            size: 17,
-                            font: BODY_FONT,
+                            size: t.bodySize - 1,
+                            font: t.headingFont === 'Consolas' ? 'Consolas' : t.bodyFont,
                         }),
                     ],
                     link: href,
@@ -179,9 +321,9 @@ function createContactRow(raw: string): Paragraph {
             children.push(
                 new TextRun({
                     text: trimmed,
-                    size: 17,
-                    font: BODY_FONT,
-                    color: '333333',
+                    size: t.bodySize - 1,
+                    font: t.bodyFont,
+                    color: t.secondaryColor,
                 })
             );
         }
@@ -190,8 +332,8 @@ function createContactRow(raw: string): Paragraph {
             children.push(
                 new TextRun({
                     text: '  |  ',
-                    size: 17,
-                    font: BODY_FONT,
+                    size: t.bodySize - 1,
+                    font: t.bodyFont,
                     color: '666666',
                 })
             );
@@ -201,12 +343,12 @@ function createContactRow(raw: string): Paragraph {
     return new Paragraph({
         children,
         spacing: { after: 100 },
-        alignment: AlignmentType.LEFT,
+        alignment: t.centerHeader ? AlignmentType.CENTER : AlignmentType.LEFT,
     });
 }
 
 // ── Borderless Side-by-Side Row ────────────────────────────────────────────────
-function createSideBySideRow(leftText: string, rightText: string, leftBold = true): Table {
+function createSideBySideRow(leftText: string, rightText: string, t: TemplateTokens, leftBold = true): Table {
     return new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
         borders: {
@@ -235,9 +377,9 @@ function createSideBySideRow(leftText: string, rightText: string, leftBold = tru
                                     new TextRun({
                                         text: leftText,
                                         bold: leftBold ? true : undefined,
-                                        size: 19, // 9.5pt
-                                        font: BODY_FONT,
-                                        color: '000000',
+                                        size: t.roleSize + 1, // slightly larger
+                                        font: t.bodyFont,
+                                        color: t.primaryColor,
                                     }),
                                 ],
                                 spacing: { after: 40 },
@@ -258,9 +400,10 @@ function createSideBySideRow(leftText: string, rightText: string, leftBold = tru
                                 children: [
                                     new TextRun({
                                         text: rightText,
-                                        size: 17, // 8.5pt
-                                        font: BODY_FONT,
-                                        color: '555555',
+                                        size: t.bodySize - 1,
+                                        font: t.headingFont === 'Consolas' ? 'Consolas' : t.bodyFont,
+                                        color: t.headingFont === 'Consolas' ? t.secondaryColor : '555555',
+                                        bold: t.headingFont === 'Consolas' ? true : undefined,
                                     }),
                                 ],
                                 alignment: AlignmentType.RIGHT,
@@ -275,30 +418,38 @@ function createSideBySideRow(leftText: string, rightText: string, leftBold = tru
 }
 
 // ── Main Section Builder ──────────────────────────────────────────────────────
-function buildSection(sec: Sec): any[] {
+function buildSection(sec: Sec, t: TemplateTokens): any[] {
     const els: any[] = [];
     const sectionName = sec.heading;
     
-    // 1. Header
+    // 1. Header with Template Specific borders/accents
     els.push(
         new Paragraph({
             children: [
                 new TextRun({
                     text: sectionName.toUpperCase(),
                     bold: true,
-                    size: 20, // 10pt
-                    font: HEADING_FONT,
-                    color: '000000',
+                    size: t.headingSize,
+                    font: t.headingFont,
+                    color: t.primaryColor,
                 }),
             ],
-            border: {
+            border: t.borderAccent === 'bottom' ? {
                 bottom: {
-                    color: '000000',
+                    color: t.primaryColor,
                     space: 4,
                     style: BorderStyle.SINGLE,
                     size: 8, // 1pt
                 },
-            },
+            } : t.borderAccent === 'left' ? {
+                left: {
+                    color: t.secondaryColor,
+                    space: 6,
+                    style: BorderStyle.SINGLE,
+                    size: 24, // 3pt left border highlight
+                }
+            } : undefined,
+            indent: t.borderAccent === 'left' ? { left: 120 } : undefined,
             spacing: { before: 240, after: 120 },
         })
     );
@@ -318,7 +469,7 @@ function buildSection(sec: Sec): any[] {
             const text = line.replace(/^\s*[-•*]\s+/, '').trim();
             els.push(
                 new Paragraph({
-                    children: createRichTextRuns(text, { size: 18 }), // 9pt
+                    children: createRichTextRuns(text, { size: t.bodySize, font: t.bodyFont }),
                     bullet: { level: 0 },
                     indent: { left: 240 },
                     spacing: { before: 40, after: 40 },
@@ -352,8 +503,9 @@ function buildSection(sec: Sec): any[] {
                                 new TextRun({
                                     text: certText,
                                     bold: true,
-                                    size: 18,
-                                    font: BODY_FONT,
+                                    size: t.bodySize,
+                                    font: t.bodyFont,
+                                    color: t.primaryColor,
                                 }),
                             ],
                             bullet: { level: 0 },
@@ -366,15 +518,15 @@ function buildSection(sec: Sec): any[] {
                     const subtitle = stripped[1];
                     const rightDetail = stripped[2];
                     
-                    els.push(createSideBySideRow(title, rightDetail));
+                    els.push(createSideBySideRow(title, rightDetail, t));
                     
                     if (subtitle) {
                         if (isProjectSec) {
                             els.push(
                                 new Paragraph({
                                     children: [
-                                        new TextRun({ text: 'Technologies: ', bold: true, size: 18, font: BODY_FONT }),
-                                        new TextRun({ text: subtitle, size: 18, font: BODY_FONT, color: '333333' }),
+                                        new TextRun({ text: 'Technologies: ', bold: true, size: t.bodySize, font: t.headingFont === 'Consolas' ? 'Consolas' : t.bodyFont, color: t.headingFont === 'Consolas' ? t.secondaryColor : t.primaryColor }),
+                                        new TextRun({ text: subtitle, size: t.bodySize, font: t.bodyFont, color: t.secondaryColor }),
                                     ],
                                     spacing: { after: 60 },
                                 })
@@ -386,9 +538,9 @@ function buildSection(sec: Sec): any[] {
                                         new TextRun({
                                             text: subtitle,
                                             bold: true,
-                                            size: 18, // 9pt
-                                            font: BODY_FONT,
-                                            color: '222222',
+                                            size: t.bodySize,
+                                            font: t.bodyFont,
+                                            color: t.secondaryColor,
                                         }),
                                     ],
                                     spacing: { after: 60 },
@@ -403,16 +555,16 @@ function buildSection(sec: Sec): any[] {
                     const isDate = /\d{4}|present|current|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i.test(detail);
                     
                     if (isDate) {
-                        els.push(createSideBySideRow(title, detail));
+                        els.push(createSideBySideRow(title, detail, t));
                     } else {
-                        els.push(createSideBySideRow(title, ''));
+                        els.push(createSideBySideRow(title, '', t));
                         if (detail) {
                             if (isProjectSec) {
                                 els.push(
                                     new Paragraph({
                                         children: [
-                                            new TextRun({ text: 'Technologies: ', bold: true, size: 18, font: BODY_FONT }),
-                                            new TextRun({ text: detail, size: 18, font: BODY_FONT, color: '333333' }),
+                                            new TextRun({ text: 'Technologies: ', bold: true, size: t.bodySize, font: t.headingFont === 'Consolas' ? 'Consolas' : t.bodyFont, color: t.headingFont === 'Consolas' ? t.secondaryColor : t.primaryColor }),
+                                            new TextRun({ text: detail, size: t.bodySize, font: t.bodyFont, color: t.secondaryColor }),
                                         ],
                                         spacing: { after: 60 },
                                     })
@@ -424,9 +576,9 @@ function buildSection(sec: Sec): any[] {
                                             new TextRun({
                                                 text: detail,
                                                 bold: true,
-                                                size: 18,
-                                                font: BODY_FONT,
-                                                color: '222222',
+                                                size: t.bodySize,
+                                                font: t.bodyFont,
+                                                color: t.secondaryColor,
                                             }),
                                         ],
                                         spacing: { after: 60 },
@@ -451,9 +603,9 @@ function buildSection(sec: Sec): any[] {
                         new TextRun({
                             text: `Client: ${clientVal}`,
                             bold: true,
-                            size: 17, // 8.5pt
-                            font: BODY_FONT,
-                            color: '333333',
+                            size: t.bodySize - 1,
+                            font: t.bodyFont,
+                            color: t.secondaryColor,
                         }),
                     ],
                     spacing: { before: 40, after: 40 },
@@ -475,8 +627,8 @@ function buildSection(sec: Sec): any[] {
                     els.push(
                         new Paragraph({
                             children: [
-                                new TextRun({ text: `${c.category}: `, bold: true, size: 18, font: BODY_FONT }),
-                                new TextRun({ text: c.items, size: 18, font: BODY_FONT, color: '333333' }),
+                                new TextRun({ text: `${c.category}: `, bold: true, size: t.bodySize, font: t.headingFont === 'Consolas' ? 'Consolas' : t.bodyFont, color: t.headingFont === 'Consolas' ? t.secondaryColor : t.primaryColor }),
+                                new TextRun({ text: c.items, size: t.bodySize, font: t.bodyFont, color: t.secondaryColor }),
                             ],
                             spacing: { after: 60 },
                         })
@@ -486,8 +638,8 @@ function buildSection(sec: Sec): any[] {
                 els.push(
                     new Paragraph({
                         children: [
-                            new TextRun({ text: `${cat}: `, bold: true, size: 18, font: BODY_FONT }),
-                            new TextRun({ text: rawVal, size: 18, font: BODY_FONT, color: '333333' }),
+                            new TextRun({ text: `${cat}: `, bold: true, size: t.bodySize, font: t.headingFont === 'Consolas' ? 'Consolas' : t.bodyFont, color: t.headingFont === 'Consolas' ? t.secondaryColor : t.primaryColor }),
+                            new TextRun({ text: rawVal, size: t.bodySize, font: t.bodyFont, color: t.secondaryColor }),
                         ],
                         spacing: { after: 60 },
                     })
@@ -506,8 +658,9 @@ function buildSection(sec: Sec): any[] {
                         new TextRun({
                             text: line.slice(4).trim(),
                             bold: true,
-                            size: 19, // 9.5pt
-                            font: HEADING_FONT,
+                            size: t.roleSize + 1,
+                            font: t.headingFont,
+                            color: t.primaryColor,
                         }),
                     ],
                     spacing: { before: 120, after: 60 },
@@ -520,7 +673,7 @@ function buildSection(sec: Sec): any[] {
         // F. Paragraphs (Fallback)
         els.push(
             new Paragraph({
-                children: createRichTextRuns(line, { size: 18 }), // 9pt
+                children: createRichTextRuns(line, { size: t.bodySize, font: t.bodyFont }),
                 spacing: { after: 60 },
             })
         );
@@ -534,19 +687,21 @@ function buildSection(sec: Sec): any[] {
 // ── Export Interface ─────────────────────────────────────────────────────────
 export interface ExportOptions {
     fileName?: string;
+    template?: 'modern' | 'classic' | 'minimal' | 'executive' | 'tech' | 'creative' | 'emerald' | 'elegant' | 'slate';
 }
 
 export async function exportResumeDOCX(
     resumeMarkdown: string,
     opts: ExportOptions = {}
 ): Promise<void> {
-    const { fileName = 'Resume' } = opts;
+    const { fileName = 'Resume', template = 'modern' } = opts;
     const safeName = fileName.replace(/[^a-zA-Z0-9_\-\s]/g, '').trim() || 'Resume';
 
     const { header, secs } = parseMarkdown(resumeMarkdown);
     const [name, ...contactLines] = header;
 
     const children: any[] = [];
+    const t = TOKENS[template] || TOKENS.modern;
 
     // 1. Header (Large Name)
     if (name) {
@@ -556,11 +711,12 @@ export async function exportResumeDOCX(
                     new TextRun({
                         text: name,
                         bold: true,
-                        size: 40, // 20pt
-                        font: HEADING_FONT,
-                        color: '000000',
+                        size: t.nameSize,
+                        font: t.headingFont,
+                        color: t.primaryColor,
                     }),
                 ],
+                alignment: t.centerHeader ? AlignmentType.CENTER : AlignmentType.LEFT,
                 spacing: { after: 80 },
             })
         );
@@ -568,27 +724,35 @@ export async function exportResumeDOCX(
 
     // 2. Contact details lines
     contactLines.forEach(l => {
-        children.push(createContactRow(l));
+        children.push(createContactRow(l, t));
     });
 
     // 3. Header Divider Line
-    children.push(
-        new Paragraph({
-            border: {
-                bottom: {
-                    color: '000000',
-                    space: 4,
-                    style: BorderStyle.SINGLE,
-                    size: 12, // 1.5pt
+    if (t.headerSeparator) {
+        children.push(
+            new Paragraph({
+                border: {
+                    bottom: {
+                        color: t.primaryColor,
+                        space: 4,
+                        style: BorderStyle.SINGLE,
+                        size: 12, // 1.5pt
+                    },
                 },
-            },
-            spacing: { after: 120 },
-        })
-    );
+                spacing: { after: 120 },
+            })
+        );
+    } else {
+        children.push(
+            new Paragraph({
+                spacing: { after: 120 },
+            })
+        );
+    }
 
     // 4. Document Sections
     secs.forEach(sec => {
-        const secChildren = buildSection(sec);
+        const secChildren = buildSection(sec, t);
         children.push(...secChildren);
     });
 
@@ -598,12 +762,7 @@ export async function exportResumeDOCX(
             {
                 properties: {
                     page: {
-                        margin: {
-                            top: 1080, // 0.75 in
-                            bottom: 1080,
-                            left: 1080,
-                            right: 1080,
-                        },
+                        margin: t.margin,
                     },
                 },
                 children: children,
@@ -628,6 +787,7 @@ export async function buildResumeDOCXBuffer(resumeMarkdown: string): Promise<Buf
     const [name, ...contactLines] = header;
 
     const children: any[] = [];
+    const t = TOKENS.modern; // Default buffer export (e.g. backend/migration) uses Modern
 
     if (name) {
         children.push(
@@ -636,9 +796,9 @@ export async function buildResumeDOCXBuffer(resumeMarkdown: string): Promise<Buf
                     new TextRun({
                         text: name,
                         bold: true,
-                        size: 40,
-                        font: HEADING_FONT,
-                        color: '000000',
+                        size: t.nameSize,
+                        font: t.headingFont,
+                        color: t.primaryColor,
                     }),
                 ],
                 spacing: { after: 80 },
@@ -647,14 +807,14 @@ export async function buildResumeDOCXBuffer(resumeMarkdown: string): Promise<Buf
     }
 
     contactLines.forEach(l => {
-        children.push(createContactRow(l));
+        children.push(createContactRow(l, t));
     });
 
     children.push(
         new Paragraph({
             border: {
                 bottom: {
-                    color: '000000',
+                    color: t.primaryColor,
                     space: 4,
                     style: BorderStyle.SINGLE,
                     size: 12,
@@ -665,7 +825,7 @@ export async function buildResumeDOCXBuffer(resumeMarkdown: string): Promise<Buf
     );
 
     secs.forEach(sec => {
-        const secChildren = buildSection(sec);
+        const secChildren = buildSection(sec, t);
         children.push(...secChildren);
     });
 
@@ -674,12 +834,7 @@ export async function buildResumeDOCXBuffer(resumeMarkdown: string): Promise<Buf
             {
                 properties: {
                     page: {
-                        margin: {
-                            top: 1080,
-                            bottom: 1080,
-                            left: 1080,
-                            right: 1080,
-                        },
+                        margin: t.margin,
                     },
                 },
                 children,

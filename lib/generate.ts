@@ -1,6 +1,8 @@
 import { getGeminiModel } from './gemini';
 import { generateWithLocal } from './ollama';
 import { generateWithCustom } from './custom_llm';
+import { callGitHubModels } from './github_models';
+
 
 export interface CustomConfig {
     localUrl?: string;
@@ -105,6 +107,30 @@ export async function generateText(opts: GenerateOptions): Promise<string> {
         });
     }
 
+    if (provider === 'github') {
+        const githubModel = modelName || 'gpt-4o-mini';
+        return withRetry(async () => {
+            const messages: any[] = [];
+            if (systemInstruction) {
+                messages.push({ role: 'system', content: systemInstruction });
+            }
+            messages.push({ role: 'user', content: prompt });
+
+            const result = await withTimeout(
+                callGitHubModels({
+                    model: githubModel,
+                    messages,
+                    temperature,
+                    apiKey,
+                    ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
+                }),
+                TIMEOUT_MS,
+                `GitHub Model ${githubModel} timed out after 60s`
+            );
+            return result;
+        });
+    }
+
     // ── Gemini ──
     return withRetry(async () => {
         try {
@@ -160,7 +186,7 @@ function sanitizeJson(raw: string): string {
     // 1. Remove trailing commas before ] or }
     const s = raw.replace(/,\s*([}\]])/g, '$1');
 
-    // 2. Fix raw control characters embedded inside string values.
+    // 2. Fix raw control characters and unescaped quotes embedded inside string values.
     //    We scan char-by-char so we only touch content actually inside a JSON string.
     let result = '';
     let inStr = false;
@@ -169,7 +195,50 @@ function sanitizeJson(raw: string): string {
         const ch = s[i];
         if (esc) { result += ch; esc = false; continue; }
         if (ch === '\\' && inStr) { result += ch; esc = true; continue; }
-        if (ch === '"') { inStr = !inStr; result += ch; continue; }
+        
+        if (ch === '"') {
+            if (inStr) {
+                // Smart Lookahead: Is this quote followed by a JSON structural separator?
+                let isClosing = false;
+                let j = i + 1;
+                while (j < s.length) {
+                    const nextCh = s[j];
+                    if (/\s/.test(nextCh)) { j++; continue; }
+                    if (nextCh === ':') {
+                        isClosing = true;
+                    } else if (nextCh === '}' || nextCh === ']') {
+                        isClosing = true;
+                    } else if (nextCh === ',') {
+                        // After a comma, we expect a new key (starts with '"') or new value item ('"', '[', '{', number, boolean, null)
+                        let k = j + 1;
+                        let nextToken = '';
+                        while (k < s.length) {
+                            const nCh = s[k];
+                            if (/\s/.test(nCh)) { k++; continue; }
+                            nextToken = nCh;
+                            break;
+                        }
+                        if (nextToken === '"' || nextToken === '{' || nextToken === '[' || nextToken === '}' || nextToken === ']' || /[0-9tfn\-]/.test(nextToken)) {
+                            isClosing = true;
+                        }
+                    }
+                    break;
+                }
+
+                if (isClosing) {
+                    inStr = false;
+                    result += ch;
+                } else {
+                    // It's an unescaped inner quote inside a string! Escape it.
+                    result += '\\"';
+                }
+            } else {
+                inStr = true;
+                result += ch;
+            }
+            continue;
+        }
+
         if (inStr) {
             if (ch === '\n') { result += '\\n'; continue; }
             if (ch === '\r') { result += '\\r'; continue; }

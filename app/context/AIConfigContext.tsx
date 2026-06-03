@@ -3,7 +3,61 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { createGeminiHealthyStatus, GeminiHealthStatus, parseGeminiHealthError } from '@/lib/gemini-quota';
 
-export type AIProvider = 'gemini' | 'local' | 'custom';
+export type AIProvider = 'gemini' | 'local' | 'custom' | 'github';
+
+const GITHUB_FREE_MODELS: Model[] = [
+    {
+        name: 'gpt-4o-mini',
+        displayName: 'GPT-4o Mini (GitHub)',
+        description: 'Blazing fast, highly accurate, and extremely safe on rate limits.',
+        inputTokenLimit: 8000,
+        outputTokenLimit: 4000,
+        family: 'flash',
+        stability: 'stable',
+        bestFor: 'Low tier: Ideal for fast, concurrent resume tailoring operations',
+    },
+    {
+        name: 'gpt-4o',
+        displayName: 'GPT-4o (GitHub)',
+        description: 'Elite reasoning and narrative quality, restricted to 10 RPM / 50 RPD.',
+        inputTokenLimit: 8000,
+        outputTokenLimit: 4000,
+        family: 'pro',
+        stability: 'stable',
+        bestFor: 'High tier: Deep ATS verification and advanced custom cover letters',
+    },
+    {
+        name: 'meta-llama-3.1-70b-instruct',
+        displayName: 'Llama 3.1 70B (GitHub)',
+        description: 'Open weight powerhouse from Meta, balanced and robust.',
+        inputTokenLimit: 8000,
+        outputTokenLimit: 4000,
+        family: 'pro',
+        stability: 'stable',
+        bestFor: 'Low tier: Excellent general resume structuring and bullet points',
+    },
+    {
+        name: 'cohere/cohere-command-r-plus-08-2024',
+        displayName: 'Cohere Command R+ (GitHub)',
+        description: 'Highly optimized for long context document search and structured parsing.',
+        inputTokenLimit: 8000,
+        outputTokenLimit: 4000,
+        family: 'pro',
+        stability: 'stable',
+        bestFor: 'High tier: Outstanding for Phase 0 keyword extraction',
+    },
+    {
+        name: 'meta/Meta-Llama-3.1-405B-Instruct',
+        displayName: 'Llama 3.1 405B (GitHub)',
+        description: 'Elite open weights model with massive reasoning power (restricted limits).',
+        inputTokenLimit: 8000,
+        outputTokenLimit: 4000,
+        family: 'pro',
+        stability: 'stable',
+        bestFor: 'High tier: Masterful structural edits and deep complex verification',
+    }
+];
+
 
 export interface Model {
     name: string;
@@ -91,6 +145,18 @@ export function AIConfigProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     useEffect(() => {
+        if (selectedProvider === 'github') {
+            const models = GITHUB_FREE_MODELS;
+            setAvailableModels(models);
+            setIsLoadingModels(false);
+            
+            const currentExists = models.some(model => model.name === selectedModel);
+            if (!currentExists) {
+                setModelState(models[0].name);
+            }
+            return;
+        }
+
         async function fetchModels() {
             try {
                 const savedKey = localStorage.getItem('gemini_api_key') || undefined;
@@ -135,7 +201,7 @@ export function AIConfigProvider({ children }: { children: React.ReactNode }) {
         }
 
         fetchModels();
-    }, [selectedModel]);
+    }, [selectedModel, selectedProvider]);
 
     const setSelectedProvider = (provider: AIProvider) => {
         setProviderState(provider);

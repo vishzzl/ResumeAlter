@@ -6,6 +6,8 @@ export const users = sqliteTable('users', {
     email: text('email').notNull().unique(),
     password: text('password').notNull(),
     role: text('role').default('user').notNull(),
+    masterResume: text('master_resume'),
+    masterResumeUpdatedAt: text('master_resume_updated_at'),
     createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
 });
 
@@ -47,6 +49,7 @@ export const profiles = sqliteTable('profiles', {
     education: text('education'), // JSON Array
     projects: text('projects'), // JSON Array
     certifications: text('certifications'), // JSON Array of {name, issuer, date, url}
+    skillMappings: text('skill_mappings'), // JSON: SkillMapping[]
     updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
     userId: integer('user_id').references(() => users.id),
 });

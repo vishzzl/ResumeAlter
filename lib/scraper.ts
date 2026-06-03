@@ -12,6 +12,8 @@ const AUTH_WALL_SIGNALS = [
     'sign in', 'log in', 'login', 'create account', 'register to view',
     'please log in', 'access denied', 'captcha', 'verify you are human',
     'enable javascript', 'javascript is required',
+    'iniciar sesión', 'iniciar sesion', 'crear cuenta', 'acceso denegado',
+    'contraseña', 'sign-in', 'log-in',
 ];
 
 function detectAuthWall(content: string): boolean {
@@ -67,6 +69,39 @@ export async function scrapeJobDescription(url: string): Promise<ScrapeResult> {
 
         if (isDisallowedHost(parsedUrl.hostname)) {
             throw new Error('Scraping internal network resources is prohibited');
+        }
+
+        // Try Jina Reader first because it bypasses Cloudflare/bot detection
+        try {
+            const jinaUrl = `https://r.jina.ai/${url}`;
+            const jinaHeaders: Record<string, string> = {
+                'Accept': 'application/json'
+            };
+
+            if (process.env.JINA_API_KEY) {
+                jinaHeaders['Authorization'] = `Bearer ${process.env.JINA_API_KEY}`;
+            }
+
+            const response = await axios.get(jinaUrl, {
+                headers: jinaHeaders,
+                timeout: 20000 // 20s timeout for Jina
+            });
+
+            if (response.status === 200 && response.data?.data?.content) {
+                const jinaContent = response.data.data.content.trim();
+                const cleaned = jinaContent.replace(/\s+/g, ' ').trim();
+
+                if (!detectAuthWall(cleaned)) {
+                    console.log(`Successfully scraped URL using Jina Reader: ${url}`);
+                    return { content: cleaned };
+                } else {
+                    console.warn(`Jina scraped content for ${url} looks like an auth-wall or bot detection. Falling back to Cheerio.`);
+                }
+            } else {
+                console.warn(`Jina Reader returned status ${response.status} or empty data for ${url}. Falling back to Cheerio.`);
+            }
+        } catch (jinaError: any) {
+            console.warn(`Jina Reader failed for ${url}: ${jinaError.message}. Falling back to Cheerio.`);
         }
 
         const { data } = await axios.get(url, {

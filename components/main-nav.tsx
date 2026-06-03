@@ -102,7 +102,7 @@ export function MainNav({ user }: MainNavProps) {
                                 )}
                             >
                                 <UserIcon className="h-4 w-4" />
-                                Master Profile
+                                My Resume
                             </Link>
                             <Link
                                 href="/new"

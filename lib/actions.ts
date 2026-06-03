@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { applications, profiles } from '@/lib/db/schema';
+import { applications, profiles, users } from '@/lib/db/schema';
 import { desc, eq, and } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/auth';
@@ -20,6 +20,34 @@ export async function getResumeDownloadLink() {
     return `/api/resume?userId=${userId}&token=${token}`;
 }
 
+export async function getMasterResume() {
+    const userId = await getUserId();
+    if (!userId) return '';
+
+    const result = await db
+        .select({ masterResume: users.masterResume })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+
+    return result[0]?.masterResume || '';
+}
+
+export async function updateMasterResume(masterResume: string) {
+    const userId = await getUserId();
+    if (!userId) throw new Error('Unauthorized');
+
+    await db
+        .update(users)
+        .set({
+            masterResume,
+            masterResumeUpdatedAt: new Date().toISOString(),
+        })
+        .where(eq(users.id, userId));
+
+    revalidatePath('/profile');
+    revalidatePath('/new');
+}
 
 export async function getProfiles() {
     const userId = await getUserId();
@@ -89,14 +117,29 @@ export async function deleteProfile(id: number) {
 export async function getApplications() {
     const userId = await getUserId();
     if (!userId) return [];
-    return await db.select().from(applications).where(eq(applications.userId, userId)).orderBy(desc(applications.createdAt));
+    try {
+        return await db.select().from(applications).where(eq(applications.userId, userId)).orderBy(desc(applications.createdAt));
+    } catch (err: any) {
+        const msg = String(err?.message || err);
+        if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('SERVER_ERROR')) {
+            console.error('[getApplications] DB auth error — check TURSO_AUTH_TOKEN:', msg);
+        } else {
+            console.error('[getApplications] DB error:', msg);
+        }
+        return [];
+    }
 }
 
 export async function getApplication(id: number) {
     const userId = await getUserId();
     if (!userId) return null;
-    const result = await db.select().from(applications).where(and(eq(applications.id, id), eq(applications.userId, userId)));
-    return result[0];
+    try {
+        const result = await db.select().from(applications).where(and(eq(applications.id, id), eq(applications.userId, userId)));
+        return result[0];
+    } catch (err: any) {
+        console.error('[getApplication] DB error:', err?.message || err);
+        return null;
+    }
 }
 
 export async function createApplication(jobUrl: string, jobDescription?: string, baseResume?: string, profileId?: number) {
@@ -106,7 +149,7 @@ export async function createApplication(jobUrl: string, jobDescription?: string,
     const result = await db.insert(applications).values({
         jobUrl,
         jobDescription: jobDescription || '', // Use provided description or default to empty (will be scraped)
-        baseResume: baseResume, // Use provided base resume (e.g. from Master Profile)
+        baseResume,
         profileId: profileId || null,
         userId
     }).returning({ insertedId: applications.id });

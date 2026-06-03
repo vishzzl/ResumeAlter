@@ -166,6 +166,34 @@ export function ModelSelector({ estimatedInputTokens }: ModelSelectorProps) {
                 align="end"
                 className="flex max-h-[min(76vh,620px)] w-[min(92vw,380px)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white/95 p-0 shadow-2xl backdrop-blur-xl"
             >
+                {/* Provider Tab Switcher */}
+                <div className="flex border-b border-slate-100 p-1.5 bg-slate-50/50 shrink-0">
+                    <button
+                        type="button"
+                        onClick={() => setSelectedProvider("gemini")}
+                        className={cn(
+                            "flex-1 py-1 text-center text-[10px] font-bold rounded-lg transition-all border",
+                            selectedProvider === "gemini"
+                                ? "bg-white text-slate-900 shadow-sm border-slate-200/50"
+                                : "border-transparent text-slate-500 hover:text-slate-900"
+                        )}
+                    >
+                        Google Gemini
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setSelectedProvider("github")}
+                        className={cn(
+                            "flex-1 py-1 text-center text-[10px] font-bold rounded-lg transition-all border",
+                            selectedProvider === "github"
+                                ? "bg-white text-slate-900 shadow-sm border-slate-200/50"
+                                : "border-transparent text-slate-500 hover:text-slate-900"
+                        )}
+                    >
+                        GitHub Models
+                    </button>
+                </div>
+
                 <div className="shrink-0 border-b border-slate-100 bg-slate-50/80 p-3">
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -175,6 +203,11 @@ export function ModelSelector({ estimatedInputTokens }: ModelSelectorProps) {
                         {selectedProvider === "gemini" && (
                             <span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase", familyTone(currentModel))}>
                                 {currentModel.family || "flash"}
+                            </span>
+                        )}
+                        {selectedProvider === "github" && (
+                            <span className="shrink-0 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-bold uppercase text-violet-700">
+                                {currentModel.name.includes('mini') || currentModel.name.includes('8b') ? 'Low Tier' : 'High Tier'}
                             </span>
                         )}
                     </div>
@@ -197,10 +230,32 @@ export function ModelSelector({ estimatedInputTokens }: ModelSelectorProps) {
                             </div>
                         </div>
                     )}
+
+                    {selectedProvider === "github" && (
+                        <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
+                            <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+                                <p className="text-slate-400">RPM Limit</p>
+                                <p className="mt-0.5 font-bold text-violet-700">
+                                    {currentModel.name.includes('mini') || currentModel.name.includes('8b') ? '15 RPM' : '10 RPM'}
+                                </p>
+                            </div>
+                            <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+                                <p className="text-slate-400">Daily Limit</p>
+                                <p className="mt-0.5 font-bold text-violet-700">
+                                    {currentModel.name.includes('mini') || currentModel.name.includes('8b') ? '150 RPD' : '50 RPD'}
+                                </p>
+                            </div>
+                            <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+                                <p className="text-slate-400">Tokens Cap</p>
+                                <p className="mt-0.5 font-bold text-slate-700">8k In / 4k Out</p>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
-                    <div className="flex min-h-0 flex-1 flex-col">
-                        <div className="shrink-0 space-y-2 border-b border-slate-100 p-3">
+                <div className="flex min-h-0 flex-1 flex-col">
+                    <div className="shrink-0 space-y-2 border-b border-slate-100 p-3">
+                        {selectedProvider === "gemini" && (
                             <div className={cn("rounded-lg border px-3 py-2 text-[11px]", statusTone(currentStatus?.state))}>
                                 <div className="flex items-center justify-between gap-2">
                                     <div className="flex min-w-0 items-center gap-2">
@@ -215,97 +270,123 @@ export function ModelSelector({ estimatedInputTokens }: ModelSelectorProps) {
                                     ) : null}
                                 </div>
                             </div>
+                        )}
 
-                            <div className="flex items-center gap-2">
-                                <input
-                                    value={query}
-                                    onChange={(event) => setQuery(event.target.value)}
-                                    placeholder="Filter models..."
-                                    className="h-8 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-[11px] text-slate-700 outline-none focus:border-slate-400"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => refreshGeminiStatus()}
-                                    disabled={currentStatus?.state === "checking"}
-                                    className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white px-2.5 text-slate-500 hover:bg-slate-50 disabled:opacity-50"
-                                    title="Refresh Gemini health"
-                                >
-                                    <RefreshCw className={cn("h-3.5 w-3.5", currentStatus?.state === "checking" && "animate-spin")} />
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowDetails(value => !value)}
-                                    className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white px-2.5 text-slate-500 hover:bg-slate-50"
-                                    title="Show quota details"
-                                >
-                                    <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", showDetails && "rotate-180")} />
-                                </button>
-                            </div>
-
-                            {showDetails && (
-                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600">
-                                    <p>{currentStatus?.detail || "Gemini does not expose exact remaining quota counts here. This panel shows last-known health and retry hints."}</p>
-                                    {currentStatus?.knownRemaining.requestsToday === 0 || currentStatus?.knownRemaining.inputTokensToday === 0 ? (
-                                        <p className="mt-2 font-bold text-amber-700">Known remaining today: 0</p>
-                                    ) : null}
-                                    {currentStatus?.exhaustedLabels?.length ? (
-                                        <p className="mt-2">Exhausted: {currentStatus.exhaustedLabels.join(", ")}</p>
-                                    ) : null}
-                                    <p className="mt-2">Output cap: {formatTokenCount(currentModel.outputTokenLimit ?? null)} tokens</p>
+                        {selectedProvider === "github" && (
+                            <div className="rounded-lg border border-violet-100 bg-violet-50/50 px-3 py-2 text-[11px] text-violet-700 shrink-0">
+                                <div className="flex items-center gap-2">
+                                    <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-violet-500 animate-pulse" />
+                                    <span className="font-bold">Rate limit queue active.</span>
                                 </div>
+                                <p className="mt-1 text-[10px] text-violet-600/90 leading-relaxed">
+                                    The application will automatically queue and delay requests to guarantee you never exceed GitHub Free limits.
+                                </p>
+                            </div>
+                        )}
+
+                        <div className="flex items-center gap-2">
+                            <input
+                                value={query}
+                                onChange={(event) => setQuery(event.target.value)}
+                                placeholder="Filter models..."
+                                className="h-8 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-[11px] text-slate-700 outline-none focus:border-slate-400"
+                            />
+                            {selectedProvider === "gemini" && (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() => refreshGeminiStatus()}
+                                        disabled={currentStatus?.state === "checking"}
+                                        className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white px-2.5 text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                                        title="Refresh Gemini health"
+                                    >
+                                        <RefreshCw className={cn("h-3.5 w-3.5", currentStatus?.state === "checking" && "animate-spin")} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowDetails(value => !value)}
+                                        className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white px-2.5 text-slate-500 hover:bg-slate-50"
+                                        title="Show quota details"
+                                    >
+                                        <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", showDetails && "rotate-180")} />
+                                    </button>
+                                </>
                             )}
                         </div>
 
-                        <div className="min-h-0 flex-1 overflow-y-auto p-2 custom-scrollbar">
-                            {isLoadingModels ? (
-                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">Loading models...</div>
-                            ) : geminiModels.length === 0 ? (
-                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">No models match.</div>
-                            ) : geminiModels.map(model => {
-                                const modelStatus = geminiStatuses[model.name];
-                                const modelCooldown = modelStatus?.retryAfterSeconds
-                                    ? Math.max(0, modelStatus.retryAfterSeconds - Math.floor((now - modelStatus.checkedAt) / 1000))
-                                    : null;
-                                const isSelected = selectedProvider === "gemini" && selectedModel === model.name;
-
-                                return (
-                                    <button
-                                        key={model.name}
-                                        type="button"
-                                        onClick={() => {
-                                            setSelectedProvider("gemini");
-                                            setSelectedModel(model.name);
-                                            setOpen(false);
-                                        }}
-                                        className={cn(
-                                            "mb-1.5 flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all",
-                                            isSelected
-                                                ? "border-slate-900 bg-slate-900 text-white"
-                                                : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-                                        )}
-                                    >
-                                        <Check className={cn("h-4 w-4 shrink-0", isSelected ? "opacity-100" : "opacity-0")} />
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex min-w-0 items-center gap-2">
-                                                <span className="truncate text-sm font-semibold">{model.displayName}</span>
-                                                <span className={cn("shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold uppercase", isSelected ? "border-white/20 bg-white/10 text-white" : familyTone(model))}>
-                                                    {model.family || "flash"}
-                                                </span>
-                                            </div>
-                                            <p className={cn("truncate text-[11px]", isSelected ? "text-slate-300" : "text-slate-500")}>
-                                                {model.bestFor || model.name}
-                                            </p>
-                                        </div>
-                                        {modelStatus?.state && modelStatus.state !== "idle" ? (
-                                            <span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase", isSelected ? "border-white/20 bg-white/10 text-white" : statusTone(modelStatus.state))}>
-                                                {modelCooldown && modelCooldown > 0 ? `${modelCooldown}s` : statusLabel(modelStatus.state)}
-                                            </span>
-                                        ) : null}
-                                    </button>
-                                );
-                            })}
-                        </div>
+                        {selectedProvider === "gemini" && showDetails && (
+                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600">
+                                <p>{currentStatus?.detail || "Gemini does not expose exact remaining quota counts here. This panel shows last-known health and retry hints."}</p>
+                                {currentStatus?.knownRemaining.requestsToday === 0 || currentStatus?.knownRemaining.inputTokensToday === 0 ? (
+                                    <p className="mt-2 font-bold text-amber-700">Known remaining today: 0</p>
+                                ) : null}
+                                {currentStatus?.exhaustedLabels?.length ? (
+                                    <p className="mt-2">Exhausted: {currentStatus.exhaustedLabels.join(", ")}</p>
+                                ) : null}
+                                <p className="mt-2">Output cap: {formatTokenCount(currentModel.outputTokenLimit ?? null)} tokens</p>
+                            </div>
+                        )}
                     </div>
+
+                    <div className="min-h-0 flex-1 overflow-y-auto p-2 custom-scrollbar">
+                        {isLoadingModels ? (
+                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">Loading models...</div>
+                        ) : geminiModels.length === 0 ? (
+                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">No models match.</div>
+                        ) : geminiModels.map(model => {
+                            const modelStatus = geminiStatuses[model.name];
+                            const modelCooldown = modelStatus?.retryAfterSeconds
+                                ? Math.max(0, modelStatus.retryAfterSeconds - Math.floor((now - modelStatus.checkedAt) / 1000))
+                                : null;
+                            const isSelected = selectedModel === model.name;
+
+                            return (
+                                <button
+                                    key={model.name}
+                                    type="button"
+                                    onClick={() => {
+                                        setSelectedProvider(selectedProvider);
+                                        setSelectedModel(model.name);
+                                        setOpen(false);
+                                    }}
+                                    className={cn(
+                                        "mb-1.5 flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all",
+                                        isSelected
+                                            ? "border-slate-900 bg-slate-900 text-white"
+                                            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                                    )}
+                                >
+                                    <Check className={cn("h-4 w-4 shrink-0", isSelected ? "opacity-100" : "opacity-0")} />
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex min-w-0 items-center gap-2">
+                                            <span className="truncate text-sm font-semibold">{model.displayName}</span>
+                                            <span className={cn(
+                                                "shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold uppercase", 
+                                                isSelected 
+                                                    ? "border-white/20 bg-white/10 text-white" 
+                                                    : selectedProvider === "github" 
+                                                        ? "border-violet-200 bg-violet-50 text-violet-700" 
+                                                        : familyTone(model)
+                                            )}>
+                                                {selectedProvider === "github" 
+                                                    ? (model.name.includes('mini') || model.name.includes('8b') ? 'Low Tier' : 'High Tier') 
+                                                    : (model.family || "flash")}
+                                            </span>
+                                        </div>
+                                        <p className={cn("truncate text-[11px]", isSelected ? "text-slate-300" : "text-slate-500")}>
+                                            {model.bestFor || model.name}
+                                        </p>
+                                    </div>
+                                    {selectedProvider === "gemini" && modelStatus?.state && modelStatus.state !== "idle" ? (
+                                        <span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase", isSelected ? "border-white/20 bg-white/10 text-white" : statusTone(modelStatus.state))}>
+                                            {modelCooldown && modelCooldown > 0 ? `${modelCooldown}s` : statusLabel(modelStatus.state)}
+                                        </span>
+                                    ) : null}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
             </PopoverContent>
         </Popover>
     );

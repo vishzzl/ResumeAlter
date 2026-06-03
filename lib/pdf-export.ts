@@ -15,19 +15,20 @@ import type { DocumentProps } from '@react-pdf/renderer';
 
 export interface ExportOptions {
     fileName?: string;
+    template?: 'modern' | 'classic' | 'minimal' | 'executive' | 'tech' | 'creative' | 'emerald';
 }
 
 /**
  * Generate a text-native PDF from a Markdown resume string and trigger download.
  *
  * @param resumeMarkdown  The tailored resume in Markdown format.
- * @param opts            Optional overrides (file name etc.)
+ * @param opts            Optional overrides (file name, template etc.)
  */
 export async function exportResumePDF(
     resumeMarkdown: string,
     opts: ExportOptions = {},
 ): Promise<void> {
-    const { fileName = 'Resume' } = opts;
+    const { fileName = 'Resume', template = 'modern' } = opts;
     const safeName = fileName.replace(/[^a-zA-Z0-9_\-\s]/g, '').trim() || 'Resume';
 
     // Build the document element — typed as ReactElement<DocumentProps>
@@ -35,7 +36,7 @@ export async function exportResumePDF(
     const docElement = React.createElement(
         Document,
         null,
-        React.createElement(ResumePDFPage, { resumeMarkdown })
+        React.createElement(ResumePDFPage, { resumeMarkdown, template })
     ) as React.ReactElement<DocumentProps>;
 
     // Generate PDF blob

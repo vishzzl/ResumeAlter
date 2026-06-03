@@ -1,11 +1,10 @@
 import { db } from '@/lib/db';
-import { profiles } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import React from 'react';
 import { ResumePDFPage } from '@/lib/resume-pdf-template';
-import { formatProfileToMarkdownForPDF } from '@/lib/utils';
 import { buildResumeDOCXBuffer } from '@/lib/docx-export';
 import { Document, pdf } from '@react-pdf/renderer';
 
@@ -77,13 +76,16 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        // Fetch the user's profile
-        const result = await db.select().from(profiles).where(eq(profiles.userId, userId)).limit(1);
-        const profile = result[0];
+        const result = await db
+            .select({ masterResume: users.masterResume, email: users.email })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+        const user = result[0];
 
-        if (!profile) {
+        if (!user?.masterResume?.trim()) {
             return NextResponse.json(
-                { error: 'Profile not found. Please create a master profile first.' },
+                { error: 'Resume not found. Please add My Resume first.' },
                 { 
                     status: 404,
                     headers: {
@@ -93,8 +95,7 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        // Format to Markdown
-        const resumeMarkdown = formatProfileToMarkdownForPDF(profile);
+        const resumeMarkdown = user.masterResume.trim() + '\n';
 
         if (format === 'markdown' || format === 'text') {
             return new Response(resumeMarkdown, {
@@ -106,7 +107,9 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        const sanitizedName = (profile.name || 'Resume').replace(/[^a-zA-Z0-9_\-\s]/g, '').trim() || 'Resume';
+        const headingMatch = resumeMarkdown.match(/^#\s+(.+)$/m);
+        const fallbackName = user.email?.split('@')[0] || 'Resume';
+        const sanitizedName = (headingMatch?.[1] || fallbackName).replace(/[^a-zA-Z0-9_\-\s]/g, '').trim() || 'Resume';
         const inline = searchParams.get('inline') === 'true';
 
         if (format === 'docx' || format === 'word') {

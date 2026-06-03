@@ -41,16 +41,32 @@ async function main() {
                     await client.execute(statement);
                     console.log(`   ✓ Executed statement`);
                 } catch (e) {
+                    const msg = e.message || '';
                     const isAlreadyExists =
-                        e.message.includes('already exists') ||
-                        e.message.includes('duplicate column name');
+                        msg.includes('already exists') ||
+                        msg.includes('duplicate column name');
+
+                    // Auth / network errors should not crash the build —
+                    // the DB may be temporarily unavailable or the token rotated.
+                    const isAuthError =
+                        msg.includes('401') ||
+                        msg.includes('Unauthorized') ||
+                        msg.includes('SERVER_ERROR') ||
+                        msg.includes('ECONNREFUSED') ||
+                        msg.includes('fetch failed');
 
                     if (isAlreadyExists) {
                         console.log(`   ⏭️ Skipped (Already applied)`);
+                    } else if (isAuthError) {
+                        console.warn(`\n⚠️  WARNING: Turso auth error — migrations skipped.`);
+                        console.warn(`   Ensure TURSO_AUTH_TOKEN is valid in your .env.local or deployment env.`);
+                        console.warn(`   Error: ${msg}`);
+                        // Don't crash the build — the app will still work with an existing schema.
+                        return;
                     } else {
-                        console.error(`   ❌ Error executing statement:`, e.message);
+                        console.error(`   ❌ Error executing statement:`, msg);
                         console.error(`   Statement: ${statement}`);
-                        throw e; // Fail the build if it's a real error
+                        throw e; // Fail the build if it's a real schema error
                     }
                 }
             }

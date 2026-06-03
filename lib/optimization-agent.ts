@@ -130,7 +130,7 @@ EXPERIENCE (HIGHEST PRIORITY SECTION):
 - Each bullet: exactly 1 sentence, follows STAR method (Action + Task + Result), uses an executive action verb from the JD.
 - Use only metrics that are present in the original resume — do not add new numbers.
 - Use only company names from the original resume, never the hiring company's name from the JD.
-- Maximum 3 roles. Maximum 3–4 bullets per role or per client.
+- Maximum 6 roles. Maximum 3–6 bullets per role or per client.
 
 EDUCATION: Keep exactly as original. Format: **Degree** | **Institution** | **Dates** (no bullet points).
 

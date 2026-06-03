@@ -247,16 +247,96 @@ export function auditContactLeakage(
 // Resume reconstruction
 // ---------------------------------------------------------------------------
 
-export function reconstructResume(sections: TailoredSections): string {
+export function detectOptimalSectionOrder(jdAnalysis: JDAnalysis): string {
+    // Heuristic: If there are many required skills, prioritize the Skills section by placing it before Experience
+    if (jdAnalysis.requiredSkills.length > 8) {
+        return 'skills-first';
+    }
+    return 'default';
+}
+
+export function reconstructResume(sections: TailoredSections, sectionOrder?: string): string {
     const parts: string[] = [];
     if (sections.header) parts.push(sections.header);
     if (sections.summary) parts.push(`## Summary\n${sections.summary}`);
-    if (sections.experience) parts.push(`## Experience\n${sections.experience}`);
-    if (sections.skills) parts.push(`## Skills\n${sections.skills}`);
+    
+    if (sectionOrder === 'skills-first') {
+        if (sections.skills) parts.push(`## Skills\n${sections.skills}`);
+        if (sections.experience) parts.push(`## Experience\n${sections.experience}`);
+    } else {
+        if (sections.experience) parts.push(`## Experience\n${sections.experience}`);
+        if (sections.skills) parts.push(`## Skills\n${sections.skills}`);
+    }
+    
     if (sections.education) parts.push(`## Education\n${sections.education}`);
     if (sections.projects) parts.push(`## Projects\n${sections.projects}`);
     if (sections.other) parts.push(`## ${inferOtherHeading(sections.other)}\n${sections.other}`);
     return parts.join('\n\n').trim();
+}
+
+export function deduplicateBullets(experience: string, keywords: string[]): { cleaned: string; removedDuplicates: string[] } {
+    const lines = experience.split('\n');
+    const cleanedLines: string[] = [];
+    const removedDuplicates: string[] = [];
+    const seenBullets = new Set<string>();
+    
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('-') && !trimmed.startsWith('*') && !trimmed.startsWith('•')) {
+            cleanedLines.push(line);
+            continue;
+        }
+        
+        const bulletContent = trimmed.replace(/^[-*•]\s*/, '').trim();
+        const normalized = bulletContent.toLowerCase().replace(/[^a-z0-9]/g, '');
+        
+        let isDuplicate = false;
+        for (const seen of seenBullets) {
+            if (seen === normalized || (normalized.length > 15 && (seen.includes(normalized) || normalized.includes(seen)))) {
+                isDuplicate = true;
+                break;
+            }
+        }
+        
+        if (isDuplicate) {
+            removedDuplicates.push(bulletContent);
+        } else {
+            seenBullets.add(normalized);
+            cleanedLines.push(line);
+        }
+    }
+    
+    return {
+        cleaned: cleanedLines.join('\n'),
+        removedDuplicates,
+    };
+}
+
+export function auditExperienceBullets(experience: string): string[] {
+    const warnings: string[] = [];
+    const lines = experience.split('\n');
+    
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('-') && !trimmed.startsWith('*') && !trimmed.startsWith('•')) {
+            continue;
+        }
+        const bullet = trimmed.replace(/^[-*•]\s*/, '').trim();
+        if (!bullet) continue;
+        
+        if (bullet.length < 50) {
+            warnings.push(`Bullet point is too short (${bullet.length} chars) — expand with more context/results: "${bullet.substring(0, 30)}..."`);
+        } else if (bullet.length > 220) {
+            warnings.push(`Bullet point is too long (${bullet.length} chars) — condense to stay concise: "${bullet.substring(0, 30)}..."`);
+        }
+        
+        const lowercaseBullet = bullet.toLowerCase();
+        if (lowercaseBullet.startsWith('responsible for') || lowercaseBullet.startsWith('helped with') || lowercaseBullet.startsWith('worked on')) {
+            warnings.push(`Bullet starts with a weak phrase — use an active, professional verb: "${bullet.substring(0, 30)}..."`);
+        }
+    }
+    
+    return warnings;
 }
 
 // ---------------------------------------------------------------------------
@@ -302,7 +382,19 @@ ${sections.other}`;
 // Prompt: full resume tailoring
 // ---------------------------------------------------------------------------
 
-export function buildTailoringPrompt(sections: ResumeSections, jobDescription: string, hints: KeywordHints): string {
+export function buildTailoringPrompt(
+    sections: ResumeSections,
+    jobDescription: string,
+    hints: KeywordHints,
+    isPreFiltered?: boolean
+): string {
+    const preFilterBlock = isPreFiltered ? `
+NOTE ON PRE-FILTERING (CRITICAL):
+This resume has been programmatically pre-filtered based on the user's master profile skill mappings.
+1. The Skills listed in the Skills section are the precise ones that match this JD. Prioritize all of them.
+2. The Experience bullets contain a mix of direct JD keyword-matched achievements (first) and general high-impact accomplishments (following) for career continuity. Rephrase and optimize all bullets, prioritizing direct JD-alignment for the top bullets, and ensuring no fabrication of unsupported facts.
+` : '';
+
     return `You are tailoring a resume for a specific job. Use a balanced ATS style: exact JD terms where supported, concise professional language, and no keyword stuffing.
 
 PRIORITY ORDER
@@ -310,7 +402,7 @@ PRIORITY ORDER
 2. ATS alignment: use exact job-description terms only when the resume contains evidence for them.
 3. Human readability: concise bullets, strong verbs, and plain ATS-safe Markdown.
 4. Completeness: keep relevant roles/projects; prune unrelated bullets only when enough relevant evidence remains.
-
+${preFilterBlock}
 JOB DESCRIPTION AND USER SELECTIONS
 ${jobDescription}
 
@@ -350,8 +442,8 @@ SKILLS
 EXPERIENCE
 - Preserve real companies, roles, dates, clients, and metrics exactly as written.
 - Use past tense for roles that have ended; use present tense for the current role only.
-- Write 2–4 bullets per relevant role. Each bullet must be one sentence, action-led, and result-oriented.
-- Target 80–120 characters per bullet (excluding the leading dash). Trim padding words to meet this.
+- Write 3–6 bullets per relevant role (retain and optimize as many bullets as the original role had, prioritizing JD-relevant achievements). Each bullet must be one sentence, action-led, and result-oriented.
+- Target 100–180 characters per bullet (excluding the leading dash). This allows for sufficient detail (Action-Context-Result) without being too wordy.
 - Preserve exact numbers, percentages, timeframes, and dollar amounts. Never round or approximate.
 - Vary action verbs across bullets; do not repeat the same opening verb more than twice in the entire section.
 

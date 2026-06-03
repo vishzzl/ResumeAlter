@@ -7,7 +7,7 @@ interface ResumePreviewProps {
     content: string;
     title?: string | null;
     company?: string | null;
-    template?: 'modern' | 'classic' | 'minimal';
+    template?: 'modern' | 'classic' | 'minimal' | 'executive' | 'tech' | 'creative' | 'emerald' | 'elegant' | 'slate';
 }
 
 export function ResumePreview({ content, template = 'modern' }: ResumePreviewProps) {
@@ -52,6 +52,84 @@ export function ResumePreview({ content, template = 'modern' }: ResumePreviewPro
             strong: "font-semibold text-gray-950",
             hr: "border-gray-200 my-5",
             a: "text-gray-950 underline decoration-gray-300 underline-offset-2"
+        },
+        // EXECUTIVE (SERIF CORPORATE) - Deep navy/indigo accents, elegant serifs.
+        executive: {
+            container: "font-serif text-slate-900 leading-relaxed break-words [&>h1+p]:text-center [&>h1+p]:text-[12px] [&>h1+p]:sm:text-sm [&>h1+p]:text-slate-500 [&>h1+p]:mb-5",
+            h1: "text-3xl sm:text-[34px] font-bold text-indigo-950 mb-2 text-center border-b-2 border-indigo-950 pb-3 uppercase tracking-wide",
+            h2: "text-[13px] sm:text-sm font-bold uppercase text-indigo-900 mt-6 sm:mt-7 mb-2 border-b border-indigo-200 pb-1.5",
+            h3: "text-[14px] sm:text-base font-bold text-indigo-950 mt-3 sm:mt-4 mb-1",
+            p: "text-[13px] sm:text-sm text-slate-800 mb-2 leading-relaxed",
+            ul: "list-disc list-outside ml-4 sm:ml-5 space-y-1 text-[13px] sm:text-sm text-slate-800 mb-3 marker:text-indigo-500",
+            li: "pl-1",
+            strong: "font-bold text-slate-950",
+            hr: "border-indigo-100 my-4",
+            a: "text-indigo-900 underline decoration-indigo-300 underline-offset-2"
+        },
+        // TECH MONO (DEVELOPER HIGHLIGHT) - Monospace headers, clean sky/ocean accent lines.
+        tech: {
+            container: "font-sans text-slate-800 leading-relaxed break-words [&>h1+p]:text-center [&>h1+p]:text-[12px] [&>h1+p]:sm:text-sm [&>h1+p]:text-slate-500 [&>h1+p]:mb-5",
+            h1: "text-3xl sm:text-[34px] font-mono font-bold text-slate-950 mb-2 text-center border-b-2 border-sky-500 pb-3",
+            h2: "text-[13px] sm:text-sm font-mono font-bold uppercase text-sky-700 mt-6 sm:mt-7 mb-2 border-l-4 border-sky-600 pl-2 py-0.5",
+            h3: "text-[14px] sm:text-base font-mono font-bold text-slate-950 mt-3 sm:mt-4 mb-1",
+            p: "text-[13px] sm:text-sm text-slate-700 mb-2 leading-relaxed",
+            ul: "list-disc list-outside ml-4 sm:ml-5 space-y-1.5 text-[13px] sm:text-sm text-slate-700 mb-3 marker:text-sky-500",
+            li: "pl-1",
+            strong: "font-mono font-semibold text-slate-950 bg-slate-50 px-1 border border-slate-200/50 rounded",
+            hr: "border-slate-200 my-4",
+            a: "font-mono text-sky-600 underline decoration-sky-300 underline-offset-2"
+        },
+        // CREATIVE TEAL - Vibrant teal accents, left-accent border, sleek sans-serif.
+        creative: {
+            container: "font-sans text-slate-800 leading-relaxed break-words [&>h1+p]:text-center [&>h1+p]:text-[12px] [&>h1+p]:sm:text-sm [&>h1+p]:text-slate-500 [&>h1+p]:mb-5",
+            h1: "text-3xl sm:text-[34px] font-bold text-teal-900 mb-2 text-center border-b-2 border-teal-600 pb-3 tracking-wide",
+            h2: "text-[13px] sm:text-sm font-bold uppercase text-teal-700 mt-6 sm:mt-7 mb-2 border-l-4 border-teal-600 pl-2.5 py-0.5",
+            h3: "text-[14px] sm:text-base font-semibold text-slate-900 mt-3 sm:mt-4 mb-1",
+            p: "text-[13px] sm:text-sm text-slate-700 mb-2 leading-relaxed",
+            ul: "list-disc list-outside ml-4 sm:ml-5 space-y-1 text-[13px] sm:text-sm text-slate-700 mb-3 marker:text-teal-500",
+            li: "pl-1",
+            strong: "font-semibold text-slate-950",
+            hr: "border-teal-100 my-4",
+            a: "text-teal-600 underline decoration-teal-300 underline-offset-2"
+        },
+        // EMERALD CORPORATE - Deep forest emerald details, classy serif headers, elegant layout.
+        emerald: {
+            container: "font-serif text-slate-900 leading-relaxed break-words [&>h1+p]:text-center [&>h1+p]:text-[12px] [&>h1+p]:sm:text-sm [&>h1+p]:text-slate-500 [&>h1+p]:mb-5",
+            h1: "text-3xl sm:text-[34px] font-bold text-emerald-950 mb-2 text-center border-b-2 border-emerald-800 pb-3 uppercase tracking-wide",
+            h2: "text-[13px] sm:text-sm font-bold uppercase text-emerald-800 mt-6 sm:mt-7 mb-2 border-b border-emerald-200 pb-1.5",
+            h3: "text-[14px] sm:text-base font-bold text-emerald-950 mt-3 sm:mt-4 mb-1",
+            p: "text-[13px] sm:text-sm text-slate-800 mb-2 leading-relaxed",
+            ul: "list-disc list-outside ml-4 sm:ml-5 space-y-1 text-[13px] sm:text-sm text-slate-800 mb-3 marker:text-emerald-500",
+            li: "pl-1",
+            strong: "font-bold text-slate-950",
+            hr: "border-emerald-100 my-4",
+            a: "text-emerald-800 underline decoration-emerald-300 underline-offset-2"
+        },
+        // ELEGANT CRIMSON - Rich burgundy accents, double bottom border on headers, polished Georgia serif.
+        elegant: {
+            container: "font-serif text-rose-950 leading-relaxed break-words [&>h1+p]:text-center [&>h1+p]:text-[12px] [&>h1+p]:sm:text-sm [&>h1+p]:text-rose-900 [&>h1+p]:mb-5",
+            h1: "text-3xl sm:text-[34px] font-bold text-rose-900 mb-2 text-center border-b-4 border-double border-rose-900 pb-3 uppercase tracking-wider",
+            h2: "text-[13px] sm:text-sm font-bold uppercase text-rose-800 mt-6 sm:mt-7 mb-2 border-b border-rose-200 pb-1.5",
+            h3: "text-[14px] sm:text-base font-bold text-rose-950 mt-3 sm:mt-4 mb-1",
+            p: "text-[13px] sm:text-sm text-rose-900 mb-2 leading-relaxed",
+            ul: "list-disc list-outside ml-4 sm:ml-5 space-y-1 text-[13px] sm:text-sm text-rose-900 mb-3 marker:text-rose-700",
+            li: "pl-1",
+            strong: "font-bold text-rose-950",
+            hr: "border-rose-100 my-4",
+            a: "text-rose-800 underline decoration-rose-300 underline-offset-2"
+        },
+        // SLATE MODERNIST - Slate grey accent tones, clean sans-serif layout, light border lines.
+        slate: {
+            container: "font-sans text-slate-700 leading-relaxed break-words [&>h1+p]:text-center [&>h1+p]:text-[12px] [&>h1+p]:sm:text-sm [&>h1+p]:text-slate-500 [&>h1+p]:mb-5",
+            h1: "text-3xl sm:text-[34px] font-bold text-slate-900 mb-2 text-center border-b border-slate-400 pb-3",
+            h2: "text-[13px] sm:text-sm font-bold uppercase text-slate-800 mt-6 sm:mt-7 mb-2 border-b border-slate-100 pb-1.5",
+            h3: "text-[14px] sm:text-base font-bold text-slate-900 mt-3 sm:mt-4 mb-1",
+            p: "text-[13px] sm:text-sm text-slate-600 mb-2 leading-relaxed",
+            ul: "list-disc list-outside ml-4 sm:ml-5 space-y-1 text-[13px] sm:text-sm text-slate-600 mb-3 marker:text-slate-400",
+            li: "pl-1",
+            strong: "font-semibold text-slate-900",
+            hr: "border-slate-100 my-4",
+            a: "text-slate-800 underline decoration-slate-300 underline-offset-2"
         }
     };
 

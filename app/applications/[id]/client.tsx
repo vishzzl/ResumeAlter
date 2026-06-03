@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Application } from '@/lib/db/schema';
-import { updateApplication, getProfile } from '@/lib/actions';
+import { updateApplication, getMasterResume } from '@/lib/actions';
 import {
     Loader2, Save, Wand2, Upload, FileText, ChevronLeft, ChevronRight,
     RefreshCw, Download, CheckSquare, Square, UserCheck, Briefcase,
@@ -18,11 +18,11 @@ import { JobDetails } from '@/lib/parser';
 import { useAIConfig } from '@/app/context/AIConfigContext';
 import { ResumePreview } from '@/components/ResumePreview';
 import { DiffViewer } from '@/components/DiffViewer';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { SectionWiseEditor, SectionName, SectionState, SectionsState, SECTION_ORDER } from '@/components/SectionWiseEditor';
 import { parseResumeSections } from '@/lib/resume-parser';
 import { ModelSelector } from '@/components/ModelSelector';
 import { ATSScorePanel } from '@/components/ATSScorePanel';
+
 interface AnalysisChange {
     section?: string;
     reason?: string;
@@ -203,11 +203,13 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     // UI State
     const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
     const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
-    const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'classic' | 'minimal'>('modern');
+    const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'classic' | 'minimal' | 'executive' | 'tech' | 'creative' | 'emerald' | 'elegant' | 'slate'>('modern');
     const [activeAnalysisTab, setActiveAnalysisTab] = useState<'changes' | 'coverage' | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pdfGenerating, setPdfGenerating] = useState(false);
     const [docxGenerating, setDocxGenerating] = useState(false);
+    const [isFormatting, setIsFormatting] = useState(false);
+    const [showPlainTextBanner, setShowPlainTextBanner] = useState(false);
         // ─── Section-wise generation state ───────────────────────────────────────────
 
 
@@ -238,8 +240,6 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const inputTooShort = resumeText.length < 200 || jobDescription.length < 100;
     const canTailor = !loading && !!resumeText && !!jobDescription && !inputTooShort;
 
-    // Certifications State
-    const [, setProfileCertifications] = useState<Record<string, unknown>[]>([]);
     const [selectedCertifications] = useState<Record<string, unknown>[]>(
         app.selectedCertifications ? JSON.parse(app.selectedCertifications) : []
     );
@@ -273,43 +273,12 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const hasInsights = ((changes.length > 0) || keywordCoverage) && tailoredResume;
 
 
-    // Sync Profile Sections State
-    const [selectedSyncSections, setSelectedSyncSections] = useState({
-        basics: true,
-        experience: true,
-        education: true,
-        skills: true,
-        projects: true,
-        certifications: true
-    });
-    const [isSyncPopoverOpen, setIsSyncPopoverOpen] = useState(false);
-
-    useEffect(() => {
-        // Load master profile certifications
-        getProfile(app.profileId || undefined).then(p => {
-            if (p && p.certifications) {
-                try {
-                    const certs = JSON.parse(p.certifications);
-                    setProfileCertifications(certs);
-                } catch (e) {
-                    console.error("Failed to parse certifications:", e);
-                    setProfileCertifications([]);
-                }
-                // If no selection made yet, select all by default? Or leave empty? 
-                // Let's leave empty or respect DB.
-            }
-        });
-    }, []);
-
-
-
-
     // Wrap scrapeJob in useCallback so it can be safely used in useEffect deps
     const scrapeJob = useCallback(async () => {
         if (!app.jobUrl && !jobDescription) return;
         setIsScraping(true);
         try {
-            const apiKey = localStorage.getItem('gemini_api_key');
+            const apiKey = selectedProvider === 'github' ? localStorage.getItem('github_token') : localStorage.getItem('gemini_api_key');
             const res = await fetch('/api/scrape', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -422,7 +391,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
         setOutputTab('coverLetter');
         let timeoutId: ReturnType<typeof setTimeout> | undefined;
         try {
-            const apiKey = localStorage.getItem('gemini_api_key');
+            const apiKey = selectedProvider === 'github' ? localStorage.getItem('github_token') : localStorage.getItem('gemini_api_key');
             let finalJobDescription = jobDescription;
             if (jobDetails && !selectedJobDetails.useFullDescription) {
                 const selectedSkills = getSelectedSkillBuckets();
@@ -535,128 +504,25 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
         }
     };
 
-    const handleSyncProfile = async () => {
-        if (resumeText && !confirm("This will overwrite your current Base Resume with the selected sections from your Master Profile. Are you sure?")) {
+    const handleImportMasterResume = async () => {
+        if (resumeText && !confirm("This will overwrite your current Base Resume with My Resume. Are you sure?")) {
             return;
         }
-        setIsSyncPopoverOpen(false);
         setLoading(true);
         try {
-            const profile = await getProfile(app.profileId || undefined);
-            if (!profile) {
-                alert("No Master Profile found. Please configure it in the Profile section.");
+            const masterResume = await getMasterResume();
+            if (!masterResume.trim()) {
+                alert("No resume saved yet. Please add it in My Resume first.");
                 setLoading(false);
                 return;
             }
-            const parts = [];
-
-            if (selectedSyncSections.basics) {
-                if (profile.name) parts.push(`# ${profile.name}`);
-                const contact = [profile.email, profile.phone, profile.linkedin, profile.website].filter(Boolean).join(' | ');
-                if (contact) parts.push(`${contact}\n`);
-                if (profile.summary) {
-                    parts.push(`## Professional Summary\n${profile.summary}\n`);
-                }
-            }
-
-            if (selectedSyncSections.experience) {
-                const exp = profile.experience ? JSON.parse(profile.experience) : [];
-                if (exp.length > 0) {
-                    parts.push('## Experience');
-                    exp.forEach((e: any) => {
-                        parts.push(`### ${e.role} | ${e.company}`);
-                        parts.push(`*${e.dates}*`);
-                        if (e.description) parts.push(e.description);
-
-                        // Render client-specific sections if they exist
-                        const clients = e.clients || [];
-                        if (clients.length > 0) {
-                            clients.forEach((c: any) => {
-                                let clientHeader = '';
-                                if (c.name) clientHeader += c.name;
-                                if (c.domain) clientHeader += (clientHeader ? ` - ${c.domain}` : c.domain);
-                                if (clientHeader) parts.push(`\n**Client:** ${clientHeader}`);
-                                if (c.description) parts.push(c.description);
-                            });
-                        }
-
-                        parts.push('');
-                    });
-                }
-            }
-
-            if (selectedSyncSections.education) {
-                const edu = profile.education ? JSON.parse(profile.education) : [];
-                if (edu.length > 0) {
-                    parts.push('## Education');
-                    edu.forEach((e: any) => {
-                        parts.push(`### ${e.degree}`);
-                        parts.push(`${e.institution} | ${e.dates}`);
-                        parts.push('');
-                    });
-                }
-            }
-
-            if (selectedSyncSections.skills) {
-                let skills = profile.skills;
-                if (typeof skills === 'string') {
-                    try { skills = JSON.parse(skills); } catch { }
-                }
-                if (Array.isArray(skills) && skills.length > 0) {
-                    parts.push('## Skills');
-                    parts.push(skills.join(', '));
-                    parts.push('');
-                } else if (typeof skills === 'string' && skills) {
-                    parts.push('## Skills');
-                    parts.push(skills);
-                    parts.push('');
-                }
-            }
-
-            if (selectedSyncSections.projects) {
-                const projects = profile.projects ? JSON.parse(profile.projects) : [];
-                if (projects.length > 0) {
-                    parts.push('## Projects');
-                    projects.forEach((p: any) => {
-                        let projectLine = `### ${p.name}`;
-                        if (p.link) projectLine += ` | [Link](${p.link})`;
-                        parts.push(projectLine);
-                        if (p.description) {
-                            const descLines = p.description.split('\n').filter((l: string) => l.trim().length > 0);
-                            descLines.forEach((line: string) => {
-                                parts.push(line.trim().startsWith('*') || line.trim().startsWith('-') ? line : `* ${line}`);
-                            });
-                        }
-                        parts.push('');
-                    });
-                }
-            }
-
-            if (selectedSyncSections.certifications) {
-                const certs = profile.certifications ? JSON.parse(profile.certifications) : [];
-                if (certs.length > 0) {
-                    parts.push('## Certifications');
-                    certs.forEach((c: any) => {
-                        let certLine = `### ${c.name}`;
-                        if (c.issuer) certLine += ` | ${c.issuer}`;
-                        parts.push(certLine);
-
-                        const details = [];
-                        if (c.date) details.push(c.date);
-                        if (c.url) details.push(`[Link](${c.url})`);
-                        if (details.length > 0) parts.push(`* ${details.join(' | ')}`);
-
-                        parts.push('');
-                    });
-                }
-            }
-
-            const newResumeText = parts.join('\n');
-            setResumeText(newResumeText);
-            await updateApplication(app.id, { baseResume: newResumeText });
+            setResumeText(masterResume);
+            await updateApplication(app.id, { baseResume: masterResume, profileId: null });
+            setApp((prev: Application) => ({ ...prev, baseResume: masterResume, profileId: null }));
+            toast.success('Imported My Resume.');
         } catch (err) {
-            console.error("Failed to sync profile", err);
-            alert("Failed to sync profile");
+            console.error("Failed to import My Resume", err);
+            alert("Failed to import My Resume");
         } finally {
             setLoading(false);
         }
@@ -677,7 +543,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
 
         let timeoutId: ReturnType<typeof setTimeout> | undefined;
         try {
-            const apiKey = localStorage.getItem('gemini_api_key');
+            const apiKey = selectedProvider === 'github' ? localStorage.getItem('github_token') : localStorage.getItem('gemini_api_key');
             let finalJobDescription = jobDescription;
             if (jobDetails && !selectedJobDetails.useFullDescription) {
                 const selectedSkills = getSelectedSkillBuckets();
@@ -748,7 +614,10 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                         try {
                             const event = JSON.parse(line.slice(6));
 
-                            if (event.phase === 'extracting') {
+                            if (event.phase === 'formatting') {
+                                setTailorPhase('extracting');
+                                toast.info('🔄 Auto-formatting plain-text resume...', { id: 'tailor-status' });
+                            } else if (event.phase === 'extracting') {
                                 setTailorPhase('extracting');
                                 toast.info('🔍 Extracting keywords...', { id: 'tailor-status' });
                             } else if (event.phase === 'tailoring') {
@@ -862,7 +731,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             }
             const { exportResumePDF } = await import('@/lib/pdf-export');
             const fileName = ['Resume', app.companyName, app.jobTitle].filter(Boolean).join(' - ');
-            await exportResumePDF(tailoredResume, { fileName });
+            await exportResumePDF(tailoredResume, { fileName, template: selectedTemplate });
         } catch (err) {
             console.error('PDF export failed:', err);
             setError('PDF export failed. Please try again.');
@@ -885,12 +754,48 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             }
             const { exportResumeDOCX } = await import('@/lib/docx-export');
             const fileName = ['Resume', app.companyName, app.jobTitle].filter(Boolean).join(' - ');
-            await exportResumeDOCX(tailoredResume, { fileName });
+            await exportResumeDOCX(tailoredResume, { fileName, template: selectedTemplate });
         } catch (err) {
             console.error('DOCX export failed:', err);
             setError('DOCX export failed. Please try again.');
         } finally {
             setDocxGenerating(false);
+        }
+    };
+
+    // ─── Format Resume Handler ────────────────────────────────────────────────
+    const handleFormatResume = async () => {
+        if (!resumeText || isFormatting) return;
+        setIsFormatting(true);
+        setShowPlainTextBanner(false);
+        toast.info('✨ Formatting resume to industry standard...', { id: 'format-status' });
+        try {
+            const apiKey = selectedProvider === 'github' ? localStorage.getItem('github_token') : localStorage.getItem('gemini_api_key');
+            const res = await fetch('/api/format-resume', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: resumeText,
+                    apiKey,
+                    modelProvider: selectedProvider,
+                    modelName: selectedModel,
+                    customConfig: customModelConfig,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Format failed');
+            if (data.formatted) {
+                setResumeText(data.formatted);
+                await updateApplication(app.id, { baseResume: data.formatted });
+                toast.success('✅ Resume formatted to industry standard!', { id: 'format-status' });
+            } else {
+                toast.warning('Could not auto-format — please check your input.', { id: 'format-status' });
+            }
+        } catch (err) {
+            console.error('Format resume failed:', err);
+            toast.error('Formatting failed. Please try again.', { id: 'format-status' });
+        } finally {
+            setIsFormatting(false);
         }
     };
 
@@ -913,7 +818,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
         }));
 
         try {
-            const apiKey = localStorage.getItem('gemini_api_key');
+            const apiKey = selectedProvider === 'github' ? localStorage.getItem('github_token') : localStorage.getItem('gemini_api_key');
             const res = await fetch('/api/tailor-section', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1703,65 +1608,39 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                     <div>
                                         <p className="text-[11px] font-semibold text-slate-500">Step 2</p>
                                         <h3 className="text-sm font-semibold text-slate-950">Resume source</h3>
-                                        <p className="mt-0.5 text-[11px] text-slate-500">Paste, upload, or sync your master profile.</p>
+                                        <p className="mt-0.5 text-[11px] text-slate-500">Paste, upload, or import My Resume.</p>
                                     </div>
                                     <div className="scrollbar-hide flex w-full items-center gap-1 overflow-x-auto sm:w-auto">
-                                        <Popover open={isSyncPopoverOpen} onOpenChange={setIsSyncPopoverOpen}>
-                                            <PopoverTrigger asChild>
-                                                <button
-                                                    className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950"
-                                                    title="Sync from Master Profile"
-                                                >
-                                                    <UserCheck className="h-3.5 w-3.5" />
-                                                    Sync Profile
-                                                </button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-64 p-3" align="end">
-                                                <div className="space-y-3">
-                                                    <div>
-                                                        <h4 className="text-xs font-semibold text-slate-900">Select Sections to Sync</h4>
-                                                        <p className="text-[10px] text-slate-500">Choose which parts of your Master Profile to copy over.</p>
-                                                    </div>
-                                                    <div className="space-y-1.5">
-                                                        {Object.entries({
-                                                            basics: "Basics & Summary",
-                                                            experience: "Experience",
-                                                            education: "Education",
-                                                            skills: "Skills",
-                                                            projects: "Projects",
-                                                            certifications: "Certifications"
-                                                        }).map(([key, label]) => (
-                                                            <label key={key} className="flex items-center gap-2 cursor-pointer group">
-                                                                <button
-                                                                    type="button"
-                                                                    className={`flex h-4 w-4 items-center justify-center rounded border ${selectedSyncSections[key as keyof typeof selectedSyncSections] ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300 group-hover:border-indigo-400'}`}
-                                                                    onClick={() => setSelectedSyncSections(prev => ({ ...prev, [key]: !prev[key as keyof typeof selectedSyncSections] }))}
-                                                                >
-                                                                    {selectedSyncSections[key as keyof typeof selectedSyncSections] && <Check className="h-3 w-3" />}
-                                                                </button>
-                                                                <span className="text-xs font-medium text-slate-700 select-none group-hover:text-slate-900 transition-colors">
-                                                                    {label}
-                                                                </span>
-                                                            </label>
-                                                        ))}
-                                                    </div>
-                                                    <div className="pt-2 border-t border-slate-100">
-                                                        <button
-                                                            onClick={handleSyncProfile}
-                                                            className="w-full bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold py-1.5 rounded-md transition-colors shadow-sm"
-                                                        >
-                                                            Confirm Sync
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </PopoverContent>
-                                        </Popover>
+                                        <button
+                                            type="button"
+                                            onClick={handleImportMasterResume}
+                                            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950"
+                                            title="Import My Resume"
+                                        >
+                                            <UserCheck className="h-3.5 w-3.5" />
+                                            Import My Resume
+                                        </button>
                                         <div className="h-4 w-px bg-slate-200" />
                                         <label className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-950">
                                             {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
                                             Upload PDF
                                             <input type="file" accept=".pdf,.txt" className="hidden" onChange={handleFileUpload} />
                                         </label>
+                                        {resumeText && (
+                                            <>
+                                                <div className="h-4 w-px bg-slate-200" />
+                                                <button
+                                                    type="button"
+                                                    onClick={handleFormatResume}
+                                                    disabled={isFormatting || loading}
+                                                    title="Format plain-text resume to industry-standard Markdown"
+                                                    className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-indigo-600 transition-colors hover:bg-indigo-50 hover:text-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    {isFormatting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                                                    {isFormatting ? 'Formatting...' : 'Format'}
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
 
@@ -1780,12 +1659,48 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                         </label>
                                     </div>
                                 ) : (
-                                    <textarea
-                                        className="custom-scrollbar w-full flex-1 resize-none overflow-y-auto bg-white p-4 font-mono text-base text-slate-800 outline-none placeholder:text-slate-300 sm:text-[13px] lg:min-h-0"
-                                        placeholder="Paste your resume content here..."
-                                        value={resumeText}
-                                        onChange={(e) => setResumeText(e.target.value)}
-                                    />
+                                    <div className="flex flex-col flex-1 min-h-0 relative">
+                                        {/* Plain-text detection banner */}
+                                        {showPlainTextBanner && (
+                                            <div className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                                <svg className="h-4 w-4 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                <span className="flex-1">Plain text detected — format to industry-standard Markdown for best results.</span>
+                                                <button
+                                                    onClick={handleFormatResume}
+                                                    disabled={isFormatting}
+                                                    className="flex items-center gap-1 rounded-md bg-amber-600 px-2.5 py-1 font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
+                                                >
+                                                    {isFormatting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                                                    Format Now
+                                                </button>
+                                                <button onClick={() => setShowPlainTextBanner(false)} className="rounded p-1 hover:bg-amber-100">
+                                                    <X className="h-3.5 w-3.5" />
+                                                </button>
+                                            </div>
+                                        )}
+                                        <textarea
+                                            className="custom-scrollbar w-full flex-1 resize-none overflow-y-auto bg-white p-4 font-mono text-base text-slate-800 outline-none placeholder:text-slate-300 sm:text-[13px] lg:min-h-0"
+                                            placeholder="Paste your resume content here..."
+                                            value={resumeText}
+                                            onChange={(e) => {
+                                                setResumeText(e.target.value);
+                                                setShowPlainTextBanner(false);
+                                            }}
+                                            onBlur={(e) => {
+                                                // Auto-detect plain text on blur
+                                                const val = e.target.value;
+                                                if (val.trim().length > 200) {
+                                                    const hasMarkdownHeadings = /^#{1,3}\s/m.test(val);
+                                                    const hasMarkdownBold = /\*\*/.test(val);
+                                                    const hasMdLinks = /\[.+?\]\(.+?\)/.test(val);
+                                                    const signals = [hasMarkdownHeadings, hasMarkdownBold, hasMdLinks].filter(Boolean).length;
+                                                    setShowPlainTextBanner(signals < 2);
+                                                }
+                                            }}
+                                        />
+                                    </div>
                                 )}
                             </div>
                         )}
@@ -1914,6 +1829,10 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                                     <option value="modern">Modern</option>
                                                     <option value="classic">Classic</option>
                                                     <option value="minimal">Minimal</option>
+                                                    <option value="executive">Executive</option>
+                                                    <option value="tech">Tech Mono</option>
+                                                    <option value="creative">Creative Teal</option>
+                                                    <option value="emerald">Emerald Corporate</option>
                                                 </select>
                                             </>
                                         )}
@@ -2387,7 +2306,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                         <div className="flex-1 overflow-y-auto p-3 space-y-1">
                             {([
                                 { href: '/', label: 'Dashboard', Icon: Home },
-                                { href: '/profile', label: 'Master Profile', Icon: UserCheck },
+                                { href: '/profile', label: 'My Resume', Icon: UserCheck },
                                 { href: '/new', label: 'New Application', Icon: PlusCircle },
                                 { href: '/settings', label: 'Settings', Icon: Settings },
                             ] as const).map(({ href, label, Icon }) => (
