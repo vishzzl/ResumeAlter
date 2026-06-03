@@ -31,7 +31,7 @@ function normalizeModelIdentifier(model: string): string {
         return 'meta/Meta-Llama-3.1-405B-Instruct';
     }
     if (m.includes('cohere-command-r-plus') || m.includes('command-r-plus')) {
-        return 'cohere/cohere-command-r-plus-08-2024';
+        return 'Cohere-command-r-plus';
     }
     return model; // Pass through custom or already normalized names
 }
@@ -132,7 +132,7 @@ export const GITHUB_FREE_MODELS = [
         bestFor: 'Low tier: Excellent general resume structuring and bullet points',
     },
     {
-        name: 'cohere/cohere-command-r-plus-08-2024',
+        name: 'Cohere-command-r-plus',
         displayName: 'Cohere Command R+ (GitHub)',
         description: 'Highly optimized for long context document search and structured parsing.',
         inputTokenLimit: 8000,

@@ -26,13 +26,12 @@ export async function evaluateAtsLLM(params: {
     const { originalResume, tailoredResume, jobDescription, apiKey, modelName, provider, customConfig } = params;
 
     const prompt = `
-You are an expert ATS (Applicant Tracking System) parser and evaluator. Your job is to semantically analyze a Job Description and compare two resumes (Original and Tailored) against it.
+You are an expert ATS (Applicant Tracking System) parser and evaluator. Your job is to analyze a Job Description and compare two resumes (Original and Tailored) against it using precise keyword matching.
 
 JOB DESCRIPTION:
 ${jobDescription}
 
-ORIGINAL RESUME:
-${originalResume || tailoredResume}
+${originalResume ? `ORIGINAL RESUME:\n${originalResume}` : 'ORIGINAL RESUME: [Not provided — set all "before" scores to 0]'}
 
 TAILORED RESUME:
 ${tailoredResume}
@@ -40,10 +39,15 @@ ${tailoredResume}
 INSTRUCTIONS:
 1. Extract ALL "must-have" (required) technical skills, tools, and platforms from the JD.
 2. Extract ALL "nice-to-have" (preferred) technical skills from the JD.
-3. For both the ORIGINAL and TAILORED resumes, determine if each required/preferred skill is contextually demonstrated. A semantic match (e.g., "React" matching "Frontend Framework") is completely acceptable and should be counted as a MATCH.
-4. Calculate an Experience Relevance Score (0-100) for both resumes based on how well the candidate's recent experience aligns with the JD's core responsibilities and contextual usage of skills.
-5. Calculate a Skills Alignment Score (0-100) based on the percentage and importance of matched skills.
-6. Calculate a Keyword Match Score (0-100) based purely on skill coverage.
+3. For both resumes, determine if each required/preferred skill is demonstrated using these match tiers:
+   - EXACT MATCH: The keyword appears verbatim (case-insensitive). Count as MATCH.
+   - VARIANT MATCH: A known spelling variant appears (e.g., "Node.js" ↔ "NodeJS", "PostgreSQL" ↔ "Postgres"). Count as MATCH.
+   - NO MATCH: The skill is absent. Count as MISSING.
+   Do NOT count semantic/conceptual matches (e.g., "React" does NOT match "Frontend Framework").
+4. Calculate scores using these rubrics:
+   - keywordScore = (exactMatches + variantMatches) / totalExtractedSkills × 100
+   - skillsScore = (matchedRequired / totalRequired) × 70 + (matchedPreferred / totalPreferred) × 30
+   - experienceScore: 0–20 if no relevant role, 20–50 if related but different domain, 50–80 if same domain with partial overlap, 80–100 if directly aligned role with matching responsibilities
 
 OUTPUT STRICTLY VALID JSON IN THIS EXACT FORMAT:
 {
@@ -83,7 +87,7 @@ OUTPUT STRICTLY VALID JSON IN THIS EXACT FORMAT:
             apiKey,
             modelName: modelName || 'gemini-flash-latest',
             customConfig,
-            temperature: 0.2, // Low temperature for deterministic scoring
+            temperature: 0.15, // Low temperature for deterministic scoring
             jsonMode: true,
         });
 

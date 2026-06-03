@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
                     apiKey,
                     modelName,
                     customConfig,
-                    temperature: 0.35,
+                    temperature: 0.30,
                     jsonMode: true,
                 });
 

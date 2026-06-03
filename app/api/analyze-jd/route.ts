@@ -9,6 +9,7 @@ export interface JDAnalysis {
     seniority: 'junior' | 'mid' | 'senior' | 'staff' | 'principal' | 'lead' | 'executive';
     requiredSkills: string[];
     preferredSkills: string[];
+    requirements: string[];
     keyVerbs: string[];
     companyDomain: string;
     keyPhrases: string[];
@@ -49,8 +50,9 @@ Return ONLY valid JSON (no markdown, no explanation) with this exact structure:
   "seniority": "junior|mid|senior|staff|principal|lead|executive",
   "requiredSkills": ["up to 12 skills from required/must-have sections"],
   "preferredSkills": ["up to 8 skills from preferred/nice-to-have sections"],
+  "requirements": ["up to 10 non-skill requirements, e.g. '5+ years experience', 'Bachelor's degree in CS', 'US citizenship required'"],
   "keyVerbs": ["up to 10 action verbs from responsibilities, e.g. architect, deploy, lead, scale"],
-  "companyDomain": "one-word domain: fintech|healthcare|ecommerce|saas|gaming|consulting|enterprise|edtech",
+  "companyDomain": "one-word industry domain (e.g., fintech, healthcare, ecommerce, saas, gaming, consulting, enterprise, edtech, defense, automotive, logistics, media, telecom, government, legal, energy, biotech, or other appropriate term)",
   "keyPhrases": ["up to 8 exact multi-word phrases candidates should mirror, e.g. distributed systems at scale"]
 }`;
 
@@ -74,6 +76,7 @@ Return ONLY valid JSON (no markdown, no explanation) with this exact structure:
             seniority: parsed.seniority || 'senior',
             requiredSkills: Array.isArray(parsed.requiredSkills) ? parsed.requiredSkills.slice(0, 12) : [],
             preferredSkills: Array.isArray(parsed.preferredSkills) ? parsed.preferredSkills.slice(0, 8) : [],
+            requirements: Array.isArray(parsed.requirements) ? parsed.requirements.slice(0, 10) : [],
             keyVerbs: Array.isArray(parsed.keyVerbs) ? parsed.keyVerbs.slice(0, 10) : [],
             companyDomain: parsed.companyDomain || 'technology',
             keyPhrases: Array.isArray(parsed.keyPhrases) ? parsed.keyPhrases.slice(0, 8) : [],

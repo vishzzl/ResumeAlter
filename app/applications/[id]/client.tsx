@@ -10,7 +10,7 @@ import {
     Sparkles, X, Eye, GitCompare, Mail, Copy, Check,
     PenLine, BookOpen, Zap, Crown, Target, Layers, CheckCircle2,
     AlertCircle, PanelLeftClose, PanelLeftOpen, FileCheck2,
-    FileDown, ListChecks, ArrowRight, Menu, Home, PlusCircle, Settings, Award
+    FileDown, ListChecks, ArrowRight, Menu, Home, PlusCircle, Settings, Award, ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -99,6 +99,21 @@ function ScoreRing({ score, size = 80, strokeWidth = 7 }: { score: number; size?
 }
 
 
+
+const TEMPLATES = [
+    { id: 'modern' as const, label: 'Modern' },
+    { id: 'classic' as const, label: 'Classic' },
+    { id: 'minimal' as const, label: 'Minimal' },
+    { id: 'executive' as const, label: 'Executive' },
+    { id: 'tech' as const, label: 'Tech Mono' },
+    { id: 'creative' as const, label: 'Creative Teal' },
+    { id: 'emerald' as const, label: 'Emerald Corporate' },
+    { id: 'elegant' as const, label: 'Elegant Crimson' },
+    { id: 'slate' as const, label: 'Slate Modernist' },
+    { id: 'startup' as const, label: 'Startup' },
+    { id: 'banking' as const, label: 'Investment Banking' },
+    { id: 'academia' as const, label: 'Academia' },
+];
 
 export default function ApplicationClient({ initialApplication }: ApplicationClientProps) {
     const [app, setApp] = useState(initialApplication);
@@ -203,7 +218,21 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     // UI State
     const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
     const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
-    const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'classic' | 'minimal' | 'executive' | 'tech' | 'creative' | 'emerald' | 'elegant' | 'slate'>('modern');
+    const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'classic' | 'minimal' | 'executive' | 'tech' | 'creative' | 'emerald' | 'elegant' | 'slate' | 'startup' | 'banking' | 'academia'>('modern');
+    const [hoveredTemplate, setHoveredTemplate] = useState<typeof selectedTemplate | null>(null);
+    const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
+    const templateDropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (templateDropdownRef.current && !templateDropdownRef.current.contains(event.target as Node)) {
+                setIsTemplateDropdownOpen(false);
+                setHoveredTemplate(null);
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
     const [activeAnalysisTab, setActiveAnalysisTab] = useState<'changes' | 'coverage' | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pdfGenerating, setPdfGenerating] = useState(false);
@@ -1713,7 +1742,7 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                     mobileTab !== 'result' ? "hidden lg:flex" : "flex min-h-0"
                 )}>
                     {/* ── Command Bar ── */}
-                    <div className="shrink-0 border-b border-slate-100 bg-white/95 backdrop-blur-sm px-3 py-0 sm:px-4">
+                    <div className="relative z-20 shrink-0 border-b border-slate-100 bg-white/95 backdrop-blur-sm px-3 py-0 sm:px-4">
                         <div className="flex h-14 items-center gap-3">
 
                             {/* Mobile menu */}
@@ -1821,19 +1850,41 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                         {resultViewMode === 'preview' && (
                                             <>
                                                 <div className="hidden h-4 w-px bg-slate-200 md:block" />
-                                                <select
-                                                    value={selectedTemplate}
-                                                    onChange={(e) => setSelectedTemplate(e.target.value as any)}
-                                                    className="hidden h-7 rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 outline-none hover:bg-slate-50 transition-colors cursor-pointer md:block"
-                                                >
-                                                    <option value="modern">Modern</option>
-                                                    <option value="classic">Classic</option>
-                                                    <option value="minimal">Minimal</option>
-                                                    <option value="executive">Executive</option>
-                                                    <option value="tech">Tech Mono</option>
-                                                    <option value="creative">Creative Teal</option>
-                                                    <option value="emerald">Emerald Corporate</option>
-                                                </select>
+                                                <div className="relative hidden md:block" ref={templateDropdownRef}>
+                                                    <button
+                                                        onClick={() => setIsTemplateDropdownOpen(!isTemplateDropdownOpen)}
+                                                        className="flex h-7 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 outline-none hover:bg-slate-50 transition-colors"
+                                                    >
+                                                        <span>Template: {TEMPLATES.find(t => t.id === (hoveredTemplate || selectedTemplate))?.label || 'Modern'}</span>
+                                                        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                                                    </button>
+                                                    
+                                                    {isTemplateDropdownOpen && (
+                                                        <div className="absolute right-0 z-50 mt-1 w-48 rounded-lg border border-slate-200 bg-white p-1 shadow-lg max-h-60 overflow-y-auto custom-scrollbar">
+                                                            {TEMPLATES.map((t) => (
+                                                                <button
+                                                                    key={t.id}
+                                                                    onClick={() => {
+                                                                        setSelectedTemplate(t.id);
+                                                                        setHoveredTemplate(null);
+                                                                        setIsTemplateDropdownOpen(false);
+                                                                    }}
+                                                                    onMouseEnter={() => setHoveredTemplate(t.id)}
+                                                                    onMouseLeave={() => setHoveredTemplate(null)}
+                                                                    className={cn(
+                                                                        "flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-[11px] font-semibold transition-colors",
+                                                                        selectedTemplate === t.id
+                                                                            ? "bg-slate-900 text-white"
+                                                                            : "text-slate-700 hover:bg-slate-50"
+                                                                    )}
+                                                                >
+                                                                    <span>{t.label}</span>
+                                                                    {selectedTemplate === t.id && <Check className="h-3.5 w-3.5" />}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </>
                                         )}
 
@@ -1998,12 +2049,12 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                                     <div className="flex min-w-0 items-center gap-2">
                                                         <FileCheck2 className="h-4 w-4 text-emerald-600" />
                                                         <span className="font-semibold text-slate-700">Resume preview</span>
-                                                        <span className="truncate">{selectedTemplate.charAt(0).toUpperCase() + selectedTemplate.slice(1)} template</span>
+                                                        <span className="truncate">{(hoveredTemplate || selectedTemplate).charAt(0).toUpperCase() + (hoveredTemplate || selectedTemplate).slice(1)} template</span>
                                                     </div>
                                                     <span className="text-[11px]">{hasUnsavedChanges ? 'Save before export for the latest copy.' : saveStatusLabel}</span>
                                                 </div>
                                                 <div className="min-h-[78vh] rounded-xl border border-slate-200 bg-white px-5 py-7 shadow-sm sm:min-h-[900px] sm:px-10 sm:py-10 lg:min-h-[1050px] lg:px-16 print:min-h-0 print:border-0 print:p-0 print:shadow-none">
-                                                    <ResumePreview content={tailoredResume} title={null} company={null} template={selectedTemplate} />
+                                                    <ResumePreview content={tailoredResume} title={null} company={null} template={hoveredTemplate || selectedTemplate} />
                                                 </div>
                                             </div>
                                         )

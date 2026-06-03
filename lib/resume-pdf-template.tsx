@@ -250,7 +250,7 @@ const S_EXECUTIVE = StyleSheet.create({
         color: '#475569',
     },
     contactText: { fontFamily: F_SERIF, color: '#475569', fontSize: 8.5 },
-    contactLink: { fontFamily: F_SERIF, color: '#1e3a8a', fontSize: 8.5, textDecoration: 'none' },
+    contactLink: { fontFamily: F_SERIF, color: '#1e3a8a', fontSize: 8.5, textDecoration: 'underline' },
     contactSep: { fontFamily: F_SERIF, color: '#cbd5e1', fontSize: 8.5, marginHorizontal: 5 },
     headerRule: { borderBottomWidth: 2, borderBottomColor: '#1e3a8a', marginBottom: 12 },
     section: { marginBottom: 10 },
@@ -318,9 +318,9 @@ const S_TECH = StyleSheet.create({
         color: '#475569',
     },
     contactText: { fontFamily: F_SANS, color: '#475569', fontSize: 8.5 },
-    contactLink: { fontFamily: F_MONO, color: '#0284c7', fontSize: 8.5, textDecoration: 'none' }, // Monospace links
+    contactLink: { fontFamily: F_MONO, color: '#4f46e5', fontSize: 8.5, textDecoration: 'none' }, // Monospace links
     contactSep: { fontFamily: F_SANS, color: '#94a3b8', fontSize: 8.5, marginHorizontal: 4 },
-    headerRule: { borderBottomWidth: 2, borderBottomColor: '#0284c7', marginBottom: 12 }, // Sky blue divider
+    headerRule: { borderBottomWidth: 2, borderBottomColor: '#4f46e5', marginBottom: 12 }, // Indigo divider
     section: { marginBottom: 10 },
     sectionHead: {
         fontFamily: FB_MONO, // Monospace section headers
@@ -329,7 +329,7 @@ const S_TECH = StyleSheet.create({
         textTransform: 'uppercase',
         letterSpacing: 0.5,
         borderLeftWidth: 3,
-        borderLeftColor: '#0284c7', // Sky Blue Left Accent
+        borderLeftColor: '#4f46e5', // Indigo Left Accent
         paddingLeft: 6,
         paddingBottom: 0,
         marginBottom: 6,
@@ -343,18 +343,18 @@ const S_TECH = StyleSheet.create({
         marginBottom: 1.5,
     },
     entryTitle: { fontFamily: FB_SANS, fontSize: 9.5, color: '#0f172a', flex: 1, marginRight: 8 },
-    entryDate: { fontFamily: FB_MONO, fontSize: 8.5, color: '#0284c7', textAlign: 'right', flexShrink: 0 }, // Monospace blue dates
+    entryDate: { fontFamily: FB_MONO, fontSize: 8.5, color: '#4f46e5', textAlign: 'right', flexShrink: 0 }, // Monospace indigo dates
     entryRole: { fontFamily: FB_SANS, fontSize: 9, color: '#334155', marginBottom: 3 },
     clientLabel: { fontFamily: FB_SANS, fontSize: 8.5, color: '#475569', marginTop: 1.5, marginBottom: 1.5 },
     bulletRow: { flexDirection: 'row', marginBottom: 2.5, paddingLeft: 6 },
-    bulletDot: { fontFamily: F_SANS, width: 8, fontSize: 9, color: '#0284c7', flexShrink: 0, marginTop: 0, marginRight: 4 },
+    bulletDot: { fontFamily: F_SANS, width: 8, fontSize: 9, color: '#4f46e5', flexShrink: 0, marginTop: 0, marginRight: 4 },
     bulletText: { fontFamily: F_SANS, flex: 1, fontSize: 9, color: '#334155', lineHeight: 1.4 },
     skillRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 3 },
-    skillCat: { fontFamily: FB_MONO, fontSize: 8.5, color: '#0284c7', marginRight: 4, marginBottom: 1.5 }, // Monospace blue labels
+    skillCat: { fontFamily: FB_MONO, fontSize: 8.5, color: '#4f46e5', marginRight: 4, marginBottom: 1.5 }, // Monospace indigo labels
     skillVal: { fontFamily: F_SANS, fontSize: 9, color: '#334155', flex: 1, marginBottom: 1.5 },
     para: { fontFamily: F_SANS, fontSize: 9, color: '#334155', lineHeight: 1.4, marginBottom: 3 },
     inlineBold: { fontFamily: FB_SANS },
-    subHead: { fontFamily: FB_MONO, fontSize: 9, color: '#0284c7', marginBottom: 3, marginTop: 3 },
+    subHead: { fontFamily: FB_MONO, fontSize: 9, color: '#4f46e5', marginBottom: 3, marginTop: 3 },
 });
 
 // ── CREATIVE TEAL (Sleek sans-serif, teal highlight lines & left section bars) ─────
@@ -462,7 +462,7 @@ const S_EMERALD = StyleSheet.create({
         color: '#475569',
     },
     contactText: { fontFamily: F_SERIF, color: '#475569', fontSize: 8.5 },
-    contactLink: { fontFamily: F_SERIF, color: '#065f46', fontSize: 8.5, textDecoration: 'none' },
+    contactLink: { fontFamily: F_SERIF, color: '#065f46', fontSize: 8.5, textDecoration: 'underline' },
     contactSep: { fontFamily: F_SERIF, color: '#cbd5e1', fontSize: 8.5, marginHorizontal: 5 },
     headerRule: { borderBottomWidth: 2, borderBottomColor: '#065f46', marginBottom: 12 },
     section: { marginBottom: 10 },
@@ -532,7 +532,7 @@ const S_ELEGANT = StyleSheet.create({
         color: '#475569',
     },
     contactText: { fontFamily: F_SERIF, color: '#475569', fontSize: 8.5 },
-    contactLink: { fontFamily: F_SERIF, color: '#881337', fontSize: 8.5, textDecoration: 'none' },
+    contactLink: { fontFamily: F_SERIF, color: '#881337', fontSize: 8.5, textDecoration: 'underline' },
     contactSep: { fontFamily: F_SERIF, color: '#cbd5e1', fontSize: 8.5, marginHorizontal: 5 },
     headerRule: { borderBottomWidth: 2, borderBottomColor: '#881337', marginBottom: 12 },
     section: { marginBottom: 10 },
@@ -637,6 +637,90 @@ const S_SLATE = StyleSheet.create({
     para: { fontFamily: F_SANS, fontSize: 9, color: '#475569', lineHeight: 1.4, marginBottom: 3 },
     inlineBold: { fontFamily: FB_SANS },
     subHead: { fontFamily: FB_SANS, fontSize: 9, color: '#475569', marginBottom: 3, marginTop: 3 },
+});
+
+// ── STARTUP (High Impact, Vibrant, Clean) ───────────────────────────────────
+const S_STARTUP = StyleSheet.create({
+    page: { fontFamily: F_SANS, fontSize: 9, color: '#1f2937', paddingTop: 32, paddingBottom: 24, paddingHorizontal: 35, lineHeight: 1.45, backgroundColor: '#ffffff' },
+    name: { fontFamily: FB_SANS, fontSize: 24, color: '#111827', lineHeight: 1.15, marginBottom: 4, textAlign: 'center', letterSpacing: -0.5 },
+    contactRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', marginTop: 2, marginBottom: 10, fontSize: 8.5, color: '#4b5563' },
+    contactText: { fontFamily: F_SANS, color: '#4b5563', fontSize: 8.5 },
+    contactLink: { fontFamily: FB_SANS, color: '#7c3aed', fontSize: 8.5, textDecoration: 'none' },
+    contactSep: { fontFamily: F_SANS, color: '#d1d5db', fontSize: 8.5, marginHorizontal: 4 },
+    headerRule: { borderBottomWidth: 0, marginBottom: 2 },
+    section: { marginBottom: 12 },
+    sectionHead: { fontFamily: FB_SANS, fontSize: 10, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: 0.8, backgroundColor: '#f5f3ff', padding: 3, paddingLeft: 6, marginBottom: 6, marginTop: 4, borderRadius: 2 },
+    entryBlock: { marginBottom: 6 },
+    entryTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 1.5 },
+    entryTitle: { fontFamily: FB_SANS, fontSize: 10, color: '#111827', flex: 1, marginRight: 8 },
+    entryDate: { fontFamily: FB_SANS, fontSize: 8.5, color: '#6b7280', textAlign: 'right', flexShrink: 0 },
+    entryRole: { fontFamily: FB_SANS, fontSize: 9, color: '#4b5563', marginBottom: 3 },
+    clientLabel: { fontFamily: FB_SANS, fontSize: 8.5, color: '#6b7280', marginTop: 1.5, marginBottom: 1.5 },
+    bulletRow: { flexDirection: 'row', marginBottom: 2.5, paddingLeft: 6 },
+    bulletDot: { fontFamily: FB_SANS, width: 8, fontSize: 8, color: '#8b5cf6', flexShrink: 0, marginTop: 1, marginRight: 4 },
+    bulletText: { fontFamily: F_SANS, flex: 1, fontSize: 9, color: '#374151', lineHeight: 1.45 },
+    skillRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 3 },
+    skillCat: { fontFamily: FB_SANS, fontSize: 9, color: '#111827', marginRight: 4, marginBottom: 1.5 },
+    skillVal: { fontFamily: F_SANS, fontSize: 9, color: '#374151', flex: 1, marginBottom: 1.5 },
+    para: { fontFamily: F_SANS, fontSize: 9, color: '#374151', lineHeight: 1.45, marginBottom: 3 },
+    inlineBold: { fontFamily: FB_SANS },
+    subHead: { fontFamily: FB_SANS, fontSize: 9.5, color: '#111827', marginBottom: 3, marginTop: 3 },
+});
+
+// ── BANKING (Strictly traditional, Investment Banking standard) ────────────────
+const S_BANKING = StyleSheet.create({
+    page: { fontFamily: F_SERIF, fontSize: 9, color: '#000000', paddingTop: 28, paddingBottom: 20, paddingHorizontal: 32, lineHeight: 1.25, backgroundColor: '#ffffff' },
+    name: { fontFamily: FB_SERIF, fontSize: 16, color: '#000000', lineHeight: 1.15, marginBottom: 4, textAlign: 'center', textTransform: 'uppercase' },
+    contactRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', marginTop: 1, marginBottom: 8, fontSize: 8.5, color: '#000000' },
+    contactText: { fontFamily: F_SERIF, color: '#000000', fontSize: 8.5 },
+    contactLink: { fontFamily: F_SERIF, color: '#000000', fontSize: 8.5, textDecoration: 'none' },
+    contactSep: { fontFamily: F_SERIF, color: '#000000', fontSize: 8.5, marginHorizontal: 3 },
+    headerRule: { borderBottomWidth: 1, borderBottomColor: '#000000', marginBottom: 8 },
+    section: { marginBottom: 8 },
+    sectionHead: { fontFamily: FB_SERIF, fontSize: 10, color: '#000000', textTransform: 'uppercase', borderBottomWidth: 1, borderBottomColor: '#000000', paddingBottom: 1, marginBottom: 4, marginTop: 4 },
+    entryBlock: { marginBottom: 4 },
+    entryTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 1 },
+    entryTitle: { fontFamily: FB_SERIF, fontSize: 9.5, color: '#000000', flex: 1, marginRight: 8 },
+    entryDate: { fontFamily: F_SERIF, fontSize: 9, color: '#000000', textAlign: 'right', flexShrink: 0 },
+    entryRole: { fontFamily: FB_SERIF, fontSize: 9.5, color: '#000000', marginBottom: 2 },
+    clientLabel: { fontFamily: FB_SERIF, fontSize: 8.5, color: '#000000', marginTop: 1, marginBottom: 1 },
+    bulletRow: { flexDirection: 'row', marginBottom: 2, paddingLeft: 4 },
+    bulletDot: { fontFamily: F_SERIF, width: 8, fontSize: 9, color: '#000000', flexShrink: 0, marginTop: 0, marginRight: 2 },
+    bulletText: { fontFamily: F_SERIF, flex: 1, fontSize: 9, color: '#000000', lineHeight: 1.25 },
+    skillRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 2 },
+    skillCat: { fontFamily: FB_SERIF, fontSize: 9, color: '#000000', marginRight: 4, marginBottom: 1 },
+    skillVal: { fontFamily: F_SERIF, fontSize: 9, color: '#000000', flex: 1, marginBottom: 1 },
+    para: { fontFamily: F_SERIF, fontSize: 9, color: '#000000', lineHeight: 1.25, marginBottom: 2 },
+    inlineBold: { fontFamily: FB_SERIF },
+    subHead: { fontFamily: FB_SERIF, fontSize: 9.5, color: '#000000', marginBottom: 2, marginTop: 2 },
+});
+
+// ── ACADEMIA (Wide text spacing, classic serif, formal) ───────────────────────
+const S_ACADEMIA = StyleSheet.create({
+    page: { fontFamily: F_SERIF, fontSize: 10, color: '#111827', paddingTop: 36, paddingBottom: 32, paddingHorizontal: 40, lineHeight: 1.5, backgroundColor: '#ffffff' },
+    name: { fontFamily: F_SERIF, fontSize: 22, color: '#000000', lineHeight: 1.15, marginBottom: 6, textAlign: 'center', letterSpacing: 0.5 },
+    contactRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', marginTop: 2, marginBottom: 12, fontSize: 9, color: '#374151' },
+    contactText: { fontFamily: F_SERIF, color: '#374151', fontSize: 9 },
+    contactLink: { fontFamily: F_SERIF, color: '#2563eb', fontSize: 9, textDecoration: 'underline' },
+    contactSep: { fontFamily: F_SERIF, color: '#9ca3af', fontSize: 9, marginHorizontal: 5 },
+    headerRule: { borderBottomWidth: 0, marginBottom: 4 },
+    section: { marginBottom: 12 },
+    sectionHead: { fontFamily: FB_SERIF, fontSize: 11, color: '#000000', textTransform: 'uppercase', letterSpacing: 1.5, borderBottomWidth: 1, borderBottomColor: '#d1d5db', paddingBottom: 3, marginBottom: 6, marginTop: 6 },
+    entryBlock: { marginBottom: 6 },
+    entryTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2 },
+    entryTitle: { fontFamily: FB_SERIF, fontSize: 10, color: '#000000', flex: 1, marginRight: 8 },
+    entryDate: { fontFamily: F_SERIF, fontSize: 9, color: '#4b5563', textAlign: 'right', flexShrink: 0 },
+    entryRole: { fontFamily: FB_SERIF, fontSize: 10, color: '#1f2937', marginBottom: 4 },
+    clientLabel: { fontFamily: FB_SERIF, fontSize: 9, color: '#4b5563', marginTop: 2, marginBottom: 2 },
+    bulletRow: { flexDirection: 'row', marginBottom: 2.5, paddingLeft: 8 },
+    bulletDot: { fontFamily: F_SERIF, width: 8, fontSize: 10, color: '#9ca3af', flexShrink: 0, marginTop: 0, marginRight: 4 },
+    bulletText: { fontFamily: F_SERIF, flex: 1, fontSize: 10, color: '#1f2937', lineHeight: 1.5 },
+    skillRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 4 },
+    skillCat: { fontFamily: FB_SERIF, fontSize: 10, color: '#000000', marginRight: 4, marginBottom: 2 },
+    skillVal: { fontFamily: F_SERIF, fontSize: 10, color: '#1f2937', flex: 1, marginBottom: 2 },
+    para: { fontFamily: F_SERIF, fontSize: 10, color: '#1f2937', lineHeight: 1.5, marginBottom: 4 },
+    inlineBold: { fontFamily: FB_SERIF },
+    subHead: { fontFamily: FB_SERIF, fontSize: 10, color: '#000000', marginBottom: 4, marginTop: 4 },
 });
 
 // ── Inline parser: **bold**, *bold-fallback*, [link](url) ─────────────────────
@@ -950,6 +1034,9 @@ export function ResumePDFPage({ resumeMarkdown, template = 'modern' }: { resumeM
                    template === 'emerald' ? S_EMERALD :
                    template === 'elegant' ? S_ELEGANT :
                    template === 'slate' ? S_SLATE :
+                   template === 'startup' ? S_STARTUP :
+                   template === 'banking' ? S_BANKING :
+                   template === 'academia' ? S_ACADEMIA :
                    S_MODERN;
 
     return (

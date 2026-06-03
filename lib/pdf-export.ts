@@ -15,7 +15,7 @@ import type { DocumentProps } from '@react-pdf/renderer';
 
 export interface ExportOptions {
     fileName?: string;
-    template?: 'modern' | 'classic' | 'minimal' | 'executive' | 'tech' | 'creative' | 'emerald';
+    template?: 'modern' | 'classic' | 'minimal' | 'executive' | 'tech' | 'creative' | 'emerald' | 'elegant' | 'slate' | 'startup' | 'banking' | 'academia';
 }
 
 /**

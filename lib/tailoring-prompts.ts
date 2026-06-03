@@ -114,15 +114,18 @@ const EMPTY_JD_ANALYSIS: JDAnalysis = {
 };
 
 export const TAILORING_SYSTEM_INSTRUCTION = [
-    'You are an expert resume writer, ATS optimization specialist, and strict fact checker.',
-    'Return only valid JSON when JSON is requested.',
-    'Never invent skills, metrics, dates, employers, titles, credentials, tools, projects, clients, or responsibilities.',
+    'You are a professional resume writer and ATS optimization specialist. You operate under these immutable rules:',
+    'RULE 1 — FACTUAL INTEGRITY: The original resume is the sole source of truth. Never invent, embellish, or transplant skills, metrics, dates, employers, titles, credentials, tools, projects, clients, or responsibilities. When in doubt, OMIT rather than fabricate.',
+    'RULE 2 — OUTPUT FORMAT: Return only valid JSON when JSON is requested. No markdown code fences. No commentary outside the JSON object. Ensure all string values use proper JSON escaping.',
+    'RULE 3 — DETERMINISM: For immutable sections (header, education), copy the original content character-for-character. Do not reformat, reorder, or "improve" these sections.',
+    'RULE 4 — ATS ALIGNMENT: Use exact JD terminology only when the original resume provides supporting evidence. Prefer omission over keyword stuffing.',
 ].join(' ');
 
 export const SECTION_SYSTEM_INSTRUCTION = [
-    'You are an expert resume writer who creates grounded, ATS-aware section variants.',
-    'Return only valid JSON with no markdown fences.',
-    'Every claim must be supported by the original resume context.',
+    'You are a professional resume writer who creates grounded, ATS-aware section variants.',
+    'Return only valid JSON with no markdown fences. No commentary outside the JSON object.',
+    'Every claim must be supported by the original resume context. Never transplant metrics, skills, or achievements from one role or project to another.',
+    'When in doubt between adding an unsupported claim and omitting it, always omit.',
 ].join(' ');
 
 // ---------------------------------------------------------------------------
@@ -397,11 +400,11 @@ This resume has been programmatically pre-filtered based on the user's master pr
 
     return `You are tailoring a resume for a specific job. Use a balanced ATS style: exact JD terms where supported, concise professional language, and no keyword stuffing.
 
-PRIORITY ORDER
-1. Factual accuracy: the original resume is the only source of truth.
-2. ATS alignment: use exact job-description terms only when the resume contains evidence for them.
-3. Human readability: concise bullets, strong verbs, and plain ATS-safe Markdown.
-4. Completeness: keep relevant roles/projects; prune unrelated bullets only when enough relevant evidence remains.
+PRIORITY ORDER (each level OVERRIDES the ones below it):
+1. FACTUAL ACCURACY — if a claim cannot be verified from the original resume, OMIT it. This overrides all ATS and readability goals.
+2. ATS ALIGNMENT — use exact JD terms, but only when the resume contains supporting evidence.
+3. HUMAN READABILITY — concise bullets, strong verbs, plain ATS-safe Markdown.
+4. COMPLETENESS — keep relevant roles/projects; prune unrelated bullets only when enough relevant evidence remains.
 ${preFilterBlock}
 JOB DESCRIPTION AND USER SELECTIONS
 ${jobDescription}
@@ -419,9 +422,9 @@ Stage 1 — Analyze the JD:
 - Treat "Required Skills (must target)" and "Selected Requirements" as high priority.
 
 Stage 2 — Map evidence:
-- For every required or preferred skill, decide whether the original resume supports it.
+- For every required or preferred skill, decide whether the original resume supports it with substantive evidence (appears in a skill list, project description, or experience bullet describing direct hands-on work).
 - If unsupported, do not add it. Put it in skippedRequirements with a short reason.
-- Equivalent spellings are allowed only when genuinely evident (e.g. AWS for Amazon Web Services, NodeJS for Node.js).
+- Equivalent spellings are allowed ONLY for identical tools with variant notation (e.g. "AWS" ↔ "Amazon Web Services", "Node.js" ↔ "NodeJS", "PostgreSQL" ↔ "Postgres"). Do NOT treat related-but-different tools as equivalent (e.g. "React" ≠ "React Native", "Python" ≠ "Python scripting", "Java" ≠ "JavaScript", "AWS Lambda" ≠ "AWS").
 
 Stage 3 — Rewrite with these rules:
 
@@ -431,20 +434,20 @@ HEADER
 SUMMARY (2–3 sentences using this formula)
 - Sentence 1: [Role identity from the resume] with [X years / domain] experience in [core areas most relevant to JD].
 - Sentence 2: [Most relevant evidenced achievement or strength aligned to JD].
-- Sentence 3 (optional): Forward-looking fit statement using the JD target title only if the title or an equivalent already appears in the resume.
-- Do not claim the target title as a current job title unless it is already in the resume.
+- Sentence 3 (optional): Forward-looking fit statement. You MUST NOT use the JD's target title anywhere in the summary unless that EXACT title (case-insensitive) already appears in the resume's header or experience section. If in doubt, describe the candidate's trajectory without naming the target title.
 
 SKILLS
-- Group skills with ATS-friendly bold labels: **Languages**, **Frameworks**, **Cloud / DevOps**, **Databases**, **Tools**.
-- Include only skills evidenced in the original resume.
+- Group skills into ATS-friendly bold-labelled categories. Use these standard categories when applicable: **Languages**, **Frameworks**, **Cloud / DevOps**, **Databases**, **Tools**. If the resume contains skills that don't fit these (e.g., ML/AI, Data Engineering, Design, Testing), create additional categories using the same **Bold** format. Match category names from the original resume when possible.
+- Include only skills evidenced in the original resume with substantive usage.
 - Do not list a skill more than once across groups.
 
 EXPERIENCE
 - Preserve real companies, roles, dates, clients, and metrics exactly as written.
+- Preserve ALL roles from the original, including short-tenure positions (< 6 months). Do not add explanations for career gaps that are not in the original resume.
 - Use past tense for roles that have ended; use present tense for the current role only.
-- Write 3–6 bullets per relevant role (retain and optimize as many bullets as the original role had, prioritizing JD-relevant achievements). Each bullet must be one sentence, action-led, and result-oriented.
-- Target 100–180 characters per bullet (excluding the leading dash). This allows for sufficient detail (Action-Context-Result) without being too wordy.
-- Preserve exact numbers, percentages, timeframes, and dollar amounts. Never round or approximate.
+- Retain ALL bullets from the original role, then prune to the best 3–6 bullets that demonstrate JD-relevant skills, measurable outcomes, or scope. If the original role has ≤ 6 bullets, keep all of them. If it has > 6, retain the top 6 ranked by JD relevance, and merge or drop the rest. Never add bullets that are not grounded in the original.
+- Each bullet must be one sentence, 100–180 characters (excluding the leading "- "), action-led, and result-oriented.
+- Preserve exact numbers, percentages, timeframes, and dollar amounts. Never round, approximate, or transplant a metric from one role to another.
 - Vary action verbs across bullets; do not repeat the same opening verb more than twice in the entire section.
 
 EDUCATION
@@ -454,11 +457,13 @@ PROJECTS & CERTIFICATIONS
 - Keep only source-backed items that strengthen JD alignment.
 - Do not mention the hiring company as an employer unless it appears in the original resume.
 
-Stage 4 — Self-audit before returning:
-- Remove unsupported skills, numbers, certifications, company names, job titles, and responsibilities.
-- Prefer omission over fabrication.
-- Verify header and education are copied exactly from the original.
-- Verify no contact details (email, phone, LinkedIn URL) appear in body sections unless already there in the original.
+Stage 4 — Self-audit (perform these checks IN ORDER and record violations in warnings[]):
+CHECK-1: For each skill in tailoredSections.skills, verify it appears (same skill, not just same category) in the original resume. If not → remove it and add a warning.
+CHECK-2: For each number/metric/percentage in experience bullets, verify the EXACT number exists in the original resume within the SAME role context. If not → remove the entire metric phrase and add a warning.
+CHECK-3: Verify tailoredSections.header === original header (character-for-character).
+CHECK-4: Verify tailoredSections.education === original education (character-for-character).
+CHECK-5: Scan summary, skills, experience, projects, other for any email address or phone number not present in the original header. If found → remove it and add a warning.
+CHECK-6: Count opening action verbs across all experience bullets. If any verb appears > 2 times → rewrite the excess occurrences with synonyms.
 
 Return ONLY valid JSON with this exact shape:
 {
@@ -484,7 +489,7 @@ Return ONLY valid JSON with this exact shape:
   "skippedRequirements": ["unsupported JD requirement - reason"],
   "warnings": ["brief factual or formatting warning"],
   "changeLog": [
-    { "section": "summary", "reason": "what changed and why" }
+    { "section": "summary", "action": "rewritten", "reason": "what changed and why" }
   ]
 }`;
 }
@@ -509,14 +514,25 @@ ${sectionSourceBlock(originalSections)}
 TAILORED SECTIONS TO VERIFY
 ${JSON.stringify(generatedSections, null, 2)}
 
-CHECKS — apply every rule below:
-1. Header must be copied exactly from the original, character for character.
-2. Education must be copied exactly from the original, character for character.
-3. Remove any unsupported skills, tools, metrics, dates, employers, titles, certifications, clients, or achievements.
-4. Keep JD phrasing only when the original resume clearly supports it.
-5. Past tense for ended roles; present tense for the current role only.
-6. No contact detail (email, phone, LinkedIn URL) may appear in body sections unless already present in the original.
-7. Keep ATS-safe Markdown. No section headings inside JSON values.
+VERIFICATION TASK — Compare each field of TAILORED SECTIONS against the ORIGINAL RESUME:
+
+For each section (summary, skills, experience, projects, other):
+1. List every factual claim (skill, metric, employer, title, date, tool, certification) in the tailored version.
+2. For each claim, find the supporting evidence in the original resume.
+3. If no supporting evidence exists → REMOVE the claim from correctedSections and record it in corrections[].
+4. If the claim exists but uses different phrasing that changes meaning → RESTORE the original phrasing.
+
+IMPORTANT: Your goal is to REMOVE fabrications, NOT to undo legitimate improvements. If the tailored version rephrases an original bullet using better action verbs or JD-aligned terminology but the underlying fact is the same, KEEP the improved version.
+
+IMMUTABLE SECTIONS (copy character-for-character from original):
+- header
+- education
+
+ADDITIONAL CHECKS:
+- No contact details (email, phone, LinkedIn URL) in body sections unless already present in the original.
+- Past tense for ended roles; present tense only for current role.
+- ATS-safe Markdown only. No section headings inside JSON string values.
+- Do NOT transplant metrics from one role to another. Each number must match the role context it came from.
 
 Return ONLY valid JSON:
 {
@@ -529,7 +545,7 @@ Return ONLY valid JSON:
     "projects": "verified section content only",
     "other": "verified section content only"
   },
-  "corrections": ["removed or restored item"],
+  "corrections": ["what was removed or restored and why"],
   "warnings": ["remaining caution, if any"]
 }`;
 }
@@ -563,8 +579,14 @@ INJECTION PRIORITY ORDER
 2. Experience bullets — weave it in naturally into an existing bullet only if it cannot fit in skills.
 3. Summary — use only as a last resort, and only if the keyword strongly defines the candidate's identity.
 
+INJECTION LIMITS (to prevent keyword stuffing)
+- Skills section: Add at most 8 keywords per pass.
+- Experience bullets: Modify at most 3 bullets per pass.
+- Summary: Modify at most 1 sentence.
+- If more keywords remain after these limits, put them in skippedKeywords with reason "injection limit reached".
+
 RULES
-- Make the smallest natural edit needed to include each evidenced keyword.
+- For each keyword, make a SINGLE atomic edit: either (a) append the keyword to an existing comma-separated list in Skills, OR (b) insert 1–3 words into an existing bullet to naturally include the keyword. Do not restructure, reorder, or rewrite sentences beyond the insertion point.
 - Use exact JD phrasing for the keyword.
 - Do not add any new responsibility, metric, credential, employer, or date.
 - Do not repeat a keyword that already appears in the section.
@@ -607,19 +629,19 @@ export function buildSectionTailoringPrompt(params: {
     // Map preference chips to concrete prompt instructions
     const prefInstructions: string[] = [];
     if (prefs.includes('quantify')) {
-        prefInstructions.push('QUANTIFY: Wherever the original resume contains implicit metrics (team sizes, timelines, user counts, scale, performance gains), make them explicit with numbers. If the original says "improved performance", and there is any numeric evidence anywhere in the resume, surface it. Do NOT invent numbers — only surface what exists.');
+        prefInstructions.push('QUANTIFY: Make implicit metrics explicit ONLY when the number exists in the SAME role or project context. If the original says "improved performance" for a specific role, and that SAME role description contains a number (e.g., "50% latency reduction"), you may combine them. NEVER transplant a metric from one role/project to another. If no number exists in the same context, leave the claim qualitative. Do NOT invent numbers.');
     }
     if (prefs.includes('keywords')) {
-        prefInstructions.push('KEYWORD-HEAVY: Maximize coverage of exact JD keywords and phrases. Weave them naturally into bullets and descriptions. Prioritize required skills over preferred skills. Use the exact phrasing from the job description where possible.');
+        prefInstructions.push('KEYWORD-HEAVY: Maximize coverage of exact JD keywords and phrases. Weave them naturally into bullets and descriptions. Prioritize required skills over preferred skills. Use the exact phrasing from the job description where possible. Only include keywords that are evidenced in the original resume.');
     }
     if (prefs.includes('concise')) {
         prefInstructions.push('CONCISE: Each bullet must be 60–100 characters (excluding leading dash). Remove filler words, adverbs, and padding. One concrete achievement per bullet. Favor brevity over detail.');
     }
     if (prefs.includes('detailed')) {
-        prefInstructions.push('DETAILED: Use full STAR format (Situation → Task → Action → Result) for each major bullet. Provide context about the project scope, your specific role, technologies used, and measurable outcomes.');
+        prefInstructions.push('DETAILED: Use full STAR format (Situation → Task → Action → Result) for each major bullet. Target 150–250 characters per bullet to accommodate the full STAR format. Provide context about the project scope, your specific role, technologies used, and measurable outcomes.');
     }
     if (prefs.includes('reword')) {
-        prefInstructions.push('REWORD ONLY: Preserve the original structure, bullet count, and content exactly. Only rephrase for ATS optimization — replace passive voice with active, align terminology to JD phrasing. Do not add, remove, or reorder any bullets.');
+        prefInstructions.push('REWORD ONLY: Preserve the original structure, bullet count, and factual content exactly. Only make these specific changes: (a) Replace passive voice ("was responsible for") with active voice ("Led", "Architected"). (b) Replace generic terms with exact JD terminology when meaning is identical (e.g., "built APIs" → "developed RESTful APIs" if JD says "RESTful APIs" and the original context supports REST). Do NOT add, remove, merge, split, or reorder any bullets. ALLOWED example: "Managed a team" → "Led a cross-functional team" (if evidence supports cross-functional). FORBIDDEN example: "Built backend services" → "Architected microservices on AWS" (changes scope and adds unsupported detail).');
     }
 
     const prefBlock = prefInstructions.length > 0
@@ -643,15 +665,17 @@ ${sectionSourceBlock(params.sections)}
 
 SECTION-SPECIFIC RULES
 - Output only ${label} content. Do not include section headings.
-- Every claim must be supported by the original resume.
+- Every claim must be supported by the original resume. Never transplant metrics or achievements from one role/project to another.
 - Use exact JD keywords only when supported by the original resume.
+- If the section is SUMMARY, limit to 2–3 sentences (40–80 words total). Do NOT use the JD's target title unless it already appears in the resume.
 - If the section is EDUCATION, preserve the original education content unless light formatting is needed.
-- If the section is SKILLS, group skills into concise ATS-friendly bold-label categories.
+- If the section is SKILLS, group skills into concise ATS-friendly bold-label categories. Limit to 6–10 category lines. Do not create categories with fewer than 2 items.
 - If the section is EXPERIENCE or PROJECTS:
   - Use action-led bullets and only source-backed metrics.
   - Past tense for ended roles; present tense for the current role only.
   - Preserve exact numbers, percentages, timeframes, and dollar amounts.
   - Vary opening action verbs; do not repeat the same verb more than twice.
+  - Bullet character targets: ${prefs.includes('concise') ? '60–100' : prefs.includes('detailed') ? '150–250' : '100–180'} characters per bullet (excluding leading dash).
 
 Return ONLY valid JSON with no markdown fences:
 {

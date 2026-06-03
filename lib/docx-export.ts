@@ -94,7 +94,7 @@ const TOKENS: Record<string, TemplateTokens> = {
         headingFont: 'Consolas', // Monospace headings
         bodyFont: 'Calibri', // Elegant sans body
         primaryColor: '0F172A',
-        secondaryColor: '0284C7', // Sky blue details
+        secondaryColor: '4F46E5', // Indigo details
         nameSize: 40,
         headingSize: 19,
         roleSize: 18,
@@ -157,6 +157,48 @@ const TOKENS: Record<string, TemplateTokens> = {
         bodySize: 18,
         margin: { top: 1080, bottom: 1080, left: 1080, right: 1080 },
         centerHeader: false,
+        headerSeparator: true,
+        borderAccent: 'bottom',
+    },
+    startup: {
+        headingFont: 'Arial',
+        bodyFont: 'Arial',
+        primaryColor: '7C3AED', // Violet 600
+        secondaryColor: '4C1D95', // Violet 900
+        nameSize: 46,
+        headingSize: 21,
+        roleSize: 19,
+        bodySize: 18,
+        margin: { top: 1080, bottom: 1080, left: 1080, right: 1080 },
+        centerHeader: true,
+        headerSeparator: false,
+        borderAccent: 'bottom',
+    },
+    banking: {
+        headingFont: 'Times New Roman',
+        bodyFont: 'Times New Roman',
+        primaryColor: '000000',
+        secondaryColor: '000000',
+        nameSize: 42,
+        headingSize: 21,
+        roleSize: 17,
+        bodySize: 17,
+        margin: { top: 720, bottom: 720, left: 900, right: 900 },
+        centerHeader: true,
+        headerSeparator: false,
+        borderAccent: 'bottom',
+    },
+    academia: {
+        headingFont: 'Georgia',
+        bodyFont: 'Georgia',
+        primaryColor: '000000',
+        secondaryColor: '1F2937',
+        nameSize: 44,
+        headingSize: 22,
+        roleSize: 19,
+        bodySize: 19,
+        margin: { top: 1200, bottom: 1200, left: 1260, right: 1260 }, // wide margins
+        centerHeader: true,
         headerSeparator: true,
         borderAccent: 'bottom',
     },
@@ -331,7 +373,7 @@ function createContactRow(raw: string, t: TemplateTokens): Paragraph {
         if (idx < parts.length - 1) {
             children.push(
                 new TextRun({
-                    text: '  |  ',
+                    text: ' | ',
                     size: t.bodySize - 1,
                     font: t.bodyFont,
                     color: '666666',
@@ -687,7 +729,7 @@ function buildSection(sec: Sec, t: TemplateTokens): any[] {
 // ── Export Interface ─────────────────────────────────────────────────────────
 export interface ExportOptions {
     fileName?: string;
-    template?: 'modern' | 'classic' | 'minimal' | 'executive' | 'tech' | 'creative' | 'emerald' | 'elegant' | 'slate';
+    template?: 'modern' | 'classic' | 'minimal' | 'executive' | 'tech' | 'creative' | 'emerald' | 'elegant' | 'slate' | 'startup' | 'banking' | 'academia';
 }
 
 export async function exportResumeDOCX(

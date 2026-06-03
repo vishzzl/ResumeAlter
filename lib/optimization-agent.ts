@@ -114,12 +114,13 @@ HEADER:
 - Line 2: email | phone | location | [LinkedIn](url) | [GitHub](url) — pipe-separated, all on one line, use Markdown link format for URLs.
 
 SUMMARY (2–3 sentences maximum):
-- Sentence 1: Incorporate the exact jobTitle extracted from the JD and the candidate's years of experience.
+- Sentence 1: State the candidate's actual current or most recent title (from the resume, NOT the JD) and years of experience in the domain most relevant to the JD.
 - Sentences 2–3: Include 3–5 top required keywords naturally, focusing on value delivered — not objectives.
+- Do NOT use the JD's target title unless that EXACT title already appears in the resume.
 
 SKILLS:
-- Group by category: **Languages**, **Frameworks**, **Cloud/DevOps**, **Databases**, **Tools**.
-- Include every required keyword the candidate has demonstrated anywhere in their original resume.
+- Group by category: **Languages**, **Frameworks**, **Cloud/DevOps**, **Databases**, **Tools** (add other categories like **ML/AI**, **Data**, **Design** if the resume contains skills that don't fit the standard groups).
+- Include required JD keywords that the candidate has demonstrated with substantive usage (not just a passing mention) in the original resume. A keyword is "substantive" if it appears in a skill list, project description, or an experience bullet describing direct hands-on work.
 - Use exact keyword phrasing from the JD (e.g., if JD says "Node.js", use "Node.js" not "NodeJS").
 
 EXPERIENCE (HIGHEST PRIORITY SECTION):
@@ -278,16 +279,20 @@ ${originalResume}
 TAILORED RESUME (to verify):
 ${candidateResume}
 
-CHECK EACH OF THESE:
-1. Are there any skills/technologies in the TAILORED version that do NOT exist anywhere in the ORIGINAL? List them.
-2. Are there any metrics/numbers in the TAILORED version that do NOT exist in the ORIGINAL? List them.
-3. Are there any company names or job titles that are different from the ORIGINAL? List them.
-4. Are there any fabricated achievements or experiences? List them.
+TASK: Examine every factual claim in the TAILORED resume and verify it against the ORIGINAL.
+
+For each claim (skill, technology, metric, company name, job title, date, certification, achievement), determine:
+- Is it present in the original resume? (true/false)
+- If not present, classify as: "hallucinated_skill", "fabricated_metric", "wrong_title", "wrong_company", "wrong_date", "fabricated_achievement"
 
 OUTPUT (JSON only):
 {
-    "factScore": 85,
-    "hallucinations": ["React Native (not in original)", "99.9% uptime (fabricated metric)"],
+    "claims": [
+        { "claim": "React Native", "section": "skills", "foundInOriginal": false, "type": "hallucinated_skill" },
+        { "claim": "99.9% uptime", "section": "experience", "foundInOriginal": false, "type": "fabricated_metric" }
+    ],
+    "totalClaimsChecked": 45,
+    "hallucinationCount": 2,
     "verdict": "Minor hallucinations found — 2 items need removal"
 }`;
 }
@@ -305,7 +310,7 @@ export async function optimizeResume(input: AgentInput & {
     const sections = parseResumeSections(originalResume);
     const tailoringPrompt = buildTailoringPrompt(sections, jobDescription);
 
-    const systemInstruction = 'You are an elite Executive Career Coach, Expert Resume Writer, and uncompromising Fact-Checker. You craft high-impact, results-driven professional narratives with ATS precision. You NEVER fabricate skills, metrics, or experiences. You ONLY output strictly valid JSON.';
+    const systemInstruction = 'You are a professional resume writer and strict fact-checker. You tailor resumes for ATS systems while preserving factual accuracy. The original resume is the sole source of truth — never invent skills, metrics, dates, employers, titles, or experiences. Output only valid JSON.';
 
     // ═══ STEP 1: Generate 3 candidates in parallel ═══
     console.log('═══ STEP 1: Generating 3 candidates (Gemini + 2 OpenRouter Free) ═══');
@@ -434,9 +439,17 @@ export async function optimizeResume(input: AgentInput & {
         if (result.status === 'fulfilled' && result.value) {
             try {
                 const parsed = JSON.parse(cleanJson(result.value));
-                const factScore = Math.max(0, Math.min(100, parsed.factScore ?? 80));
-                candidates[i].crossScore = factScore / 100;
-                console.log(`  ${candidates[i].model}: factScore=${factScore}%, hallucinations=${parsed.hallucinations?.length || 0}`);
+                // Compute fact score from structured claims (preferred) or fall back to legacy factScore
+                let factScore: number;
+                if (typeof parsed.totalClaimsChecked === 'number' && parsed.totalClaimsChecked > 0) {
+                    const hallucinations = typeof parsed.hallucinationCount === 'number' ? parsed.hallucinationCount : (parsed.claims?.filter((c: { foundInOriginal?: boolean }) => c.foundInOriginal === false)?.length || 0);
+                    factScore = Math.round(((parsed.totalClaimsChecked - hallucinations) / parsed.totalClaimsChecked) * 100);
+                } else {
+                    factScore = Math.max(0, Math.min(100, parsed.factScore ?? 80));
+                }
+                candidates[i].crossScore = Math.max(0, Math.min(100, factScore)) / 100;
+                const hallucinationCount = parsed.hallucinationCount ?? parsed.hallucinations?.length ?? 0;
+                console.log(`  ${candidates[i].model}: factScore=${factScore}%, hallucinations=${hallucinationCount}`);
             } catch {
                 candidates[i].crossScore = 0.80; // Default if parsing fails
             }

@@ -37,7 +37,7 @@ const GITHUB_FREE_MODELS: Model[] = [
         bestFor: 'Low tier: Excellent general resume structuring and bullet points',
     },
     {
-        name: 'cohere/cohere-command-r-plus-08-2024',
+        name: 'Cohere-command-r-plus',
         displayName: 'Cohere Command R+ (GitHub)',
         description: 'Highly optimized for long context document search and structured parsing.',
         inputTokenLimit: 8000,

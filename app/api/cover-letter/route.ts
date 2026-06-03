@@ -109,6 +109,7 @@ RULES:
    - Use clean paragraphs separated by blank lines.
    - End with "Sincerely," followed by the candidate's name (extracted from resume).
 7. **ATS-friendly**: Use standard formatting, no special characters or tables.
+8. **Grounding**: Every technical skill, achievement, or metric you mention must appear verbatim or near-verbatim in the resume. Do not paraphrase "built internal tools" into "architected enterprise-scale platforms." When in doubt, use the candidate's exact wording.
 
 OUTPUT: Return ONLY the cover letter text. No markdown headers, no JSON, no code blocks. Just the plain text cover letter.
 `;
@@ -120,7 +121,7 @@ OUTPUT: Return ONLY the cover letter text. No markdown headers, no JSON, no code
             apiKey,
             modelName,
             customConfig: customConfig as CustomConfig,
-            temperature: 0.5,
+            temperature: 0.4,
         });
 
         // Clean up: remove any markdown artifacts the model might add

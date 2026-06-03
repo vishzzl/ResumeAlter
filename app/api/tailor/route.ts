@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
                     apiKey,
                     modelName,
                     customConfig: customConfig as CustomConfig,
-                    temperature: 0.35,
+                    temperature: 0.30,
                     jsonMode: true,
                 });
 
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
                         apiKey,
                         modelName,
                         customConfig: customConfig as CustomConfig,
-                        temperature: 0.1,
+                        temperature: 0.20,
                         jsonMode: true,
                     });
                     const verification = parseVerificationResponse(verificationText, generatedSections);
