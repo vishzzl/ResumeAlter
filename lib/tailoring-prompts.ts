@@ -385,6 +385,9 @@ ${sections.other}`;
 // Prompt: full resume tailoring
 // ---------------------------------------------------------------------------
 
+/**
+ * @deprecated Use decomposed prompt builders: buildSummaryPrompt, buildSkillsPrompt, and buildExperiencePrompt.
+ */
 export function buildTailoringPrompt(
     sections: ResumeSections,
     jobDescription: string,
@@ -499,55 +502,30 @@ Return ONLY valid JSON with this exact shape:
 // ---------------------------------------------------------------------------
 
 export function buildVerificationPrompt(
-    originalSections: ResumeSections,
-    generatedSections: TailoredSections,
-    jdAnalysis: JDAnalysis
-): string {
-    return `You are verifying a tailored resume against the original resume. The original resume is the only source of truth.
+    flaggedSentences: string[],
+    originalSections: ResumeSections
+): { systemPrompt: string; userPrompt: string } {
+    const systemPrompt = [
+        'You are a professional resume proofreader and strict fact-checker.',
+        'The original resume is the absolute source of truth.',
+        'Your task is to correct hallucinated or unevidenced claims in a list of flagged sentences.',
+        'For each sentence, check the ORIGINAL RESUME EVIDENCE. If it contains any metric, company name, degree, school, or skill not supported by the original resume, rewrite it to remove or correct the unsupported claim.',
+        'If the sentence is already supported, keep it as is.',
+        'Return ONLY a valid JSON array of objects representing the patches: [{"original": "flagged sentence", "corrected": "corrected sentence"}].',
+        'No markdown code fences, no commentary outside the JSON.'
+    ].join(' ');
 
-JD ANALYSIS
-${JSON.stringify(jdAnalysis, null, 2)}
-
-ORIGINAL RESUME SOURCE OF TRUTH
+    const userPrompt = `
+ORIGINAL RESUME EVIDENCE:
 ${sectionSourceBlock(originalSections)}
 
-TAILORED SECTIONS TO VERIFY
-${JSON.stringify(generatedSections, null, 2)}
+FLAGGED SENTENCES TO CORRECT:
+${JSON.stringify(flaggedSentences, null, 2)}
 
-VERIFICATION TASK — Compare each field of TAILORED SECTIONS against the ORIGINAL RESUME:
+Produce the JSON patch array.
+`;
 
-For each section (summary, skills, experience, projects, other):
-1. List every factual claim (skill, metric, employer, title, date, tool, certification) in the tailored version.
-2. For each claim, find the supporting evidence in the original resume.
-3. If no supporting evidence exists → REMOVE the claim from correctedSections and record it in corrections[].
-4. If the claim exists but uses different phrasing that changes meaning → RESTORE the original phrasing.
-
-IMPORTANT: Your goal is to REMOVE fabrications, NOT to undo legitimate improvements. If the tailored version rephrases an original bullet using better action verbs or JD-aligned terminology but the underlying fact is the same, KEEP the improved version.
-
-IMMUTABLE SECTIONS (copy character-for-character from original):
-- header
-- education
-
-ADDITIONAL CHECKS:
-- No contact details (email, phone, LinkedIn URL) in body sections unless already present in the original.
-- Past tense for ended roles; present tense only for current role.
-- ATS-safe Markdown only. No section headings inside JSON string values.
-- Do NOT transplant metrics from one role to another. Each number must match the role context it came from.
-
-Return ONLY valid JSON:
-{
-  "correctedSections": {
-    "header": "copy original header exactly",
-    "summary": "verified section content only",
-    "skills": "verified section content only",
-    "experience": "verified section content only",
-    "education": "copy original education exactly",
-    "projects": "verified section content only",
-    "other": "verified section content only"
-  },
-  "corrections": ["what was removed or restored and why"],
-  "warnings": ["remaining caution, if any"]
-}`;
+    return { systemPrompt, userPrompt };
 }
 
 // ---------------------------------------------------------------------------

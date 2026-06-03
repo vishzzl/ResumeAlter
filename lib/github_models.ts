@@ -14,6 +14,7 @@ export interface GitHubOptions {
     max_tokens?: number;
     response_format?: { type: 'json_object' };
     apiKey?: string;
+    caller?: string;
 }
 
 /**
@@ -52,49 +53,83 @@ export async function callGitHubModels(options: GitHubOptions): Promise<string> 
     const rawModel = options.model || 'gpt-4o-mini';
     const modelName = normalizeModelIdentifier(rawModel);
 
-    // Wrap the fetch request in the rate limiter logic
-    return await executeWithRateLimits(modelName, async () => {
-        const body: Record<string, unknown> = {
-            model: modelName,
-            messages: options.messages,
-            temperature: options.temperature ?? 0.7,
-        };
+    const normalized = modelName.toLowerCase();
+    let poolModelId: any = null;
+    if (normalized.includes('cohere-command-r-plus') || normalized.includes('command-r-plus')) {
+        poolModelId = 'cohere-command-r-plus';
+    } else if (normalized.includes('405b')) {
+        poolModelId = 'meta-llama-3.1-405b';
+    }
 
-        // Guarantee ample output headroom (max 4000 tokens) to prevent Llama/Cohere JSON truncation
-        body.max_tokens = options.max_tokens || 4000;
-
-        // Only include response_format if using a model that strictly supports structured output
-        // (OpenAI and Cohere models support this, Llama 3 models on GitHub sometimes require it inside the prompt).
-        if (options.response_format) {
-            body.response_format = options.response_format;
+    if (poolModelId && options.caller !== 'model-pool') {
+        try {
+            const { modelPoolManager } = require('./model-pool');
+            modelPoolManager.recordCall(poolModelId);
+        } catch (e) {
+            console.warn('[GitHub Models API] Failed to record call in model pool:', e);
         }
+    }
 
-        console.log(`[GitHub Models API] Sending request to Azure/GitHub endpoint for model: ${modelName}`);
+    try {
+        // Wrap the fetch request in the rate limiter logic
+        return await executeWithRateLimits(modelName, async () => {
+            const body: Record<string, unknown> = {
+                model: modelName,
+                messages: options.messages,
+                temperature: options.temperature ?? 0.7,
+            };
 
-        const res = await fetch(GITHUB_MODELS_URL, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(body),
+            // Guarantee ample output headroom (max 4000 tokens) to prevent Llama/Cohere JSON truncation
+            body.max_tokens = options.max_tokens || 4000;
+
+            // Only include response_format if using a model that strictly supports structured output
+            // (OpenAI and Cohere models support this, Llama 3 models on GitHub sometimes require it inside the prompt).
+            if (options.response_format) {
+                body.response_format = options.response_format;
+            }
+
+            console.log(`[GitHub Models API] Sending request to Azure/GitHub endpoint for model: ${modelName}`);
+
+            const res = await fetch(GITHUB_MODELS_URL, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(body),
+            });
+
+            if (!res.ok) {
+                const errorText = await res.text();
+                console.error(`[GitHub Models API] Error [${res.status}]:`, errorText);
+                throw new Error(`GitHub Models API Error: ${res.status} — ${errorText.slice(0, 250)}`);
+            }
+
+            const data = await res.json();
+            const content = data?.choices?.[0]?.message?.content;
+            
+            if (!content) {
+                throw new Error('[GitHub Models API] Returned empty or malformed response');
+            }
+
+            return content;
         });
-
-        if (!res.ok) {
-            const errorText = await res.text();
-            console.error(`[GitHub Models API] Error [${res.status}]:`, errorText);
-            throw new Error(`GitHub Models API Error: ${res.status} — ${errorText.slice(0, 250)}`);
+    } catch (err: any) {
+        const is429 =
+            err?.status === 429 ||
+            err?.message?.includes('429') ||
+            err?.message?.includes('rate limit') ||
+            err?.message?.includes('RateLimit');
+        if (is429 && poolModelId && options.caller !== 'model-pool') {
+            try {
+                const { modelPoolManager } = require('./model-pool');
+                modelPoolManager.markAsExhausted(poolModelId);
+            } catch (e) {
+                console.warn('[GitHub Models API] Failed to mark as exhausted in model pool:', e);
+            }
         }
-
-        const data = await res.json();
-        const content = data?.choices?.[0]?.message?.content;
-        
-        if (!content) {
-            throw new Error('[GitHub Models API] Returned empty or malformed response');
-        }
-
-        return content;
-    });
+        throw err;
+    }
 }
 
 /**

@@ -19,11 +19,15 @@ export function getGeminiModel(
     systemInstruction?: string
 ) {
     const key = apiKey || envApiKey;
+    let actualModel = modelName;
+    if (actualModel === 'gemini-1.5-flash') {
+        actualModel = 'gemini-flash-latest';
+    }
     if (key) {
         const genAI = new GoogleGenerativeAI(key);
-        console.log(`Initializing Gemini with model: ${modelName}`);
+        console.log(`Initializing Gemini with model: ${actualModel}`);
         return genAI.getGenerativeModel({
-            model: modelName,
+            model: actualModel,
             ...(generationConfig ? { generationConfig } : {}),
             ...(systemInstruction ? { systemInstruction } : {}),
         });

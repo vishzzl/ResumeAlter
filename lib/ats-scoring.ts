@@ -1,4 +1,6 @@
 import { ResumeSections, parseResumeSections } from './resume-parser';
+import { scoreBullet } from './bullet-scorer';
+import { parseExperienceMarkdown } from './experience-helper';
 
 export interface KeywordCoverage {
     score: number;
@@ -526,5 +528,124 @@ export function mergeKeywordHints(primary: KeywordHints, fallback: Partial<Keywo
         requirements: uniqueStrings([...primary.requirements, ...(fallback.requirements || [])]),
         keyVerbs: uniqueStrings([...primary.keyVerbs, ...(fallback.keyVerbs || [])]).slice(0, 12),
         keyPhrases: uniqueStrings([...primary.keyPhrases, ...(fallback.keyPhrases || [])]).slice(0, 10),
+    };
+}
+
+export type ATSReport = {
+    overall: number;
+    dimensions: {
+        keywordCoverage: { score: number; max: 60; missingKeywords: string[] };
+        quantification:  { score: number; max: 20; bulletsLackingMetrics: string[] };
+        actionVerbs:     { score: number; max: 10; weakVerbBullets: string[] };
+        formatting:      { score: number; max: 10; violations: string[] };
+    };
+    suggestions: string[]; // Max 4, ordered by impact, deterministic
+};
+
+export function getDetailedATSReport(params: {
+    originalResume: string;
+    tailoredResume: string;
+    requiredKeywords: string[];
+    preferredKeywords: string[];
+}): ATSReport {
+    const { originalResume, tailoredResume, requiredKeywords, preferredKeywords } = params;
+    const scoreResult = calculateAtsScore(params);
+    const overallScore = scoreResult.atsScore.after;
+
+    const sections = parseResumeSections(tailoredResume);
+    const roles = parseExperienceMarkdown(sections.experience);
+    const allBullets = roles.flatMap(r => r.bullets);
+
+    const bulletsLackingMetrics: string[] = [];
+    const weakVerbBullets: string[] = [];
+
+    for (const bullet of allBullets) {
+        const score = scoreBullet(bullet);
+        if (!score.hasMetric) {
+            bulletsLackingMetrics.push(bullet);
+        }
+        if (!score.actionVerb) {
+            weakVerbBullets.push(bullet);
+        }
+    }
+
+    const keywordCoverageScore = Math.max(0, Math.min(60, Math.round(scoreResult.atsScore.breakdown.keywordMatch.after * 0.60)));
+    const formattingScoreVal = Math.max(0, Math.min(10, Math.round(scoreResult.formatting.score * 0.10)));
+
+    const remaining = overallScore - keywordCoverageScore - formattingScoreVal;
+
+    const quantRatio = allBullets.length > 0 ? (allBullets.length - bulletsLackingMetrics.length) / allBullets.length : 1.0;
+    const verbRatio = allBullets.length > 0 ? (allBullets.length - weakVerbBullets.length) / allBullets.length : 1.0;
+
+    let quantificationScore = Math.round(quantRatio * 20);
+    let actionVerbsScore = Math.round(verbRatio * 10);
+
+    const sum = keywordCoverageScore + formattingScoreVal + quantificationScore + actionVerbsScore;
+    const diff = overallScore - sum;
+
+    if (diff !== 0) {
+        if (Math.abs(diff) <= 2) {
+            quantificationScore = Math.max(0, Math.min(20, quantificationScore + diff));
+        } else {
+            const quantAdjustment = Math.round(diff * (2/3));
+            const verbAdjustment = diff - quantAdjustment;
+            quantificationScore = Math.max(0, Math.min(20, quantificationScore + quantAdjustment));
+            actionVerbsScore = Math.max(0, Math.min(10, actionVerbsScore + verbAdjustment));
+        }
+    }
+
+    const violations: string[] = [];
+    if (!scoreResult.formatting.hasHeader) violations.push('missing header');
+    if (!scoreResult.formatting.hasSummary) violations.push('missing summary');
+    if (!scoreResult.formatting.hasExperience) violations.push('missing experience');
+    if (!scoreResult.formatting.hasSkills) violations.push('missing skills');
+    if (!scoreResult.formatting.hasMinBullets) violations.push('insufficient bullets');
+    if (scoreResult.formatting.hasTables) violations.push('contains tables');
+    if (scoreResult.formatting.hasDividers) violations.push('contains dividers');
+    if (scoreResult.formatting.longLinesCount > 0) violations.push('lines too long (>180 chars)');
+
+    const suggestions: string[] = [];
+    if (scoreResult.afterCoverage.required.missing.length > 0) {
+        suggestions.push(`Include missing required keywords: ${scoreResult.afterCoverage.required.missing.slice(0, 3).join(', ')}`);
+    }
+    if (bulletsLackingMetrics.length > 0) {
+        suggestions.push(`Quantify bullet points: add metrics (%, $, timeframes) to ${bulletsLackingMetrics.length} bullets lacking numbers.`);
+    }
+    if (weakVerbBullets.length > 0) {
+        suggestions.push(`Improve action verbs: replace weak or passive verbs in ${weakVerbBullets.length} bullet points.`);
+    }
+    if (violations.length > 0) {
+        suggestions.push(`Fix layout issues: correct ${violations.slice(0, 2).join(', ')} to ensure ATS parsing safety.`);
+    }
+
+    if (suggestions.length === 0 && overallScore < 75) {
+        suggestions.push('Review resume alignment: refine experience and summary to match job requirements closely.');
+    }
+
+    return {
+        overall: overallScore,
+        dimensions: {
+            keywordCoverage: {
+                score: keywordCoverageScore,
+                max: 60,
+                missingKeywords: scoreResult.afterCoverage.required.missing
+            },
+            quantification: {
+                score: quantificationScore,
+                max: 20,
+                bulletsLackingMetrics
+            },
+            actionVerbs: {
+                score: actionVerbsScore,
+                max: 10,
+                weakVerbBullets
+            },
+            formatting: {
+                score: formattingScoreVal,
+                max: 10,
+                violations
+            }
+        },
+        suggestions: suggestions.slice(0, 4)
     };
 }

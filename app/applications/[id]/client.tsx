@@ -9,7 +9,7 @@ import {
     RefreshCw, Download, CheckSquare, Square, UserCheck, Briefcase,
     Sparkles, X, Eye, GitCompare, Mail, Copy, Check,
     PenLine, BookOpen, Zap, Crown, Target, Layers, CheckCircle2,
-    AlertCircle, PanelLeftClose, PanelLeftOpen, FileCheck2,
+    AlertCircle, PanelLeftClose, PanelLeftOpen, FileCheck2, Info,
     FileDown, ListChecks, ArrowRight, Menu, Home, PlusCircle, Settings, Award, ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -189,6 +189,12 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
     const [, setExecutionTime] = useState<number | null>(initialAnalysis.executionTime || null);
     const [resultViewMode, setResultViewMode] = useState<'preview' | 'diff' | 'edit'>('preview');
     const [tailorPhase, setTailorPhase] = useState<'extracting' | 'tailoring' | 'verifying' | 'gap_check' | 'analyzing' | 'complete' | null>(null);
+
+    // Sprint metadata states
+    const [cacheHit, setCacheHit] = useState<boolean | null>(initialAnalysis.cacheHit ?? null);
+    const [verificationSkipped, setVerificationSkipped] = useState<boolean | null>(initialAnalysis.verificationSkipped ?? null);
+    const [, setPoolStatus] = useState<any | null>(initialAnalysis.poolStatus ?? null);
+    const [, setBulletRewrites] = useState<any | null>(initialAnalysis.bulletRewrites ?? null);
 
     // Keyword Coverage State — pre-fix (before gap injection) and post-fix (final)
     const [, setPreFixCoverage] = useState<{
@@ -565,6 +571,10 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
         setPreFixCoverage(null);
         setGapFixResults(null);
         setSseIncomplete(false);
+        setCacheHit(null);
+        setVerificationSkipped(null);
+        setPoolStatus(null);
+        setBulletRewrites(null);
         
 
 
@@ -681,6 +691,16 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                 if (event.data.atsScore) setAtsScore(event.data.atsScore);
                                 if (event.data.changes) setChanges(event.data.changes);
 
+                                const cacheHitVal = event.data.cacheHit ?? event.cacheHit ?? null;
+                                const verificationSkippedVal = event.data.verificationSkipped ?? event.verificationSkipped ?? null;
+                                const poolStatusVal = event.data.poolStatus ?? event.poolStatus ?? null;
+                                const bulletRewritesVal = event.data.bulletRewrites ?? event.bulletRewrites ?? null;
+
+                                if (cacheHitVal !== null) setCacheHit(cacheHitVal);
+                                if (verificationSkippedVal !== null) setVerificationSkipped(verificationSkippedVal);
+                                if (poolStatusVal !== null) setPoolStatus(poolStatusVal);
+                                if (bulletRewritesVal !== null) setBulletRewrites(bulletRewritesVal);
+
                                 const endTime = performance.now();
                                 const duration = Math.round(endTime - startTime);
                                 setExecutionTime(duration);
@@ -700,7 +720,11 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                     analysis: JSON.stringify({
                                         changes: event.data.changes || [],
                                         atsScore: event.data.atsScore || null,
-                                        executionTime: duration
+                                        executionTime: duration,
+                                        cacheHit: cacheHitVal,
+                                        verificationSkipped: verificationSkippedVal,
+                                        poolStatus: poolStatusVal,
+                                        bulletRewrites: bulletRewritesVal
                                     })
                                 });
                             } else if (event.phase === 'error') {
@@ -724,12 +748,29 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             } else if (errorMessage.toLowerCase().includes('timeout')) {
                 errorMessage = '⚠️ ' + errorMessage;
             }
+
+            const isQuotaExhausted = errorMessage.toLowerCase().includes('exhausted') || 
+                                     errorMessage.toLowerCase().includes('quota') || 
+                                     errorMessage.toLowerCase().includes('rate limit') || 
+                                     errorMessage.toLowerCase().includes('429');
+            if (isQuotaExhausted) {
+                let retryAfterMs = 60000;
+                const match = errorMessage.match(/retryAfterMs=(\d+)/i) || 
+                              errorMessage.match(/retryAfter=(\d+)/i) || 
+                              errorMessage.match(/in (\d+)\s*seconds/i);
+                if (match) {
+                    const val = parseInt(match[1], 10);
+                    retryAfterMs = errorMessage.toLowerCase().includes('ms') ? val : val * 1000;
+                }
+                const seconds = Math.ceil(retryAfterMs / 1000);
+                errorMessage = `All AI models are currently busy. Please try again in ${seconds} seconds.`;
+            }
             
             if (selectedProvider === 'gemini') {
                 reportGeminiIssue(errorMessage, selectedModel);
             }
             setError(errorMessage);
-            toast.error('❌ Tailoring failed. See error banner for details.', { id: 'tailor-status', duration: 8000 });
+            toast.error(errorMessage, { id: 'tailor-status', duration: 8000 });
         } finally {
             clearTimeout(timeoutId);
             setLoading(() => {
@@ -914,19 +955,37 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
             }
         } catch (err: any) {
             console.error(`[SectionBuilder] Failed to generate ${sectionName}:`, err);
+            let errorMessage = err instanceof Error ? err.message : 'Generation failed';
+
+            const isQuotaExhausted = errorMessage.toLowerCase().includes('exhausted') || 
+                                     errorMessage.toLowerCase().includes('quota') || 
+                                     errorMessage.toLowerCase().includes('rate limit') || 
+                                     errorMessage.toLowerCase().includes('429');
+            if (isQuotaExhausted) {
+                let retryAfterMs = 60000;
+                const match = errorMessage.match(/retryAfterMs=(\d+)/i) || 
+                              errorMessage.match(/retryAfter=(\d+)/i) || 
+                              errorMessage.match(/in (\d+)\s*seconds/i);
+                if (match) {
+                    const val = parseInt(match[1], 10);
+                    retryAfterMs = errorMessage.toLowerCase().includes('ms') ? val : val * 1000;
+                }
+                const seconds = Math.ceil(retryAfterMs / 1000);
+                errorMessage = `All AI models are currently busy. Please try again in ${seconds} seconds.`;
+            }
+
             setSectionStates(prev => ({
                 ...prev,
                 [sectionName]: {
                     ...prev[sectionName],
                     status: 'error',
-                    error: err instanceof Error ? err.message : 'Generation failed',
+                    error: errorMessage,
                 },
             }));
             if (selectedProvider === 'gemini') {
-                const errorMessage = err instanceof Error ? err.message : 'Section generation failed';
                 reportGeminiIssue(errorMessage, selectedModel);
             }
-            toast.error(`Failed to generate ${sectionName}. Please try again.`);
+            toast.error(errorMessage);
         }
     }, [resumeText, jobDescription, jdAnalysis, selectedProvider, selectedModel, customModelConfig, reportGeminiIssue, sectionStates]);
 
@@ -1818,6 +1877,21 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
 
                             {/* ── Right Action Zone ── */}
                             <div className="flex shrink-0 items-center gap-2">
+                                {/* Sprint metadata badges */}
+                                {cacheHit && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 border border-emerald-200 shadow-sm" title="Loaded from cache">
+                                        <Check className="h-2.5 w-2.5" />
+                                        <span className="hidden md:inline">Loaded from cache</span>
+                                        <span className="md:hidden">Cached</span>
+                                    </span>
+                                )}
+                                {verificationSkipped && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 border border-blue-200 shadow-sm" title="Verification Bypassed">
+                                        <Info className="h-2.5 w-2.5" />
+                                        <span className="hidden md:inline">Verification bypassed</span>
+                                        <span className="md:hidden">Bypassed</span>
+                                    </span>
+                                )}
 
                                 {/* Resume tab actions */}
                                 {outputTab === 'resume' && tailoredResume && (
@@ -2015,7 +2089,11 @@ export default function ApplicationClient({ initialApplication }: ApplicationCli
                                             analysis: JSON.stringify({
                                                 changes,
                                                 atsScore: score,
-                                                executionTime: initialAnalysis.executionTime || null
+                                                executionTime: initialAnalysis.executionTime || null,
+                                                cacheHit,
+                                                verificationSkipped,
+                                                poolStatus: initialAnalysis.poolStatus || null,
+                                                bulletRewrites: initialAnalysis.bulletRewrites || null
                                             })
                                         });
                                     }}
