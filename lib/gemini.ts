@@ -14,19 +14,19 @@ if (model) {
 
 export function getGeminiModel(
     apiKey?: string,
-    modelName: string = 'gemini-flash-latest',
+    modelName: string = 'gemini-2.5-flash',
     generationConfig?: Record<string, any>,
     systemInstruction?: string
 ) {
     const key = apiKey || envApiKey;
     let actualModel = modelName;
-    if (actualModel === 'gemini-1.5-flash') {
-        actualModel = 'gemini-flash-latest';
+    if (actualModel.startsWith('gemini-3') || actualModel === 'gemini-1.5-flash' || actualModel === 'gemini-flash-latest') {
+        actualModel = 'gemini-2.5-flash';
     }
     if (key) {
-        const genAI = new GoogleGenerativeAI(key);
+        const client = new GoogleGenerativeAI(key);
         console.log(`Initializing Gemini with model: ${actualModel}`);
-        return genAI.getGenerativeModel({
+        return client.getGenerativeModel({
             model: actualModel,
             ...(generationConfig ? { generationConfig } : {}),
             ...(systemInstruction ? { systemInstruction } : {}),

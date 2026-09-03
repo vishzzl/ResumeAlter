@@ -105,7 +105,7 @@ function normalizeStatusMap(value: unknown): Record<string, GeminiHealthStatus> 
 }
 
 export function AIConfigProvider({ children }: { children: React.ReactNode }) {
-    const [selectedProvider, setProviderState] = useState<AIProvider>('gemini');
+    const [selectedProvider] = useState<AIProvider>('gemini');
     const [selectedModel, setModelState] = useState<string>('gemini-1.5-flash');
     const [customModelConfig, setCustomConfigState] = useState({
         localUrl: 'http://localhost:11434',
@@ -119,20 +119,8 @@ export function AIConfigProvider({ children }: { children: React.ReactNode }) {
     const [geminiStatuses, setGeminiStatuses] = useState<Record<string, GeminiHealthStatus>>({});
 
     useEffect(() => {
-        const savedProvider = localStorage.getItem('resume_alter_provider') as AIProvider;
-        if (savedProvider) setProviderState(savedProvider);
-
         const savedModel = localStorage.getItem('resume_alter_model');
         if (savedModel) setModelState(savedModel);
-
-        const savedCustomConfig = localStorage.getItem('resume_alter_custom_config');
-        if (savedCustomConfig) {
-            try {
-                setCustomConfigState(JSON.parse(savedCustomConfig));
-            } catch (error) {
-                console.error('Failed to parse custom config', error);
-            }
-        }
 
         const savedStatuses = localStorage.getItem(MODEL_STATUS_STORAGE_KEY);
         if (savedStatuses) {
@@ -145,18 +133,6 @@ export function AIConfigProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     useEffect(() => {
-        if (selectedProvider === 'github') {
-            const models = GITHUB_FREE_MODELS;
-            setAvailableModels(models);
-            setIsLoadingModels(false);
-            
-            const currentExists = models.some(model => model.name === selectedModel);
-            if (!currentExists) {
-                setModelState(models[0].name);
-            }
-            return;
-        }
-
         async function fetchModels() {
             try {
                 const savedKey = localStorage.getItem('gemini_api_key') || undefined;
@@ -176,36 +152,20 @@ export function AIConfigProvider({ children }: { children: React.ReactNode }) {
                             || models.find(model => model.name.includes('flash'));
                         const best = preferred ? preferred.name : models[0].name;
                         setModelState(best);
-                    } else if (!currentExists) {
-                        setAvailableModels(prev => {
-                            if (prev.some(model => model.name === selectedModel)) return prev;
-                            return [
-                                {
-                                    name: selectedModel,
-                                    displayName: selectedModel,
-                                    description: 'Previously selected model',
-                                    family: selectedModel.includes('pro') ? 'pro' : 'flash',
-                                    stability: 'stable',
-                                    bestFor: 'Previously selected',
-                                },
-                                ...models,
-                            ];
-                        });
                     }
                 }
             } catch (error) {
-                console.error('Failed to load models', error);
+                console.error('Failed to load Gemini models', error);
             } finally {
                 setIsLoadingModels(false);
             }
         }
 
         fetchModels();
-    }, [selectedModel, selectedProvider]);
+    }, [selectedModel]);
 
-    const setSelectedProvider = (provider: AIProvider) => {
-        setProviderState(provider);
-        localStorage.setItem('resume_alter_provider', provider);
+    const setSelectedProvider = (_provider: AIProvider) => {
+        // Restricted strictly to Google Gemini
     };
 
     const setSelectedModel = (model: string) => {

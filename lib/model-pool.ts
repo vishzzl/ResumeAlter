@@ -7,7 +7,17 @@ import { getGeminiModel } from './gemini';
 import { callGitHubModels } from './github_models';
 
 export type TaskType = 'summary' | 'skills' | 'experience' | 'verification' | 'gap_fix';
-export type ModelId = 'gemini-2.0-flash-lite' | 'gemini-1.5-flash' | 'cohere-command-r-plus' | 'meta-llama-3.1-405b';
+export type ModelId = 
+  | 'gemini-3.8-flash'
+  | 'gemini-3.7-flash'
+  | 'gemini-3.6-flash'
+  | 'gemini-3.5-flash'
+  | 'gemini-3.5-flash-lite'
+  | 'gemini-3.1-flash-lite'
+  | 'gemini-2.5-flash'
+  | 'gemini-1.5-flash'
+  | 'gemini-2.0-flash-lite'
+  | 'gemini-1.5-pro';
 
 export type PoolStatus = Record<ModelId, {
     callsInWindow: number;
@@ -25,20 +35,26 @@ export class QuotaExhaustedError extends Error {
     }
 }
 
-// Routing Table (Preferred model and fallbacks per task type)
+// Routing Table (Gemini models fallback chain per task type)
 const ROUTING_TABLE: Record<TaskType, ModelId[]> = {
-    summary: ['gemini-2.0-flash-lite', 'gemini-1.5-flash', 'cohere-command-r-plus'],
-    skills: ['gemini-2.0-flash-lite', 'gemini-1.5-flash', 'cohere-command-r-plus'],
-    experience: ['cohere-command-r-plus', 'gemini-1.5-flash', 'meta-llama-3.1-405b'],
-    verification: ['gemini-2.0-flash-lite', 'gemini-1.5-flash', 'cohere-command-r-plus'],
-    gap_fix: ['gemini-2.0-flash-lite', 'gemini-1.5-flash', 'cohere-command-r-plus']
+    summary: ['gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-1.5-flash'],
+    skills: ['gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-1.5-flash'],
+    experience: ['gemini-2.5-flash', 'gemini-3.7-flash', 'gemini-1.5-flash'],
+    verification: ['gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-1.5-flash'],
+    gap_fix: ['gemini-2.5-flash', 'gemini-3.6-flash', 'gemini-1.5-flash']
 };
 
 const RPM_LIMITS: Record<ModelId, number> = {
-    'gemini-2.0-flash-lite': 30,
+    'gemini-3.8-flash': 15,
+    'gemini-3.7-flash': 15,
+    'gemini-3.6-flash': 15,
+    'gemini-3.5-flash': 15,
+    'gemini-3.5-flash-lite': 30,
+    'gemini-3.1-flash-lite': 30,
+    'gemini-2.5-flash': 15,
     'gemini-1.5-flash': 15,
-    'cohere-command-r-plus': 10,
-    'meta-llama-3.1-405b': 10
+    'gemini-2.0-flash-lite': 30,
+    'gemini-1.5-pro': 10
 };
 
 export class ModelPoolManager {

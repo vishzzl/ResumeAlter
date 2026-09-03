@@ -9,11 +9,13 @@
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/migrate.js",
+    "reset-password": "node scripts/reset-password.js",
     "test": "vitest run"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@libsql/client": "^0.17.0",
+    "@next/swc-win32-x64-msvc": "^16.3.4",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-popover": "^1.1.15",
     "@radix-ui/react-slot": "^1.2.4",

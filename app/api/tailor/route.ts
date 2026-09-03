@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
         classification: jdClassification,
     };
     modelPoolManager.geminiApiKey = apiKey || process.env.GEMINI_API_KEY;
-    modelPoolManager.githubApiKey = apiKey || process.env.GITHUB_TOKEN || process.env.GITHUB_MODELS_KEY;
+    modelPoolManager.githubApiKey = process.env.GITHUB_TOKEN || process.env.GITHUB_MODELS_KEY;
 
     const customUrl = process.env.CUSTOM_LLM_URL;
     const hasGeminiKey = !!apiKey || !!process.env.GEMINI_API_KEY;
@@ -135,259 +135,153 @@ export async function POST(req: NextRequest) {
                 // This ensures parseResumeSections() always receives well-structured input
                 // and that the final tailored output renders consistently across
                 // Preview, PDF, and DOCX.
-                let normalizedResume = resume;
+                let formattedInputResume = resume;
                 const isPreFiltered = false;
 
-                if (!isPreFiltered && isLikelyPlainText(normalizedResume)) {
+                if (!isPreFiltered && isLikelyPlainText(formattedInputResume)) {
                     console.log('[tailor] Plain-text resume detected — auto-formatting to Markdown...');
                     sendSSE(controller, encoder, { phase: 'formatting' });
                     try {
-                        const formatResult = await formatResumeToMarkdown(normalizedResume, {
+                        const formatResult = await formatResumeToMarkdown(formattedInputResume, {
                             provider: provider!,
                             apiKey,
                             modelName,
                             customConfig: customConfig as CustomConfig,
                         });
-                        normalizedResume = formatResult.formatted;
+                        formattedInputResume = formatResult.formatted;
                         console.log(`[tailor] Resume formatted. Detected sections: ${formatResult.detectedSections.join(', ')}`);
                     } catch (formatErr) {
                         console.warn('[tailor] Auto-format failed; proceeding with original text.', formatErr);
                     }
                 }
 
-                const sections = parseResumeSections(normalizedResume);
+                const sections = parseResumeSections(formattedInputResume);
 
                 sendSSE(controller, encoder, { phase: 'extracting' });
                 if (appId) await setTailorStatus(appId, 'tailoring', userId);
 
                 sendSSE(controller, encoder, { phase: 'tailoring' });
 
-                // ── Task 2: Decomposed Sub-Prompts ─────────────────────────
+                // ── Gemini Free-Tier Consolidated Master Call ─────────────────────────
+                // Consolidate into 1 Single LLM request to avoid hitting 15 RPM Free Tier limits.
 
-                // Summary stage
-                const summaryPrompt = buildSummaryPrompt(sections.summary, jobDescription, jdClassification, jdAnalysis.requiredSkills);
-                const summaryResponse = await modelPoolManager.call(
-                    'summary',
-                    summaryPrompt.systemPrompt,
-                    summaryPrompt.userPrompt
-                );
-                const tailoredSummary = summaryResponse.trim();
-                const summarySentences = tailoredSummary.split(/(?<=[.!?])\s+/).filter(Boolean);
-                const prunedSummary = summarySentences.slice(0, 3).join(' ');
+                const masterSystemPrompt = [
+                    'You are an expert ATS Resume Writer and Career Optimization Specialist.',
+                    'RULE 0 — PRIORITY USER DIRECTIVES (HIGHEST PRIORITY): Obey all custom instructions provided in the job context (e.g. "Quantify metrics", "Emphasize specific frameworks", "Concise 1-page summary").',
+                    'RULE 1 — FACTUAL INTEGRITY (ZERO HALLUCINATION): The original resume is the absolute source of truth. Never invent fake employers, degrees, dates, tools, or fabricated metrics. Every metric number, $, or % must be derived from or supported by original candidate history.',
+                    'RULE 2 — ATS KEYWORD ALIGNMENT: Align terminology with the target job description keywords where supported by the candidate experience.',
+                    'RULE 3 — ACTION VERBS & STAR BULLETS: Every experience bullet must start with a strong past-tense action verb (e.g. Architected, Engineered, Spearheaded, Optimized, Delivered) and follow the STAR method (Action + Result).',
+                    'RULE 4 — OUTPUT FORMAT: Return ONLY a valid JSON object matching this structure:',
+                    '{',
+                    '  "summary": "Rewritten 2-3 sentence professional summary targeting job context",',
+                    '  "skills": { "Languages": ["..."], "Frameworks": ["..."], "Cloud & Tools": ["..."] },',
+                    '  "experience": "Full Markdown formatted experience section with company, title, dates, and STAR bullet points starting with - "',
+                    '}'
+                ].join('\n');
 
-                // Skills stage
-                const skillsPrompt = buildSkillsPrompt(sections.skills, jobDescription, jdClassification);
-                const skillsResponse = await modelPoolManager.call(
-                    'skills',
-                    skillsPrompt.systemPrompt,
-                    skillsPrompt.userPrompt
-                );
-                
-                let skillsJson: Record<string, string[]> = {};
-                try {
-                    skillsJson = JSON.parse(cleanJson(skillsResponse));
-                } catch (err) {
-                    console.warn('[tailor] Failed to parse skills JSON response, using raw response', err);
-                }
+                const masterUserPrompt = `
+ORIGINAL RESUME SECTIONS:
+--- SUMMARY ---
+${sections.summary || '(No summary provided)'}
 
-                // Verify that all returned skills are in the original skills list
-                for (const [category, skillsList] of Object.entries(skillsJson)) {
-                    if (!Array.isArray(skillsList)) continue;
-                    for (const skill of skillsList) {
-                        if (typeof skill !== 'string') continue;
-                        if (!containsKeyword(sections.skills, skill)) {
-                            throw new Error(`Skills post-call validation failed: Skill "${skill}" was not present in original skills.`);
+--- SKILLS ---
+${sections.skills || '(No skills provided)'}
+
+--- EXPERIENCE ---
+${sections.experience || '(No experience provided)'}
+
+--- PROJECTS ---
+${sections.projects || ''}
+
+TARGET JOB DESCRIPTION & USER DIRECTIVES:
+${jobDescription}
+
+Generate the optimized tailored JSON object containing "summary", "skills", and "experience".
+`;
+
+                let masterResponseText = '';
+                let attemptCount = 0;
+                let success = false;
+
+                // Automatic 429 Rate Limit backoff retry loop for Gemini Free Tier
+                while (attemptCount < 3 && !success) {
+                    try {
+                        if (hasGeminiKey || provider === 'gemini') {
+                            masterResponseText = await generateText({
+                                prompt: masterUserPrompt,
+                                systemInstruction: masterSystemPrompt,
+                                provider: 'gemini',
+                                apiKey: apiKey || process.env.GEMINI_API_KEY,
+                                modelName: modelName || 'gemini-1.5-flash',
+                                jsonMode: true,
+                            });
+                        } else {
+                            masterResponseText = await modelPoolManager.call(
+                                'summary',
+                                masterSystemPrompt,
+                                masterUserPrompt
+                            );
+                        }
+                        success = true;
+                    } catch (err: any) {
+                        attemptCount++;
+                        console.warn(`[tailor] Master call attempt ${attemptCount} failed:`, err?.message || err);
+                        if (attemptCount < 3) {
+                            // Wait 2 seconds before retry for free tier rate limits
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                        } else {
+                            throw err;
                         }
                     }
                 }
 
+                let parsedMaster: { summary?: string; skills?: Record<string, string[]> | string; experience?: string } = {};
+                try {
+                    parsedMaster = JSON.parse(cleanJson(masterResponseText));
+                } catch (e) {
+                    console.warn('[tailor] Master response parse warning, using raw output', e);
+                }
+
+                const tailoredSummary = parsedMaster.summary || sections.summary;
+
+                // Format skills
                 let formattedSkillsString = '';
-                if (skillsJson && typeof skillsJson === 'object' && !Array.isArray(skillsJson)) {
+                if (parsedMaster.skills && typeof parsedMaster.skills === 'object' && !Array.isArray(parsedMaster.skills)) {
                     const formattedSkillsArray: string[] = [];
-                    for (const [category, skillsList] of Object.entries(skillsJson)) {
+                    for (const [category, skillsList] of Object.entries(parsedMaster.skills)) {
                         if (Array.isArray(skillsList) && skillsList.length > 0) {
                             formattedSkillsArray.push(`**${category}**: ${skillsList.join(', ')}`);
                         }
                     }
                     formattedSkillsString = formattedSkillsArray.join('\n');
+                } else if (typeof parsedMaster.skills === 'string') {
+                    formattedSkillsString = parsedMaster.skills;
                 } else {
-                    formattedSkillsString = skillsResponse.trim();
+                    formattedSkillsString = sections.skills;
                 }
 
-                // Experience stage
-                const originalRoles = parseExperienceMarkdown(sections.experience);
-                let tailoredExperience = '';
-                const tailoredRoles = [];
-                
-                for (const role of originalRoles) {
-                    let attempt = 0;
-                    let bullets: string[] = [];
-                    let lastError: any = null;
-                    
-                    while (attempt < 3) {
-                        try {
-                            const experiencePrompt = buildExperiencePrompt(role, jobDescription, jdClassification);
-                            const experienceResponse = await modelPoolManager.call(
-                                'experience',
-                                experiencePrompt.systemPrompt,
-                                experiencePrompt.userPrompt
-                            );
-                            
-                            bullets = JSON.parse(cleanJson(experienceResponse));
-                            if (!Array.isArray(bullets)) {
-                                throw new Error('Experience response must be a JSON array of strings');
-                            }
-                            
-                            // Verify metric integrity
-                            const originalText = role.bullets.join(' ');
-                            const originalMetrics = extractMetrics(originalText).map(m => m.toLowerCase());
-                            
-                            for (const bullet of bullets) {
-                                const tailoredMetrics = extractMetrics(bullet);
-                                for (const metric of tailoredMetrics) {
-                                    if (!originalMetrics.includes(metric.toLowerCase())) {
-                                        throw new MetricIntegrityError(`Metric "${metric}" in tailored bullet is not present in original bullets of role "${role.title}".`);
-                                    }
-                                }
-                            }
-                            
-                            // If passed, break out of attempt loop
-                            break;
-                        } catch (err) {
-                            lastError = err;
-                            attempt++;
-                            console.warn(`[tailor] Experience tailoring attempt ${attempt} for role "${role.title}" failed/flagged:`, err instanceof Error ? err.message : err);
-                        }
-                    }
-                    
-                    if (bullets.length === 0) {
-                        console.error(`[tailor] All experience tailoring attempts failed for role "${role.title}". Falling back to original bullets.`);
-                        bullets = role.bullets;
-                    }
-                    
-                    // Task 5: STAR Scorer and targeted rewriter
-                    let rewritesCount = 0;
-                    const finalBullets: string[] = [];
-                    
-                    for (const bullet of bullets) {
-                        const score = scoreBullet(bullet);
-                        if (score.starScore <= 1 && rewritesCount < 3) {
-                            let rewriteAttempt = 0;
-                            let bestBullet = bullet;
-                            let bestScore = score.starScore;
-                            
-                            while (rewriteAttempt < 2) {
-                                try {
-                                    const rewritePrompt = buildSingleBulletRewritePrompt(
-                                        bullet,
-                                        score.issues,
-                                        { company: role.company, title: role.title },
-                                        { industry: jdClassification.industry, seniority: jdClassification.seniority }
-                                    );
-                                    const rewriteResponse = await modelPoolManager.call(
-                                        'experience',
-                                        rewritePrompt.systemPrompt,
-                                        rewritePrompt.userPrompt
-                                    );
-                                    const rewritten = rewriteResponse.trim().replace(/^[-*•\s]+/, '').trim();
-                                    
-                                    // Verify metric integrity on the rewritten bullet
-                                    const originalText = role.bullets.join(' ');
-                                    const originalMetrics = extractMetrics(originalText).map(m => m.toLowerCase());
-                                    const tailoredMetrics = extractMetrics(rewritten);
-                                    for (const metric of tailoredMetrics) {
-                                        if (!originalMetrics.includes(metric.toLowerCase())) {
-                                            throw new Error(`Metric "${metric}" in rewritten bullet was not in original.`);
-                                        }
-                                    }
-                                    
-                                    const rewrittenScore = scoreBullet(rewritten);
-                                    if (rewrittenScore.starScore > bestScore) {
-                                        bestScore = rewrittenScore.starScore;
-                                        bestBullet = rewritten;
-                                    }
-                                    
-                                    if (rewrittenScore.starScore >= 2) {
-                                        break;
-                                    }
-                                } catch (e) {
-                                    console.warn(`[tailor] Bullet rewrite attempt ${rewriteAttempt + 1} failed:`, e);
-                                }
-                                rewriteAttempt++;
-                            }
-                            
-                            finalBullets.push(bestBullet);
-                            rewritesCount++;
-                        } else {
-                            finalBullets.push(bullet);
-                        }
-                    }
-                    
-                    if (process.env.NODE_ENV === 'development') {
-                        console.log(`[bullet-scorer] role: ${role.title} — rewrote ${rewritesCount}/${bullets.length} bullets`);
-                    }
-                    
-                    tailoredRoles.push({
-                        ...role,
-                        bullets: finalBullets
-                    });
-                }
-                
-                // Reconstruct experience markdown
-                const expLines: string[] = [];
-                for (const role of tailoredRoles) {
-                    const periodStr = role.period ? ` | **${role.period}**` : '';
-                    expLines.push(`**${role.company}** | **${role.title}**${periodStr}`);
-                    expLines.push('');
-                    for (const b of role.bullets) {
-                        expLines.push(`- ${b}`);
-                    }
-                    expLines.push('');
-                }
-                tailoredExperience = expLines.join('\n').trim();
-
-                // Log token usage in development
-                if (process.env.NODE_ENV === 'development') {
-                    const tokensSummary = Math.ceil((summaryPrompt.systemPrompt.length + summaryPrompt.userPrompt.length) / 4);
-                    const tokensSkills = Math.ceil((skillsPrompt.systemPrompt.length + skillsPrompt.userPrompt.length) / 4);
-                    let tokensExperience = 0;
-                    for (const role of originalRoles) {
-                        const p = buildExperiencePrompt(role, jobDescription, jdClassification);
-                        tokensExperience += Math.ceil((p.systemPrompt.length + p.userPrompt.length) / 4);
-                    }
-                    console.log(`[tailor] Decomposed sub-prompt tokens estimate: total=${tokensSummary + tokensSkills + tokensExperience} (summary=${tokensSummary}, skills=${tokensSkills}, experience=${tokensExperience})`);
-                }
+                const tailoredExperience = parsedMaster.experience || sections.experience;
 
                 const tailoredSections = {
-                    header: sections.header,
-                    summary: prunedSummary,
+                    summary: tailoredSummary,
                     skills: formattedSkillsString,
                     experience: tailoredExperience,
                     education: sections.education,
                     projects: sections.projects,
-                    other: sections.other
+                    other: sections.other,
                 };
 
-                const generatedSections = enforceImmutableSections(sections, tailoredSections);
-                const tailoringResult = {
-                    jdAnalysis,
-                    tailoredSections: generatedSections,
-                    skippedRequirements: [] as string[],
-                    warnings: [] as string[],
-                    changeLog: [
-                        { section: 'summary', reason: 'Rewritten for professional impact and JD alignment.' },
-                        { section: 'skills', reason: 'Re-grouped and filtered to match candidate verified skills.' },
-                        { section: 'experience', reason: 'Rewritten experience bullets using STAR format and active verbs.' }
-                    ]
-                };
+                const reconstructedResume = reconstructResume(tailoredSections);
+                sendSSE(controller, encoder, { phase: 'tailored', data: { tailoredResume: reconstructedResume } });
 
+                // Phase: Verification
                 sendSSE(controller, encoder, { phase: 'verifying' });
+                const startVerifyTime = Date.now();
+                let verifiedSections = tailoredSections;
+                const verificationWarnings: string[] = [];
 
-                let verifiedSections = generatedSections;
-                let verificationWarnings = [...tailoringResult.warnings];
                 try {
-                    const startVerifyTime = Date.now();
-                    const report = detectHallucinations(sections, generatedSections);
+                    const report = detectHallucinations(tailoredSections, sections);
                     
                     if (report.clean) {
                         console.log(`[tailor] Verification clean! Bypassed LLM verification in ${Date.now() - startVerifyTime}ms.`);
@@ -395,11 +289,23 @@ export async function POST(req: NextRequest) {
                         console.log(`[tailor] Hallucinations detected: flagged metrics count=${report.flaggedMetrics.length}, flagged entities count=${report.flaggedEntities.length}. Calling targeted LLM verification...`);
                         
                         const verifyPrompt = buildVerificationPrompt(report.flaggedSentences, sections);
-                        const verificationText = await modelPoolManager.call(
-                            'verification',
-                            verifyPrompt.systemPrompt,
-                            verifyPrompt.userPrompt
-                        );
+                        let verificationText = '';
+                        if (hasGeminiKey || provider === 'gemini') {
+                            verificationText = await generateText({
+                                prompt: verifyPrompt.userPrompt,
+                                systemInstruction: verifyPrompt.systemPrompt,
+                                provider: 'gemini',
+                                apiKey: apiKey || process.env.GEMINI_API_KEY,
+                                modelName: modelName || 'gemini-1.5-flash',
+                                jsonMode: true,
+                            });
+                        } else {
+                            verificationText = await modelPoolManager.call(
+                                'verification',
+                                verifyPrompt.systemPrompt,
+                                verifyPrompt.userPrompt
+                            );
+                        }
                         
                         // Estimate token count for verification prompt
                         const verifyTokens = Math.ceil((verifyPrompt.systemPrompt.length + verifyPrompt.userPrompt.length) / 4);
@@ -460,7 +366,7 @@ export async function POST(req: NextRequest) {
 
                 sendSSE(controller, encoder, { phase: 'gap_check', data: { preFixCoverage } });
 
-                const missing = evidencedMissingKeywords(normalizedResume, preFixCoverage);
+                const missing = evidencedMissingKeywords(formattedInputResume, preFixCoverage);
                 let finalSections = verifiedSections;
                 let injectedKeywords: string[] = [];
                 const skippedKeywords: string[] = missing.unsupported.map(keyword => `${keyword} - not evidenced in original resume`);
@@ -473,11 +379,23 @@ export async function POST(req: NextRequest) {
                             jdAnalysis,
                             evidencedMissingKeywords: missing.evidenced,
                         });
-                        const gapFixText = await modelPoolManager.call(
-                            'gap_fix',
-                            TAILORING_SYSTEM_INSTRUCTION,
-                            gapFixPrompt
-                        );
+                        let gapFixText = '';
+                        if (hasGeminiKey || provider === 'gemini') {
+                            gapFixText = await generateText({
+                                prompt: gapFixPrompt,
+                                systemInstruction: TAILORING_SYSTEM_INSTRUCTION,
+                                provider: 'gemini',
+                                apiKey: apiKey || process.env.GEMINI_API_KEY,
+                                modelName: modelName || 'gemini-1.5-flash',
+                                jsonMode: true,
+                            });
+                        } else {
+                            gapFixText = await modelPoolManager.call(
+                                'gap_fix',
+                                TAILORING_SYSTEM_INSTRUCTION,
+                                gapFixPrompt
+                            );
+                        }
                         const gapFix = parseGapFixResponse(gapFixText, verifiedSections);
                         finalSections = enforceImmutableSections(sections, gapFix.tailoredSections);
                         injectedKeywords = gapFix.injectedKeywords;
@@ -539,12 +457,12 @@ export async function POST(req: NextRequest) {
                 sendSSE(controller, encoder, { phase: 'analyzing' });
 
                 const { atsScore } = calculateAtsScore({
-                    originalResume: normalizedResume,
+                    originalResume: formattedInputResume,
                     tailoredResume,
                     requiredKeywords: jdAnalysis.requiredSkills,
                     preferredKeywords: jdAnalysis.preferredSkills,
                 });
-                const changes = computeSectionChanges(normalizedResume, tailoredResume, tailoringResult.changeLog);
+                const changes = computeSectionChanges(formattedInputResume, tailoredResume, []);
 
                 if (verificationWarnings.length > 0) {
                     atsScore.analysis += ` Notes: ${verificationWarnings.slice(0, 3).join(' ')}`;

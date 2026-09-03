@@ -81,7 +81,7 @@ export async function generateText(opts: GenerateOptions): Promise<string> {
         jsonMode = false,
     } = opts;
 
-    const defaultModel = 'gemini-flash-latest';
+    const defaultModel = 'gemini-2.5-flash';
     const TIMEOUT_MS = 60000; // 60 seconds
 
     if (provider === 'custom') {

@@ -3,391 +3,272 @@
 import { useEffect, useState } from "react";
 import { useAIConfig, Model } from "@/app/context/AIConfigContext";
 import {
-    AlertTriangle,
-    Check,
-    ChevronDown,
-    ChevronsUpDown,
-    Clock3,
-    RefreshCw,
+  AlertTriangle,
+  Check,
+  ChevronDown,
+  ChevronsUpDown,
+  Clock3,
+  RefreshCw,
+  Sparkles,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatTokenCount } from "@/lib/gemini-quota";
 
 interface ModelSelectorProps {
-    estimatedInputTokens?: number;
+  estimatedInputTokens?: number;
 }
-
-
 
 function familyTone(model?: Model) {
-    if (model?.family === "pro") return "bg-amber-50 text-amber-700 border-amber-200";
-    if (model?.family === "experimental") return "bg-rose-50 text-rose-700 border-rose-200";
-    return "bg-emerald-50 text-emerald-700 border-emerald-200";
-}
-
-function statusTone(state?: string) {
-    switch (state) {
-        case "ok":
-            return "bg-emerald-50 text-emerald-700 border-emerald-200";
-        case "quota":
-            return "bg-amber-50 text-amber-700 border-amber-200";
-        case "timeout":
-        case "network":
-            return "bg-orange-50 text-orange-700 border-orange-200";
-        case "auth":
-        case "model":
-        case "error":
-            return "bg-rose-50 text-rose-700 border-rose-200";
-        case "checking":
-            return "bg-sky-50 text-sky-700 border-sky-200";
-        default:
-            return "bg-slate-100 text-slate-600 border-slate-200";
-    }
+  if (model?.family === "pro") return "bg-amber-500/20 text-amber-300 border-amber-500/40";
+  if (model?.family === "experimental") return "bg-rose-500/20 text-rose-300 border-rose-500/40";
+  return "bg-emerald-500/20 text-emerald-300 border-emerald-500/40";
 }
 
 function statusDotClass(state?: string) {
-    switch (state) {
-        case "ok":
-            return "bg-emerald-500";
-        case "quota":
-            return "bg-amber-500";
-        case "timeout":
-        case "network":
-            return "bg-orange-500";
-        case "auth":
-        case "model":
-        case "error":
-            return "bg-rose-500";
-        case "checking":
-            return "bg-sky-500";
-        default:
-            return "bg-slate-400";
-    }
+  switch (state) {
+    case "ok":
+      return "bg-emerald-500";
+    case "quota":
+      return "bg-amber-500";
+    case "timeout":
+    case "network":
+      return "bg-orange-500";
+    case "auth":
+    case "model":
+    case "error":
+      return "bg-rose-500";
+    case "checking":
+      return "bg-sky-500";
+    default:
+      return "bg-emerald-400";
+  }
 }
 
 function statusLabel(state?: string) {
-    switch (state) {
-        case "ok":
-            return "Ready";
-        case "quota":
-            return "Quota";
-        case "timeout":
-            return "Timeout";
-        case "network":
-            return "Network";
-        case "auth":
-            return "Key";
-        case "model":
-            return "Unavailable";
-        case "checking":
-            return "Checking";
-        case "error":
-            return "Issue";
-        default:
-            return "Unknown";
-    }
+  switch (state) {
+    case "ok":
+      return "Ready";
+    case "quota":
+      return "Quota";
+    case "timeout":
+      return "Timeout";
+    case "network":
+      return "Network";
+    case "auth":
+      return "Key";
+    case "model":
+      return "Unavailable";
+    case "checking":
+      return "Checking";
+    case "error":
+      return "Issue";
+    default:
+      return "Active";
+  }
 }
 
 export function ModelSelector({ estimatedInputTokens }: ModelSelectorProps) {
-    const {
-        availableModels,
-        selectedModel,
-        setSelectedModel,
-        isLoadingModels,
-        selectedProvider,
-        setSelectedProvider,
-        geminiStatuses,
-        refreshGeminiStatus,
-    } = useAIConfig();
+  const {
+    availableModels,
+    selectedModel,
+    setSelectedModel,
+    isLoadingModels,
+    geminiStatuses,
+    refreshGeminiStatus,
+  } = useAIConfig();
 
-    const [open, setOpen] = useState(false);
-    const [query, setQuery] = useState("");
-    const [showDetails, setShowDetails] = useState(false);
-    const [now, setNow] = useState(0);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [showDetails, setShowDetails] = useState(false);
+  const [now, setNow] = useState(0);
 
-    useEffect(() => {
-        if (!open) return;
-        const id = window.setInterval(() => setNow(Date.now()), 1000);
-        return () => window.clearInterval(id);
-    }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [open]);
 
-    const currentModel = availableModels.find(model => model.name === selectedModel) || {
-        name: selectedModel,
-        displayName: selectedModel,
-        description: "Previously selected model",
-        family: selectedModel.includes("pro") ? "pro" : "flash",
-        stability: "stable",
-    };
-    const currentStatus = geminiStatuses[selectedModel];
-    const cooldown = currentStatus?.retryAfterSeconds
-        ? Math.max(0, currentStatus.retryAfterSeconds - Math.floor((now - currentStatus.checkedAt) / 1000))
-        : null;
+  const currentModel = availableModels.find(model => model.name === selectedModel) || {
+    name: selectedModel,
+    displayName: selectedModel,
+    description: "Google Gemini Model",
+    family: selectedModel.includes("pro") ? "pro" : "flash",
+    stability: "stable",
+  };
+  const currentStatus = geminiStatuses[selectedModel];
+  const cooldown = currentStatus?.retryAfterSeconds
+    ? Math.max(0, currentStatus.retryAfterSeconds - Math.floor((now - currentStatus.checkedAt) / 1000))
+    : null;
 
-    const geminiModels = availableModels.filter(model => {
-        const haystack = `${model.displayName} ${model.name} ${model.description || ""}`.toLowerCase();
-        return haystack.includes(query.toLowerCase());
-    });
+  const geminiModels = availableModels.filter(model => {
+    const haystack = `${model.displayName} ${model.name} ${model.description || ""}`.toLowerCase();
+    return haystack.includes(query.toLowerCase());
+  });
 
-    const requestSize = estimatedInputTokens ? `~${formatTokenCount(estimatedInputTokens)}` : "Unknown";
+  const requestSize = estimatedInputTokens ? `~${formatTokenCount(estimatedInputTokens)}` : "1Pass Stream";
 
-    const currentModelDisplay = () => {
-        return currentModel.displayName || selectedModel;
-    };
+  const currentModelDisplay = () => {
+    return currentModel.displayName || selectedModel;
+  };
 
-    return (
-        <Popover
-            open={open}
-            onOpenChange={(nextOpen) => {
-                setOpen(nextOpen);
-                if (nextOpen) {
-                    setShowDetails(false);
-                    setNow(Date.now());
-                }
-            }}
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (nextOpen) {
+          setShowDetails(false);
+          setNow(Date.now());
+        }
+      }}
+    >
+      <PopoverTrigger asChild>
+        <button
+          role="combobox"
+          aria-expanded={open}
+          className="skeuo-button-secondary px-3 py-1.5 flex items-center justify-between gap-2 text-xs w-[240px]"
         >
-            <PopoverTrigger asChild>
-                <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className="h-9 w-[280px] justify-between rounded-xl border-slate-200 bg-white/75 text-xs text-slate-700 shadow-sm backdrop-blur-sm hover:bg-white hover:border-slate-300"
+          <div className="flex min-w-0 items-center gap-2">
+            <span className={cn("h-2 w-2 shrink-0 rounded-full shadow-sm", statusDotClass(currentStatus?.state))} />
+            <span className="truncate font-bold">{currentModelDisplay()}</span>
+          </div>
+          <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
+        </button>
+      </PopoverTrigger>
+
+      <PopoverContent
+        align="end"
+        className="flex max-h-[min(76vh,620px)] w-[min(92vw,380px)] flex-col overflow-hidden skeuo-panel p-0 shadow-2xl z-50"
+      >
+        {/* Header Title Bar */}
+        <div className="flex items-center justify-between border-b border-[#d8cfc0] dark:border-[#282e3c] px-4 py-3 bg-[#e6e0d4] dark:bg-[#12151f]">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
+              Google AI Model Engine
+            </span>
+          </div>
+          <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase rounded-full bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30">
+            Free Tier Optimized
+          </span>
+        </div>
+
+        {/* Selected Model Details Plate */}
+        <div className="shrink-0 border-b border-[#d8cfc0] dark:border-[#282e3c] bg-[#ede8de] dark:bg-[#151923] p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Active Model</p>
+              <h3 className="mt-0.5 truncate text-sm font-extrabold text-slate-900 dark:text-slate-100">{currentModelDisplay()}</h3>
+            </div>
+            <span className={cn("shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-extrabold uppercase", familyTone(currentModel))}>
+              {currentModel.family || "flash"}
+            </span>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
+            <div className="skeuo-well px-2 py-1.5 text-center">
+              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400">Health</p>
+              <p className={cn("mt-0.5 font-extrabold", currentStatus?.state === "quota" ? "text-amber-600" : "text-emerald-600 dark:text-emerald-400")}>
+                {statusLabel(currentStatus?.state)}
+              </p>
+            </div>
+            <div className="skeuo-well px-2 py-1.5 text-center">
+              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400">Pipeline</p>
+              <p className="mt-0.5 font-extrabold text-slate-800 dark:text-slate-200">{requestSize}</p>
+            </div>
+            <div className="skeuo-well px-2 py-1.5 text-center">
+              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400">Context</p>
+              <p className="mt-0.5 font-extrabold text-slate-800 dark:text-slate-200">{formatTokenCount(currentModel.inputTokenLimit ?? 1000000)}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Filter Input & Actions */}
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="shrink-0 space-y-2.5 border-b border-[#d8cfc0] dark:border-[#282e3c] p-3">
+            <div className="flex items-center gap-2">
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Filter Gemini models..."
+                className="skeuo-well h-8 min-w-0 flex-1 px-3 text-[11px] font-medium outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => refreshGeminiStatus()}
+                disabled={currentStatus?.state === "checking"}
+                className="skeuo-button-secondary h-8 px-2.5 flex items-center justify-center"
+                title="Refresh Gemini Health"
+              >
+                <RefreshCw className={cn("h-3.5 w-3.5", currentStatus?.state === "checking" && "animate-spin")} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDetails(value => !value)}
+                className="skeuo-button-secondary h-8 px-2.5 flex items-center justify-center"
+                title="Show Quota Details"
+              >
+                <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", showDetails && "rotate-180")} />
+              </button>
+            </div>
+
+            {showDetails && (
+              <div className="skeuo-well p-3 text-[11px] space-y-1">
+                <p className="font-semibold text-slate-800 dark:text-slate-200">Gemini Free Tier Specs:</p>
+                <p className="text-slate-600 dark:text-slate-400">• Max 15 Requests Per Minute (RPM)</p>
+                <p className="text-slate-600 dark:text-slate-400">• 1,000,000 Tokens Limit per Minute</p>
+                <p className="text-slate-600 dark:text-slate-400">• Optimized via 1-Pass Consolidated Tailoring Pipeline</p>
+              </div>
+            )}
+          </div>
+
+          {/* Model Options List */}
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">
+            {isLoadingModels ? (
+              <div className="skeuo-well p-3 text-xs text-center text-slate-500">Loading Gemini catalog...</div>
+            ) : geminiModels.length === 0 ? (
+              <div className="skeuo-well p-3 text-xs text-center text-slate-500">No Gemini models match.</div>
+            ) : geminiModels.map(model => {
+              const isSelected = selectedModel === model.name;
+
+              return (
+                <button
+                  key={model.name}
+                  type="button"
+                  onClick={() => {
+                    setSelectedModel(model.name);
+                    setOpen(false);
+                  }}
+                  className={cn(
+                    "mb-2 flex w-full items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left transition-all border",
+                    isSelected
+                      ? "bg-amber-700 dark:bg-indigo-600 text-white border-amber-800 dark:border-indigo-500 shadow-md"
+                      : "skeuo-button-secondary"
+                  )}
                 >
+                  <Check className={cn("h-4 w-4 shrink-0", isSelected ? "opacity-100" : "opacity-0")} />
+                  <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-2">
-                        <span className={cn("h-2 w-2 shrink-0 rounded-full", selectedProvider === "gemini" ? statusDotClass(currentStatus?.state) : selectedProvider === "local" ? "bg-emerald-500" : "bg-violet-500")} />
-                        <span className="truncate font-medium">{currentModelDisplay()}</span>
+                      <span className="truncate text-xs font-bold">{model.displayName}</span>
+                      <span className={cn(
+                        "shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-extrabold uppercase",
+                        isSelected ? "border-white/30 bg-white/20 text-white" : familyTone(model)
+                      )}>
+                        {model.family || "flash"}
+                      </span>
                     </div>
-                    <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-40" />
-                </Button>
-            </PopoverTrigger>
-
-            <PopoverContent
-                align="end"
-                className="flex max-h-[min(76vh,620px)] w-[min(92vw,380px)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white/95 p-0 shadow-2xl backdrop-blur-xl"
-            >
-                {/* Provider Tab Switcher */}
-                <div className="flex border-b border-slate-100 p-1.5 bg-slate-50/50 shrink-0">
-                    <button
-                        type="button"
-                        onClick={() => setSelectedProvider("gemini")}
-                        className={cn(
-                            "flex-1 py-1 text-center text-[10px] font-bold rounded-lg transition-all border",
-                            selectedProvider === "gemini"
-                                ? "bg-white text-slate-900 shadow-sm border-slate-200/50"
-                                : "border-transparent text-slate-500 hover:text-slate-900"
-                        )}
-                    >
-                        Google Gemini
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setSelectedProvider("github")}
-                        className={cn(
-                            "flex-1 py-1 text-center text-[10px] font-bold rounded-lg transition-all border",
-                            selectedProvider === "github"
-                                ? "bg-white text-slate-900 shadow-sm border-slate-200/50"
-                                : "border-transparent text-slate-500 hover:text-slate-900"
-                        )}
-                    >
-                        GitHub Models
-                    </button>
-                </div>
-
-                <div className="shrink-0 border-b border-slate-100 bg-slate-50/80 p-3">
-                    <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Model</p>
-                            <h3 className="mt-0.5 truncate text-sm font-bold text-slate-900">{currentModelDisplay()}</h3>
-                        </div>
-                        {selectedProvider === "gemini" && (
-                            <span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase", familyTone(currentModel))}>
-                                {currentModel.family || "flash"}
-                            </span>
-                        )}
-                        {selectedProvider === "github" && (
-                            <span className="shrink-0 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-bold uppercase text-violet-700">
-                                {currentModel.name.includes('mini') || currentModel.name.includes('8b') ? 'Low Tier' : 'High Tier'}
-                            </span>
-                        )}
-                    </div>
-
-                    {selectedProvider === "gemini" && (
-                        <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
-                            <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
-                                <p className="text-slate-400">Health</p>
-                                <p className={cn("mt-0.5 font-bold", currentStatus?.state === "quota" ? "text-amber-700" : currentStatus?.state === "ok" ? "text-emerald-700" : "text-slate-700")}>
-                                    {statusLabel(currentStatus?.state)}
-                                </p>
-                            </div>
-                            <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
-                                <p className="text-slate-400">Input</p>
-                                <p className="mt-0.5 font-bold text-slate-700">{requestSize}</p>
-                            </div>
-                            <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
-                                <p className="text-slate-400">Limit</p>
-                                <p className="mt-0.5 font-bold text-slate-700">{formatTokenCount(currentModel.inputTokenLimit ?? null)}</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {selectedProvider === "github" && (
-                        <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
-                            <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
-                                <p className="text-slate-400">RPM Limit</p>
-                                <p className="mt-0.5 font-bold text-violet-700">
-                                    {currentModel.name.includes('mini') || currentModel.name.includes('8b') ? '15 RPM' : '10 RPM'}
-                                </p>
-                            </div>
-                            <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
-                                <p className="text-slate-400">Daily Limit</p>
-                                <p className="mt-0.5 font-bold text-violet-700">
-                                    {currentModel.name.includes('mini') || currentModel.name.includes('8b') ? '150 RPD' : '50 RPD'}
-                                </p>
-                            </div>
-                            <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
-                                <p className="text-slate-400">Tokens Cap</p>
-                                <p className="mt-0.5 font-bold text-slate-700">8k In / 4k Out</p>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                <div className="flex min-h-0 flex-1 flex-col">
-                    <div className="shrink-0 space-y-2 border-b border-slate-100 p-3">
-                        {selectedProvider === "gemini" && (
-                            <div className={cn("rounded-lg border px-3 py-2 text-[11px]", statusTone(currentStatus?.state))}>
-                                <div className="flex items-center justify-between gap-2">
-                                    <div className="flex min-w-0 items-center gap-2">
-                                        {currentStatus?.state === "quota" ? <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> : null}
-                                        <span className="truncate font-bold">{currentStatus?.message || "No recent health check"}</span>
-                                    </div>
-                                    {cooldown && cooldown > 0 ? (
-                                        <span className="inline-flex shrink-0 items-center gap-1 font-bold">
-                                            <Clock3 className="h-3 w-3" />
-                                            {cooldown}s
-                                        </span>
-                                    ) : null}
-                                </div>
-                            </div>
-                        )}
-
-                        {selectedProvider === "github" && (
-                            <div className="rounded-lg border border-violet-100 bg-violet-50/50 px-3 py-2 text-[11px] text-violet-700 shrink-0">
-                                <div className="flex items-center gap-2">
-                                    <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-violet-500 animate-pulse" />
-                                    <span className="font-bold">Rate limit queue active.</span>
-                                </div>
-                                <p className="mt-1 text-[10px] text-violet-600/90 leading-relaxed">
-                                    The application will automatically queue and delay requests to guarantee you never exceed GitHub Free limits.
-                                </p>
-                            </div>
-                        )}
-
-                        <div className="flex items-center gap-2">
-                            <input
-                                value={query}
-                                onChange={(event) => setQuery(event.target.value)}
-                                placeholder="Filter models..."
-                                className="h-8 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-[11px] text-slate-700 outline-none focus:border-slate-400"
-                            />
-                            {selectedProvider === "gemini" && (
-                                <>
-                                    <button
-                                        type="button"
-                                        onClick={() => refreshGeminiStatus()}
-                                        disabled={currentStatus?.state === "checking"}
-                                        className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white px-2.5 text-slate-500 hover:bg-slate-50 disabled:opacity-50"
-                                        title="Refresh Gemini health"
-                                    >
-                                        <RefreshCw className={cn("h-3.5 w-3.5", currentStatus?.state === "checking" && "animate-spin")} />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowDetails(value => !value)}
-                                        className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white px-2.5 text-slate-500 hover:bg-slate-50"
-                                        title="Show quota details"
-                                    >
-                                        <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", showDetails && "rotate-180")} />
-                                    </button>
-                                </>
-                            )}
-                        </div>
-
-                        {selectedProvider === "gemini" && showDetails && (
-                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600">
-                                <p>{currentStatus?.detail || "Gemini does not expose exact remaining quota counts here. This panel shows last-known health and retry hints."}</p>
-                                {currentStatus?.knownRemaining.requestsToday === 0 || currentStatus?.knownRemaining.inputTokensToday === 0 ? (
-                                    <p className="mt-2 font-bold text-amber-700">Known remaining today: 0</p>
-                                ) : null}
-                                {currentStatus?.exhaustedLabels?.length ? (
-                                    <p className="mt-2">Exhausted: {currentStatus.exhaustedLabels.join(", ")}</p>
-                                ) : null}
-                                <p className="mt-2">Output cap: {formatTokenCount(currentModel.outputTokenLimit ?? null)} tokens</p>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="min-h-0 flex-1 overflow-y-auto p-2 custom-scrollbar">
-                        {isLoadingModels ? (
-                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">Loading models...</div>
-                        ) : geminiModels.length === 0 ? (
-                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">No models match.</div>
-                        ) : geminiModels.map(model => {
-                            const modelStatus = geminiStatuses[model.name];
-                            const modelCooldown = modelStatus?.retryAfterSeconds
-                                ? Math.max(0, modelStatus.retryAfterSeconds - Math.floor((now - modelStatus.checkedAt) / 1000))
-                                : null;
-                            const isSelected = selectedModel === model.name;
-
-                            return (
-                                <button
-                                    key={model.name}
-                                    type="button"
-                                    onClick={() => {
-                                        setSelectedProvider(selectedProvider);
-                                        setSelectedModel(model.name);
-                                        setOpen(false);
-                                    }}
-                                    className={cn(
-                                        "mb-1.5 flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all",
-                                        isSelected
-                                            ? "border-slate-900 bg-slate-900 text-white"
-                                            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-                                    )}
-                                >
-                                    <Check className={cn("h-4 w-4 shrink-0", isSelected ? "opacity-100" : "opacity-0")} />
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex min-w-0 items-center gap-2">
-                                            <span className="truncate text-sm font-semibold">{model.displayName}</span>
-                                            <span className={cn(
-                                                "shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold uppercase", 
-                                                isSelected 
-                                                    ? "border-white/20 bg-white/10 text-white" 
-                                                    : selectedProvider === "github" 
-                                                        ? "border-violet-200 bg-violet-50 text-violet-700" 
-                                                        : familyTone(model)
-                                            )}>
-                                                {selectedProvider === "github" 
-                                                    ? (model.name.includes('mini') || model.name.includes('8b') ? 'Low Tier' : 'High Tier') 
-                                                    : (model.family || "flash")}
-                                            </span>
-                                        </div>
-                                        <p className={cn("truncate text-[11px]", isSelected ? "text-slate-300" : "text-slate-500")}>
-                                            {model.bestFor || model.name}
-                                        </p>
-                                    </div>
-                                    {selectedProvider === "gemini" && modelStatus?.state && modelStatus.state !== "idle" ? (
-                                        <span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase", isSelected ? "border-white/20 bg-white/10 text-white" : statusTone(modelStatus.state))}>
-                                            {modelCooldown && modelCooldown > 0 ? `${modelCooldown}s` : statusLabel(modelStatus.state)}
-                                        </span>
-                                    ) : null}
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-            </PopoverContent>
-        </Popover>
-    );
+                    <p className={cn("truncate text-[11px]", isSelected ? "text-amber-100 dark:text-indigo-100" : "text-slate-600 dark:text-slate-400")}>
+                      {model.bestFor || model.name}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }

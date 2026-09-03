@@ -837,8 +837,8 @@ function ContactRow({ raw, styles }: { raw: string; styles: any }) {
                     );
                 }
 
-                // Bare domain URL
-                if (DOMAIN_RE.test(trimmed) || trimmed.includes('.com/') || trimmed.includes('.io/')) {
+                // Bare domain URL (must contain a dot like linkedin.com or github.com)
+                if ((DOMAIN_RE.test(trimmed) && (trimmed.includes('.') || trimmed.includes('/'))) || trimmed.includes('.com/') || trimmed.includes('.io/')) {
                     const href = `https://${trimmed}`;
                     const domainLabel = trimmed.split('/')[0].replace(/^www\./i, '');
                     const prettyLabel = domainLabel.charAt(0).toUpperCase() + domainLabel.slice(1).split('.')[0];
@@ -892,8 +892,12 @@ function Body({ lines, sectionName, styles }: { lines: string[]; sectionName?: s
 
                 if (isCertSec) {
                     const certName = stripped[0];
-                    const issuer = stripped[1];
+                    let issuer = stripped[1] || '';
                     const date = stripped[2];
+
+                    if (issuer && (certName.toLowerCase().includes(issuer.toLowerCase()) || issuer.toLowerCase().includes(certName.toLowerCase()))) {
+                        issuer = '';
+                    }
 
                     els.push(
                         <View key={i} style={styles.bulletRow}>
@@ -975,9 +979,18 @@ function Body({ lines, sectionName, styles }: { lines: string[]; sectionName?: s
             }
         }
 
-        // Client label
-        if (/^\*\*Client:/i.test(line)) {
-            els.push(<Text key={i} style={styles.clientLabel}>{'Client: ' + line.replace(/^\*\*Client:\*\*/i, '').trim()}</Text>);
+        // Client label handler
+        if (/^\*\*Client:/i.test(line) || /^Client:/i.test(line)) {
+            let clientName = line
+                .replace(/^Client:\s*/i, '')
+                .replace(/^\*\*Client:\*\*\s*/i, '')
+                .replace(/^Client:\s*/i, '')
+                .replace(/\*\*/g, '')
+                .trim();
+            if (clientName.startsWith('Client:')) {
+                clientName = clientName.replace(/^Client:\s*/i, '').trim();
+            }
+            els.push(<Text key={i} style={styles.clientLabel}>{'Client: ' + clientName}</Text>);
             i++; continue;
         }
 

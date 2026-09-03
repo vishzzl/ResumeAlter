@@ -610,8 +610,6 @@ function buildSection(sec: Sec, t: TemplateTokens): any[] {
                                         ],
                                         spacing: { after: 60 },
                                     })
-                                );
-                            } else {
                                 els.push(
                                     new Paragraph({
                                         children: [
@@ -628,8 +626,6 @@ function buildSection(sec: Sec, t: TemplateTokens): any[] {
                                 );
                             }
                         }
-                    }
-                }
                 
                 i++;
                 continue;
@@ -637,8 +633,15 @@ function buildSection(sec: Sec, t: TemplateTokens): any[] {
         }
         
         // C. Client Label
-        if (/^\*\*Client:/i.test(line)) {
-            const clientVal = line.replace(/^\*\*Client:\*\*/i, '').trim();
+        if (/^\*\*Client:/i.test(line) || /^Client:/i.test(line)) {
+            let clientVal = line
+                .replace(/^Client:\s*/i, '')
+                .replace(/^\*\*Client:\*\*\s*/i, '')
+                .replace(/\*\*/g, '')
+                .trim();
+            if (clientVal.startsWith('Client:')) {
+                clientVal = clientVal.replace(/^Client:\s*/i, '').trim();
+            }
             els.push(
                 new Paragraph({
                     children: [

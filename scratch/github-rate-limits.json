@@ -1,14 +1,13 @@
 {
   "high": {
-    "date": "2026-06-03",
-    "dailyCount": 11,
+    "date": "2026-09-03",
+    "dailyCount": 2,
     "timestamps": [
-      1780473786633,
-      1780473823017
+      1788416329294
     ]
   },
   "low": {
-    "date": "2026-06-03",
+    "date": "2026-09-03",
     "dailyCount": 0,
     "timestamps": []
   }
